@@ -2,6 +2,14 @@ apply plugin: "com.android.application"
 apply plugin: "org.jetbrains.kotlin.android"
 apply plugin: "com.facebook.react"
 
+def enableHermes = true
+
+// SOLUTION: Make hermesEnabled accessible to other modules like react-native-reanimated
+project.ext.react = [
+    enableHermes: enableHermes,
+    hermesEnabled: enableHermes  // Add this line to fix the error
+]
+
 /**
  * This is the configuration block to customize your React Native Android app.
  * By default you don't need to apply any configuration, just uncomment the lines you need.
@@ -27,13 +35,7 @@ def enableProguardInReleaseBuilds = true
  * this variant is about 6MiB larger per architecture than default.
  */
 def jscFlavor = 'org.webkit:android-jsc:+'
-def enableHermes = true
 
-// SOLUTION: Make hermesEnabled accessible to other modules like react-native-reanimated
-project.ext.react = [
-    enableHermes: enableHermes,
-    hermesEnabled: enableHermes  // Add this line to fix the error
-]
 
 android {
     namespace "com.vartmannew"
@@ -61,14 +63,14 @@ android {
             keyAlias 'androiddebugkey'
             keyPassword 'android'
         }
-        release {
-            if (project.hasProperty('MYAPP_UPLOAD_STORE_FILE')) {
-                storeFile file(MYAPP_UPLOAD_STORE_FILE)
-                storePassword MYAPP_UPLOAD_STORE_PASSWORD
-                keyAlias MYAPP_UPLOAD_KEY_ALIAS
-                keyPassword MYAPP_UPLOAD_KEY_PASSWORD
-            }
-        }
+          release {
+    if (project.hasProperty('MYAPP_UPLOAD_STORE_FILE')) {
+      storeFile file(MYAPP_UPLOAD_STORE_FILE)
+      storePassword System.getenv("KEY_STORE_PASSWORD")      
+      keyAlias System.getenv("ALIAS")                        
+      keyPassword System.getenv("KEY_PASSWORD")             
+    }
+  }
     }
 
     buildTypes {
