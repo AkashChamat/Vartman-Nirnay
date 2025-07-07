@@ -1,109 +1,93 @@
 apply plugin: "com.android.application"
+apply plugin: "org.jetbrains.kotlin.android"
 apply plugin: "com.facebook.react"
 
 /**
  * This is the configuration block to customize your React Native Android app.
+ * By default you don't need to apply any configuration, just uncomment the lines you need.
  */
 react {
-    /* Default configuration - most settings commented out to avoid issues */
+    // React Native bundling options (optional and usually left as default)
 }
-
-/**
- * Set this to true to create four separate APKs instead of one,
- * one for each native architecture. This is useful if you don't
- * use App Bundle (and the Google Play Store) and want to upload
- * multiple APKs to another store.
- */
-def enableSeparateBuildPerCPUArchitecture = false
 
 /**
  * Set this to true to Run Proguard on Release builds to minify the Java bytecode.
  */
-def enableProguardInReleaseBuilds = false
+def enableProguardInReleaseBuilds = true
 
 /**
  * The preferred build flavor of JavaScriptCore (JSC)
+ *
+ * For example, to use the international variant, you can use:
+ * `def jscFlavor = 'org.webkit:android-jsc-intl:+'`
+ *
+ * The international variant includes ICU i18n library and necessary data
+ * allowing to use e.g. `Date.toLocaleString` and `String.localeCompare` that
+ * give correct results when using with locales other than en-US. Note that
+ * this variant is about 6MiB larger per architecture than default.
  */
 def jscFlavor = 'org.webkit:android-jsc:+'
-
-/**
- * Hermes configuration - moved outside dependencies block
- */
-def enableHermes = project.ext.react.get("enableHermes", false)
-
+def enableHermes = true 
 android {
     ndkVersion rootProject.ext.ndkVersion
-    compileSdkVersion rootProject.ext.compileSdkVersion
-    
-    namespace "com.vartmannew"
-    
+    buildToolsVersion rootProject.ext.buildToolsVersion
+    compileSdk rootProject.ext.compileSdkVersion
+
+    namespace "com.vartman"
     defaultConfig {
-        applicationId "com.vartmannew"
+        applicationId "com.vartman"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
-        versionName "1.0"
-        multiDexEnabled true
+        versionCode 3
+        versionName "1.0.2"
+
+          ndk {
+            abiFilters "armeabi-v7a", "arm64-v8a", "x86", "x86_64"
+        }
     }
-    
-    buildTypes {
+
+    signingConfigs {
         debug {
-            debuggable true
+            storeFile file('debug.keystore')
+            storePassword 'android'
+            keyAlias 'androiddebugkey'
+            keyPassword 'android'
         }
         release {
+            if (project.hasProperty('MYAPP_UPLOAD_STORE_FILE')) {
+                storeFile file(MYAPP_UPLOAD_STORE_FILE)
+                storePassword MYAPP_UPLOAD_STORE_PASSWORD
+                keyAlias MYAPP_UPLOAD_KEY_ALIAS
+                keyPassword MYAPP_UPLOAD_KEY_PASSWORD
+            }
+        }
+    }
+
+    buildTypes {
+        debug {
+            signingConfig signingConfigs.debug
+        }
+        release {
+            signingConfig signingConfigs.release
             minifyEnabled enableProguardInReleaseBuilds
+            shrinkResources false
             proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"
         }
-    }
-    
-    // Updated packaging options - this was likely causing the read-only collection error
-    packagingOptions {
-        pickFirst '**/libc++_shared.so'
-        pickFirst '**/libjsc.so'
-        pickFirst '**/libjscexecutor.so'
-        // More specific exclusions to avoid conflicts
-        exclude 'META-INF/DEPENDENCIES'
-        exclude 'META-INF/LICENSE'
-        exclude 'META-INF/LICENSE.txt'
-        exclude 'META-INF/NOTICE'
-        exclude 'META-INF/NOTICE.txt'
-    }
-    
-    // Add splits configuration for better APK management
-    splits {
-        abi {
-            reset()
-            enable enableSeparateBuildPerCPUArchitecture
-            universalApk false  // If true, also generate a universal APK
-            include "armeabi-v7a", "x86", "arm64-v8a", "x86_64"
-        }
-    }
-    
-    // Add compile options for better compatibility
-    compileOptions {
-        sourceCompatibility JavaVersion.VERSION_1_8
-        targetCompatibility JavaVersion.VERSION_1_8
     }
 }
 
 dependencies {
-    implementation fileTree(dir: "libs", include: ["*.jar"])
-    implementation "com.facebook.react:react-native:+"
-    implementation "androidx.swiperefreshlayout:swiperefreshlayout:1.0.0"
-    
-    // Add multidex support
-    implementation 'androidx.multidex:multidex:2.0.1'
-    
-    // Hermes or JSC engine
-    if (enableHermes) {
-        implementation("com.facebook.react:hermes-engine:+") {
-            exclude group:'com.facebook.fbjni'
-        }
+    implementation("com.facebook.react:react-android")
+    implementation("com.facebook.react:flipper-integration")
+
+    if (enableHermes.toBoolean()) {
+        implementation("com.facebook.react:hermes-android")
     } else {
         implementation jscFlavor
     }
 }
 
-// Apply native modules - make sure this line is at the end
-apply from: file("../../node_modules/@react-native-community/cli-platform-android/native_modules.gradle")
+apply from: file("../../node_modules/@react-native-community/cli-platform-android/native_modules.gradle");
 applyNativeModulesAppBuildGradle(project)
+
+apply from: "../../node_modules/react-native-vector-icons/fonts.gradle"
