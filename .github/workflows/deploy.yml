@@ -130,7 +130,7 @@ jobs:
         echo "📦 AAB size: $(du -h android/app/build/outputs/bundle/release/app-release.aab | cut -f1)"
         
     - name: Upload AAB as artifact
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: app-release-aab
         path: android/app/build/outputs/bundle/release/app-release.aab
