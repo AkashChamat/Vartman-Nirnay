@@ -1,0 +1,9 @@
+# app_identifier is used to identify the app in various App Store Connect and Play Store operations
+# For Android, this is the package name
+app_identifier(ENV['PACKAGE_NAME'] || "com.vartmannew")
+
+# json_key_file is the path to the JSON key file for Google Play Store authentication
+json_key_file(ENV['PLAY_STORE_JSON_KEY_FILE'] || "play-store-key.json")
+
+# For more information about Appfile options, see:
+# https://docs.fastlane.tools/advanced/#appfile
