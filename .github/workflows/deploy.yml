@@ -55,6 +55,9 @@ jobs:
         
     - name: Setup Android SDK
       uses: android-actions/setup-android@v3
+
+    - name: Install Android SDK 35
+      run: sdkmanager "platforms;android-35"
       
     - name: Cache Gradle dependencies
       uses: actions/cache@v3
@@ -118,7 +121,7 @@ jobs:
       run: |
         cd android/fastlane
         echo '${{ secrets.PLAY_STORE_JSON_KEY }}' > /tmp/play-store-key.json
-        bundle exec fastlane internal
+        bundle exec fastlane internal --verbose
       env:
         PLAY_STORE_JSON_KEY_FILE: /tmp/play-store-key.json
         PACKAGE_NAME: com.vartmannew
