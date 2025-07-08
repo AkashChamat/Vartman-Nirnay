@@ -54,8 +54,8 @@ android {
             keyPassword 'android'
         }
         release {
-            if (project.hasProperty('MYAPP_UPLOAD_STORE_FILE')) {
-                storeFile file(MYAPP_UPLOAD_STORE_FILE)
+            if (System.getenv("MYAPP_UPLOAD_STORE_FILE")) {
+                storeFile file(System.getenv("MYAPP_UPLOAD_STORE_FILE"))
                 storePassword System.getenv("KEY_STORE_PASSWORD")      
                 keyAlias System.getenv("ALIAS")                        
                 keyPassword System.getenv("KEY_PASSWORD")             
@@ -97,6 +97,7 @@ dependencies {
     }
 }
 
-apply from: file("../../node_modules/@react-native-community/cli-platform-android/native_modules.gradle"); applyNativeModulesAppBuildGradle(project)
+apply from: file("../../node_modules/@react-native-community/cli-platform-android/native_modules.gradle"); 
+applyNativeModulesAppBuildGradle(project)
 
 apply from: "../../node_modules/react-native-vector-icons/fonts.gradle"
