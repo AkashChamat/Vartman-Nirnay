@@ -54,12 +54,12 @@ android {
             keyPassword 'android'
         }
         release {
-            if (System.getenv("MYAPP_UPLOAD_STORE_FILE")) {
-                storeFile file(System.getenv("MYAPP_UPLOAD_STORE_FILE"))
+       
+                storeFile file("upload-keystore.jks")
                 storePassword System.getenv("KEY_STORE_PASSWORD")      
                 keyAlias System.getenv("ALIAS")                        
                 keyPassword System.getenv("KEY_PASSWORD")             
-            }
+            
         }
     }
 
