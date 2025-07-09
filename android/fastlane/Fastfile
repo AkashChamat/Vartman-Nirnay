@@ -12,10 +12,6 @@
 
 default_platform(:android)
 
-# Global configuration
-json_key_file(ENV['PLAY_STORE_JSON_KEY_FILE'] || "play-store-key.json")
-package_name(ENV['PACKAGE_NAME'] || "com.vartmannew")
-
 platform :android do
   before_all do
     # Ensure the AAB file exists before any lane runs
