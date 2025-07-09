@@ -1,31 +1,18 @@
-# This file contains the fastlane.tools configuration
-# You can find the documentation at https://docs.fastlane.tools
-#
-# For a list of all available actions, check out
-#     https://docs.fastlane.tools/actions
-#
-# For a list of all available plugins, check out
-#     https://docs.fastlane.tools/plugins/available-plugins
-
-# Uncomment the line if you want fastlane to automatically update itself
-# update_fastlane
-
 default_platform(:android)
 
 platform :android do
   before_all do
-    # Ensure the AAB file exists before any lane runs
-    aab_path = File.expand_path("..app/build/outputs/bundle/release/app-release.aab", __dir__)
-    
+    # Ensure the AAB file exists
+    aab_path = File.expand_path("../app/build/outputs/bundle/release/app-release.aab", __dir__)
     unless File.exist?(aab_path)
-      UI.user_error!("AAB file not found at #{aab_path}. Please build the project first.")
+      UI.user_error!("❌ AAB file not found at #{aab_path}. Please build the project first.")
     end
     ENV['AAB_PATH'] = aab_path
-    
-    # Validate Play Store credentials
+
+    # Ensure Play Store key file exists
     json_key_path = ENV['PLAY_STORE_JSON_KEY_FILE'] || File.expand_path("play-store-key.json", __dir__)
     unless File.exist?(json_key_path)
-      UI.user_error!("Play Store JSON key file not found at #{json_key_path}")
+      UI.user_error!("❌ Play Store JSON key not found at #{json_key_path}")
     end
     ENV['JSON_KEY_PATH'] = json_key_path
 
@@ -34,8 +21,8 @@ platform :android do
 
   desc "Deploy to Play Store Internal Testing"
   lane :internal do
-    UI.message("🚀 Starting deployment to Internal Testing...")
-    
+    UI.message("🚀 Deploying to Internal Testing...")
+
     upload_to_play_store(
       track: 'internal',
       json_key: ENV['JSON_KEY_PATH'],
@@ -48,14 +35,14 @@ platform :android do
       release_status: 'completed',
       timeout: 300
     )
-    
+
     UI.success("🎉 Successfully deployed to Internal Testing!")
   end
 
   desc "Deploy to Play Store Alpha Testing"
   lane :alpha do
-    UI.message("🚀 Starting deployment to Alpha Testing...")
-    
+    UI.message("🚀 Deploying to Alpha Testing...")
+
     upload_to_play_store(
       track: 'alpha',
       json_key: ENV['JSON_KEY_PATH'],
@@ -68,18 +55,18 @@ platform :android do
       release_status: 'completed',
       timeout: 300
     )
-    
+
     UI.success("🎉 Successfully deployed to Alpha Testing!")
   end
 
   desc "Deploy to Play Store Beta Testing"
   lane :beta do
-    UI.message("🚀 Starting deployment to Beta Testing...")
-    
+    UI.message("🚀 Deploying to Beta Testing...")
+
     upload_to_play_store(
       track: 'beta',
-      json_key: ENV['PLAY_STORE_JSON_KEY_FILE'] || 'play-store-key.json',
-      aab: '../app/build/outputs/bundle/release/app-release.aab',
+      json_key: ENV['JSON_KEY_PATH'],
+      aab: ENV['AAB_PATH'],
       package_name: ENV['PACKAGE_NAME'] || 'com.vartmannew',
       skip_upload_apk: true,
       skip_upload_metadata: true,
@@ -88,21 +75,19 @@ platform :android do
       release_status: 'completed',
       timeout: 300
     )
-    
+
     UI.success("🎉 Successfully deployed to Beta Testing!")
   end
 
   desc "Deploy to Play Store Production"
   lane :production do
-    UI.message("🚀 Starting deployment to Production...")
-    
-    # Add confirmation for production deployment
-    UI.confirm("Are you sure you want to deploy to Production?")
-    
+    UI.message("🚀 Deploying to Production...")
+    UI.confirm("⚠️ Are you sure you want to deploy to Production?")
+
     upload_to_play_store(
       track: 'production',
-      json_key: ENV['PLAY_STORE_JSON_KEY_FILE'] || 'play-store-key.json',
-      aab: '../app/build/outputs/bundle/release/app-release.aab',
+      json_key: ENV['JSON_KEY_PATH'],
+      aab: ENV['AAB_PATH'],
       package_name: ENV['PACKAGE_NAME'] || 'com.vartmannew',
       skip_upload_apk: true,
       skip_upload_metadata: true,
@@ -111,18 +96,18 @@ platform :android do
       release_status: 'completed',
       timeout: 300
     )
-    
+
     UI.success("🎉 Successfully deployed to Production!")
   end
 
-  desc "Promote from internal to alpha"
+  desc "Promote from Internal to Alpha"
   lane :promote_internal_to_alpha do
-    UI.message("🔄 Promoting from Internal to Alpha Testing...")
-    
+    UI.message("🔄 Promoting from Internal to Alpha...")
+
     upload_to_play_store(
       track: 'internal',
       track_promote_to: 'alpha',
-      json_key: ENV['PLAY_STORE_JSON_KEY_FILE'] || 'play-store-key.json',
+      json_key: ENV['JSON_KEY_PATH'],
       package_name: ENV['PACKAGE_NAME'] || 'com.vartmannew',
       skip_upload_apk: true,
       skip_upload_aab: true,
@@ -131,18 +116,18 @@ platform :android do
       skip_upload_screenshots: true,
       timeout: 300
     )
-    
-    UI.success("🎉 Successfully promoted from Internal to Alpha!")
+
+    UI.success("🎉 Successfully promoted to Alpha!")
   end
 
-  desc "Promote from alpha to beta"
+  desc "Promote from Alpha to Beta"
   lane :promote_alpha_to_beta do
-    UI.message("🔄 Promoting from Alpha to Beta Testing...")
-    
+    UI.message("🔄 Promoting from Alpha to Beta...")
+
     upload_to_play_store(
       track: 'alpha',
       track_promote_to: 'beta',
-      json_key: ENV['PLAY_STORE_JSON_KEY_FILE'] || 'play-store-key.json',
+      json_key: ENV['JSON_KEY_PATH'],
       package_name: ENV['PACKAGE_NAME'] || 'com.vartmannew',
       skip_upload_apk: true,
       skip_upload_aab: true,
@@ -151,21 +136,19 @@ platform :android do
       skip_upload_screenshots: true,
       timeout: 300
     )
-    
-    UI.success("🎉 Successfully promoted from Alpha to Beta!")
+
+    UI.success("🎉 Successfully promoted to Beta!")
   end
 
-  desc "Promote from beta to production"
+  desc "Promote from Beta to Production"
   lane :promote_beta_to_production do
     UI.message("🔄 Promoting from Beta to Production...")
-    
-    # Add confirmation for production promotion
-    UI.confirm("Are you sure you want to promote to Production?")
-    
+    UI.confirm("⚠️ Are you sure you want to promote to Production?")
+
     upload_to_play_store(
       track: 'beta',
       track_promote_to: 'production',
-      json_key: ENV['PLAY_STORE_JSON_KEY_FILE'] || 'play-store-key.json',
+      json_key: ENV['JSON_KEY_PATH'],
       package_name: ENV['PACKAGE_NAME'] || 'com.vartmannew',
       skip_upload_apk: true,
       skip_upload_aab: true,
@@ -174,42 +157,37 @@ platform :android do
       skip_upload_screenshots: true,
       timeout: 300
     )
-    
-    UI.success("🎉 Successfully promoted from Beta to Production!")
+
+    UI.success("🎉 Successfully promoted to Production!")
   end
 
   desc "Get app info from Play Store"
   lane :app_info do
-    UI.message("📱 Getting app information from Play Store...")
-    
+    UI.message("📱 Fetching app info from Play Store...")
+
     version_info = google_play_track_version_codes(
-      json_key: ENV['PLAY_STORE_JSON_KEY_FILE'] || 'play-store-key.json',
+      json_key: ENV['JSON_KEY_PATH'],
       package_name: ENV['PACKAGE_NAME'] || 'com.vartmannew'
     )
-    
+
     UI.message("Current version codes:")
     version_info.each do |track, versions|
       UI.message("#{track}: #{versions}")
     end
   end
 
+  desc "Increment version code"
+  lane :increment_version do
+    increment_version_code(
+      gradle_file_path: "../app/build.gradle"
+    )
+  end
+
   after_all do |lane|
-    # This block is called only if the executed lane was successful
     UI.success("✅ Lane #{lane} completed successfully!")
   end
 
   error do |lane, exception|
-    # This block is called only if the executed lane failed
     UI.error("❌ Lane #{lane} failed with error: #{exception.message}")
-    
-    # You can add notifications here (Slack, email, etc.)
   end
-
-  desc "Increment version code"
-lane :increment_version do
-  increment_version_code(
-    gradle_file_path: "../app/build.gradle"
-  )
 end
-end
-
