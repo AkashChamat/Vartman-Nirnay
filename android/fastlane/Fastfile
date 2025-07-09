@@ -15,7 +15,7 @@ default_platform(:android)
 platform :android do
   before_all do
     # Ensure the AAB file exists before any lane runs
-    aab_path = File.expand_path("../build/outputs/bundle/release/app-release.aab", __dir__)
+    aab_path = File.expand_path("..app/build/outputs/bundle/release/app-release.aab", __dir__)
     
     unless File.exist?(aab_path)
       UI.user_error!("AAB file not found at #{aab_path}. Please build the project first.")
