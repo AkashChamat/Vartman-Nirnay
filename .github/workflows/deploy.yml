@@ -119,12 +119,17 @@ jobs:
     - name: Deploy to Play Store (Internal Testing)
       if: github.ref == 'refs/heads/main' && github.event_name == 'push'
       run: |
-        cd android/fastlane
-        echo '${{ secrets.PLAY_STORE_JSON_KEY }}' > /tmp/play-store-key.json
-        bundle exec fastlane internal --verbose
+       cd android/fastlane
+       echo '${{ secrets.PLAY_STORE_JSON_KEY }}' > /tmp/play-store-key.json
+       AAB_PATH=$(realpath ../app/build/outputs/bundle/release/app-release.aab)
+       export AAB_PATH
+       export JSON_KEY_PATH=/tmp/play-store-key.json
+       export PACKAGE_NAME=com.vartmannew
+       bundle exec fastlane internal --verbose
       env:
-        PLAY_STORE_JSON_KEY_FILE: /tmp/play-store-key.json
-        PACKAGE_NAME: com.vartmannew
+       JSON_KEY_PATH: /tmp/play-store-key.json
+       PACKAGE_NAME: com.vartmannew
+
         
     - name: Build only (for PRs)
       if: github.event_name == 'pull_request'
