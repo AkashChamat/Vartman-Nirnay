@@ -10,7 +10,7 @@ platform :android do
     ENV['AAB_PATH'] = aab_path
 
     # Ensure Play Store key file exists
-    json_key_path = ENV['PLAY_STORE_JSON_KEY_FILE'] || File.expand_path("play-store-key.json", __dir__)
+    json_key_path = ENV['JSON_KEY_PATH'] || File.expand_path("play-store-key.json", __dir__)
     unless File.exist?(json_key_path)
       UI.user_error!("❌ Play Store JSON key not found at #{json_key_path}")
     end
