@@ -15,17 +15,20 @@ default_platform(:android)
 platform :android do
   before_all do
     # Ensure the AAB file exists before any lane runs
-    aab_path = "../app/build/outputs/bundle/release/app-release.aab"
+    aab_path = File.expand_path("../build/outputs/bundle/release/app-release.aab", __dir__)
+    
     unless File.exist?(aab_path)
       UI.user_error!("AAB file not found at #{aab_path}. Please build the project first.")
     end
+    ENV['AAB_PATH'] = aab_path
     
     # Validate Play Store credentials
-    json_key_path = ENV['PLAY_STORE_JSON_KEY_FILE'] || "play-store-key.json"
+    json_key_path = ENV['PLAY_STORE_JSON_KEY_FILE'] || File.expand_path("play-store-key.json", __dir__)
     unless File.exist?(json_key_path)
       UI.user_error!("Play Store JSON key file not found at #{json_key_path}")
     end
-    
+    ENV['JSON_KEY_PATH'] = json_key_path
+
     UI.success("✅ Pre-flight checks passed")
   end
 
@@ -35,8 +38,8 @@ platform :android do
     
     upload_to_play_store(
       track: 'internal',
-      json_key: ENV['PLAY_STORE_JSON_KEY_FILE'] || 'play-store-key.json',
-      aab: '../app/build/outputs/bundle/release/app-release.aab',
+      json_key: ENV['JSON_KEY_PATH'],
+      aab: ENV['AAB_PATH'],
       package_name: ENV['PACKAGE_NAME'] || 'com.vartmannew',
       skip_upload_apk: true,
       skip_upload_metadata: true,
@@ -55,8 +58,8 @@ platform :android do
     
     upload_to_play_store(
       track: 'alpha',
-      json_key: ENV['PLAY_STORE_JSON_KEY_FILE'] || 'play-store-key.json',
-      aab: '../app/build/outputs/bundle/release/app-release.aab',
+      json_key: ENV['JSON_KEY_PATH'],
+      aab: ENV['AAB_PATH'],
       package_name: ENV['PACKAGE_NAME'] || 'com.vartmannew',
       skip_upload_apk: true,
       skip_upload_metadata: true,
