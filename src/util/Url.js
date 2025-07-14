@@ -38,5 +38,13 @@ export const paymentUrl = `${baseUrl}/createPaymentcashfree`;
 export const materialtypeUrl = `${baseUrl}/AllVMMaterialTypes`;
 export const testseriesUrl = `${baseUrl}/AllTestSeries`;
 export const paperbyseriesUrl = `${baseUrl}/TestPapersByTestSeries`;
+export const vtcategoriesUrl = `${baseUrl}/AllVTCategories`;
+export const ebookordersUrl = `${baseUrl}/user`;
+export const testseriesordersUrl = `${baseUrl}/testseries/user`;
+export const testseriesPaymentUrl = `${baseUrl}/createTestSeriesPayment`;
+
+
+
+
 
 

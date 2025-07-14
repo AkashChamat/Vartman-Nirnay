@@ -38,6 +38,7 @@ import AllResult from '../screens/AllResult';
 import PaymentScreen from '../screens/PaymentScreen';
 import PaymentSuccess from '../screens/PaymentSuccess';
 import TestPaper from '../screens/TestSeries/TestPaper';
+import SeriesPayment from '../screens/TestSeries/SeriesPayment';
 
 const Stack = createStackNavigator();
 
@@ -95,6 +96,7 @@ const AuthNavigator = () => {
             <Stack.Screen name="PaymentScreen" component={PaymentScreen} />
             <Stack.Screen name="PaymentSuccess" component={PaymentSuccess} />
             <Stack.Screen name="TestPaper" component={TestPaper} />
+            <Stack.Screen name="SeriesPayment" component={SeriesPayment} />
 
 
           </>

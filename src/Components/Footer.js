@@ -70,7 +70,7 @@ const Footer = () => {
           </View>
         </TouchableOpacity>
 
-        {/* <TouchableOpacity
+        <TouchableOpacity
           style={styles.tabButton}
           onPress={navigateToMyPurchase}
           activeOpacity={0.7}>
@@ -78,7 +78,7 @@ const Footer = () => {
             <Ionicons name="cart-outline" size={24} color="#FFFFFF" />
             <Text style={styles.buttonText}>My Purchase</Text>
           </View>
-        </TouchableOpacity> */}
+        </TouchableOpacity>
 
       
       </LinearGradient>

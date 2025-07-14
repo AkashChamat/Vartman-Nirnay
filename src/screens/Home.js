@@ -94,13 +94,13 @@ const Home = () => {
       screen: 'EPaper',
       color: '#FBE9E7',
     },
-    // {
-    //   id: '2',
-    //   title: 'Ebook',
-    //   image: require('../assets/ebook.png'),
-    //   screen: 'Ebook',
-    //   color: '#E0F7FA',
-    // },
+    {
+      id: '2',
+      title: 'Ebook',
+      image: require('../assets/ebook.png'),
+      screen: 'Ebook',
+      color: '#E0F7FA',
+    },
     {
       id: '3',
       title: 'Test Series',

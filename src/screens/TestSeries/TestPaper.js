@@ -1,16 +1,17 @@
-import React, { useState, useEffect } from 'react';
-import { 
-  View, 
-  Text, 
-  FlatList, 
-  TouchableOpacity, 
+import React, {useState, useEffect} from 'react';
+import {
+  View,
+  Text,
+  FlatList,
+  TouchableOpacity,
   StyleSheet,
-  Dimensions
+  Dimensions,
 } from 'react-native';
-import { useRoute, useNavigation } from '@react-navigation/native';
+import {useRoute, useNavigation} from '@react-navigation/native';
 import Header from '../../Components/Header';
 import Footer from '../../Components/Footer';
-const { width } = Dimensions.get('window');
+
+const {width} = Dimensions.get('window');
 
 const TestPaper = () => {
   const route = useRoute();
@@ -20,11 +21,17 @@ const TestPaper = () => {
   const [totalPages, setTotalPages] = useState(1);
   const itemsPerPage = 10;
 
-  const { seriesId, seriesData } = route.params;
-  
+  const {seriesId, seriesData} = route.params;
+  console.log('📘 seriesData:', seriesData);
+
+  const isPaid = seriesData?.pricing > 0 || seriesData?.mrp > 0;
+  console.log('💰 isPaid:', isPaid);
+
   useEffect(() => {
     if (seriesData && seriesData.testPapers) {
-      const activePapers = seriesData.testPapers.filter(paper => paper.status === true);
+      const activePapers = seriesData.testPapers.filter(
+        paper => paper.status === true,
+      );
       setPapers(activePapers);
       setTotalPages(Math.ceil(activePapers.length / itemsPerPage));
     }
@@ -36,7 +43,7 @@ const TestPaper = () => {
     return papers.slice(startIndex, endIndex);
   };
 
-  const handleStartTest = (paper) => {
+  const handleStartTest = paper => {
     if (!paper.status) {
       alert('This test is currently not active.');
       return;
@@ -44,35 +51,48 @@ const TestPaper = () => {
     alert(`Starting test: ${paper.testTitle}`);
   };
 
-  const formatDate = (dateString) => {
+  const formatDate = dateString => {
     const date = new Date(dateString);
     return date.toLocaleDateString('en-US', {
       month: 'short',
-      day: 'numeric'
+      day: 'numeric',
     });
   };
 
-  const formatTime = (timeString) => {
+  const formatTime = timeString => {
     const [hours, minutes] = timeString.split(':');
     const date = new Date();
     date.setHours(parseInt(hours), parseInt(minutes));
     return date.toLocaleTimeString('en-US', {
       hour: 'numeric',
       minute: '2-digit',
-      hour12: true
+      hour12: true,
     });
   };
 
-  const renderPaper = ({ item, index }) => (
-    <View style={[styles.paperCard, { backgroundColor: index % 2 === 0 ? '#ffffff' : '#fafbfc' }]}>
+  const renderPaper = ({item, index}) => (
+    <View
+      style={[
+        styles.paperCard,
+        {backgroundColor: index % 2 === 0 ? '#ffffff' : '#fafbfc'},
+      ]}>
       <View style={styles.cardHeader}>
         <View style={styles.titleContainer}>
           <Text style={styles.paperTitle} numberOfLines={1}>
             {item.testTitle}
           </Text>
           <View style={styles.statusContainer}>
-            <View style={[styles.statusDot, { backgroundColor: item.status ? '#10b981' : '#ef4444' }]} />
-            <Text style={[styles.statusText, { color: item.status ? '#10b981' : '#ef4444' }]}>
+            <View
+              style={[
+                styles.statusDot,
+                {backgroundColor: item.status ? '#10b981' : '#ef4444'},
+              ]}
+            />
+            <Text
+              style={[
+                styles.statusText,
+                {color: item.status ? '#10b981' : '#ef4444'},
+              ]}>
               {item.status ? 'Live' : 'Inactive'}
             </Text>
           </View>
@@ -99,27 +119,39 @@ const TestPaper = () => {
 
         <View style={styles.timeContainer}>
           <View style={styles.timeItem}>
-            <Text style={styles.timeLabel}>📅 {formatDate(item.testStartDate)}</Text>
+            <Text style={styles.timeLabel}>
+              📅 {formatDate(item.testStartDate)}
+            </Text>
           </View>
           <View style={styles.timeItem}>
-            <Text style={styles.timeLabel}>🕐 {formatTime(item.startTime)} - {formatTime(item.endTime)}</Text>
+            <Text style={styles.timeLabel}>
+              🕐 {formatTime(item.startTime)} - {formatTime(item.endTime)}
+            </Text>
           </View>
         </View>
       </View>
 
       <View style={styles.actionContainer}>
-        <TouchableOpacity 
-          style={[styles.actionButton, { 
-            backgroundColor: item.status ? '#3b82f6' : '#e5e7eb',
-            opacity: item.status ? 1 : 0.6
-          }]}
-          onPress={() => handleStartTest(item)}
-          disabled={!item.status}
-        >
-          <Text style={[styles.actionText, { color: item.status ? '#ffffff' : '#9ca3af' }]}>
-            {item.status ? 'Start Test' : 'Unavailable'}
-          </Text>
-        </TouchableOpacity>
+        {seriesData?.pricing === 0 && (
+          <TouchableOpacity
+            style={[
+              styles.actionButton,
+              {
+                backgroundColor: item.status ? '#3b82f6' : '#e5e7eb',
+                opacity: item.status ? 1 : 0.6,
+              },
+            ]}
+            onPress={() => handleStartTest(item)}
+            disabled={!item.status}>
+            <Text
+              style={[
+                styles.actionText,
+                {color: item.status ? '#ffffff' : '#9ca3af'},
+              ]}>
+              {item.status ? 'Start Test' : 'Unavailable'}
+            </Text>
+          </TouchableOpacity>
+        )}
 
         {item.showTestResult && (
           <TouchableOpacity style={styles.resultButton}>
@@ -149,10 +181,12 @@ const TestPaper = () => {
     return (
       <View style={styles.paginationContainer}>
         <TouchableOpacity
-          style={[styles.paginationButton, { opacity: currentPage === 1 ? 0.3 : 1 }]}
+          style={[
+            styles.paginationButton,
+            {opacity: currentPage === 1 ? 0.3 : 1},
+          ]}
           onPress={() => setCurrentPage(Math.max(1, currentPage - 1))}
-          disabled={currentPage === 1}
-        >
+          disabled={currentPage === 1}>
           <Text style={styles.paginationText}>‹</Text>
         </TouchableOpacity>
 
@@ -161,24 +195,26 @@ const TestPaper = () => {
             key={page}
             style={[
               styles.paginationButton,
-              currentPage === page && styles.paginationButtonActive
+              currentPage === page && styles.paginationButtonActive,
             ]}
-            onPress={() => setCurrentPage(page)}
-          >
-            <Text style={[
-              styles.paginationText,
-              currentPage === page && styles.paginationTextActive
-            ]}>
+            onPress={() => setCurrentPage(page)}>
+            <Text
+              style={[
+                styles.paginationText,
+                currentPage === page && styles.paginationTextActive,
+              ]}>
               {page}
             </Text>
           </TouchableOpacity>
         ))}
 
         <TouchableOpacity
-          style={[styles.paginationButton, { opacity: currentPage === totalPages ? 0.3 : 1 }]}
+          style={[
+            styles.paginationButton,
+            {opacity: currentPage === totalPages ? 0.3 : 1},
+          ]}
           onPress={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
-          disabled={currentPage === totalPages}
-        >
+          disabled={currentPage === totalPages}>
           <Text style={styles.paginationText}>›</Text>
         </TouchableOpacity>
       </View>
@@ -197,24 +233,37 @@ const TestPaper = () => {
 
   return (
     <View style={styles.container}>
-        <Header/>
+      <Header />
       <View style={styles.header}>
         <Text style={styles.headerTitle}>
           {seriesData?.examTitle || 'Test Papers'}
         </Text>
+
+        {seriesData?.pricing > 0 && (
+          <TouchableOpacity
+            style={styles.getAccessButton}
+            onPress={() =>
+              navigation.navigate('SeriesPayment', {
+                seriesId: seriesData.id,
+                amount:seriesData.pricing,
+              })
+            }>
+            <Text style={styles.getAccessText}>Get Access</Text>
+          </TouchableOpacity>
+        )}
       </View>
-      
+
       <FlatList
         data={getCurrentPageData()}
         renderItem={renderPaper}
-        keyExtractor={(item) => item.id.toString()}
+        keyExtractor={item => item.id.toString()}
         contentContainerStyle={styles.listContainer}
         showsVerticalScrollIndicator={false}
         ListEmptyComponent={renderEmptyComponent}
       />
 
       {renderPagination()}
-      <Footer/>
+      <Footer />
     </View>
   );
 };
@@ -237,17 +286,23 @@ const styles = StyleSheet.create({
     color: '#1e293b',
     textAlign: 'center',
   },
-  headerSubtitle: {
-    fontSize: 14,
-    color: '#64748b',
-    textAlign: 'center',
-    marginTop: 2,
+  getAccessButton: {
+    backgroundColor: '#3b82f6',
+    marginTop: 10,
+    marginHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 8,
+    alignItems: 'center',
   },
-  headerCount: {
-    fontSize: 12,
-    color: '#94a3b8',
-    textAlign: 'center',
-    marginTop: 4,
+  getAccessText: {
+    color: '#ffffff',
+    fontWeight: '600',
+    fontSize: 16,
+  },
+  getAccessButtonText: {
+    color: '#1e293b',
+    fontWeight: '600',
+    fontSize: 14,
   },
   listContainer: {
     padding: 16,
@@ -260,7 +315,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#f1f5f9',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
+    shadowOffset: {width: 0, height: 1},
     shadowOpacity: 0.05,
     shadowRadius: 3,
     elevation: 1,
@@ -414,4 +469,4 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
 });
-export default TestPaper
+export default TestPaper;

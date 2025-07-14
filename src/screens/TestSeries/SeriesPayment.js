@@ -13,19 +13,18 @@ import {
 } from 'react-native';
 import {useRoute, useFocusEffect} from '@react-navigation/native';
 import {WebView} from 'react-native-webview';
-import {useAuth} from '../Auth/AuthContext';
+import {useAuth} from '../../Auth/AuthContext';
 import {
-  createPaymentSession,
-  verifyPayment,
+  createTestSeriesPaymentSession,
   getUserByEmail,
-} from '../util/apiCall';
+} from '../../util/apiCall';
 
 // Payment validation and helper functions
-const validatePaymentData = (materialId, email, phone, amount, userId) => {
+const validatePaymentData = (seriesId, email, phone, amount, userId) => {
   const errors = [];
 
-  if (!materialId) {
-    errors.push('Material ID is required');
+  if (!seriesId) {
+    errors.push('Series ID is required');
   }
 
   if (!email || !email.trim()) {
@@ -61,9 +60,11 @@ const formatCurrency = amount => {
   })}`;
 };
 
-const CashfreePaymentScreen = ({navigation}) => {
+const TestSeriesPaymentScreen = ({navigation}) => {
   const route = useRoute();
-  const {materialId, materialName, amount} = route.params;
+   const {seriesId} = route.params || {};
+   const {amount} = route.params || {};
+   console.log('amount',amount);
 
   const {getUserEmail} = useAuth();
   const [loading, setLoading] = useState(true);
@@ -101,6 +102,32 @@ const CashfreePaymentScreen = ({navigation}) => {
         BackHandler.removeEventListener('hardwareBackPress', onBackPress);
     }, [showWebView]),
   );
+
+    const fetchSeriesData = async () => {
+    try {
+      // Debug: Log all route params
+      console.log('🔍 Route params received:', route.params);
+      console.log('🔍 Test Series ID from route:', testSeriesId);
+      console.log('🔍 Resolved Series ID:', routeSeriesId);
+
+      // If we have seriesId, we need to fetch the series details from API
+      if (routeSeriesId) {
+        console.log('📚 Fetching series data for ID:', routeSeriesId);
+        
+        return {
+          seriesId: routeSeriesId,
+          seriesName: seriesName || 'Test Series', // You'll need to fetch this
+          amount: amount || 0, // You'll need to fetch this
+        };
+      }
+
+      // If no seriesId at all, throw error
+      throw new Error('Series ID is required but not provided in navigation params');
+    } catch (error) {
+      console.error('❌ Error fetching series data:', error);
+      throw error;
+    }
+  };
 
   const initializePayment = async () => {
     try {
@@ -154,7 +181,7 @@ const CashfreePaymentScreen = ({navigation}) => {
 
       // Validate payment data
       const validation = validatePaymentData(
-        materialId,
+        seriesId,
         userEmail,
         userPhone,
         amount,
@@ -166,9 +193,9 @@ const CashfreePaymentScreen = ({navigation}) => {
         return;
       }
 
-      // Create payment session
-      const sessionResponse = await createPaymentSession(
-        materialId,
+      // Create payment session for test series
+      const sessionResponse = await createTestSeriesPaymentSession(
+        seriesId,
         userEmail,
         userPhone,
         userId,
@@ -182,10 +209,10 @@ const CashfreePaymentScreen = ({navigation}) => {
       setShowWebView(true);
       setLoading(false);
 
-      console.log('✅ Payment initialized successfully');
+      console.log('✅ Test Series Payment initialized successfully');
       
     } catch (error) {
-      console.error('❌ Payment initialization error:', error);
+      console.error('❌ Test Series Payment initialization error:', error);
       setLoading(false);
       Alert.alert(
         'Payment Error',
@@ -274,28 +301,13 @@ const CashfreePaymentScreen = ({navigation}) => {
         txStatus === 'success' ||
         txStatus === 'COMPLETED'
       ) {
-        try {
-          // Verify payment on server if we have order details
-          if (orderId && sessionData) {
-            console.log('🔄 Verifying payment on server...');
-            await verifyPayment(orderId, sessionData.payment_session_id);
-          }
-
-          Alert.alert(
-            'Payment Successful! 🎉',
-            `Your payment has been processed successfully.${
-              orderId ? `\n\nOrder ID: ${orderId}` : ''
-            }`,
-            [{text: 'Continue', onPress: () => navigation.goBack()}],
-          );
-        } catch (verificationError) {
-          console.error('❌ Payment verification failed:', verificationError);
-          Alert.alert(
-            'Payment Verification Failed',
-            'Payment was successful but verification failed. Please contact support with your transaction details.',
-            [{text: 'OK', onPress: () => navigation.goBack()}],
-          );
-        }
+        Alert.alert(
+          'Payment Successful! 🎉',
+          `Your test series payment has been processed successfully.${
+            orderId ? `\n\nOrder ID: ${orderId}` : ''
+          }`,
+          [{text: 'Continue', onPress: () => navigation.goBack()}],
+        );
       } else if (
         txStatus === 'FAILED' ||
         txStatus === 'failed' ||
@@ -377,7 +389,7 @@ const CashfreePaymentScreen = ({navigation}) => {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Cashfree Payment</title>
+    <title>Test Series Payment</title>
     <script src="https://sdk.cashfree.com/js/v3/cashfree.js"></script>
     <style>
         * {
@@ -388,7 +400,7 @@ const CashfreePaymentScreen = ({navigation}) => {
         
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
             min-height: 100vh;
             display: flex;
             align-items: center;
@@ -417,7 +429,7 @@ const CashfreePaymentScreen = ({navigation}) => {
             left: 0;
             right: 0;
             height: 4px;
-            background: linear-gradient(90deg, #667eea, #764ba2);
+            background: linear-gradient(90deg, #4f46e5, #7c3aed);
         }
         
         .header {
@@ -426,7 +438,7 @@ const CashfreePaymentScreen = ({navigation}) => {
         }
         
         .logo-container {
-            background: linear-gradient(135deg, #667eea, #764ba2);
+            background: linear-gradient(135deg, #4f46e5, #7c3aed);
             width: 64px;
             height: 64px;
             border-radius: 20px;
@@ -434,7 +446,7 @@ const CashfreePaymentScreen = ({navigation}) => {
             align-items: center;
             justify-content: center;
             margin: 0 auto 16px;
-            box-shadow: 0 8px 20px rgba(102, 126, 234, 0.3);
+            box-shadow: 0 8px 20px rgba(79, 70, 229, 0.3);
         }
         
         .logo {
@@ -463,7 +475,7 @@ const CashfreePaymentScreen = ({navigation}) => {
             width: 50px;
             height: 50px;
             border: 4px solid #e2e8f0;
-            border-top: 4px solid #667eea;
+            border-top: 4px solid #4f46e5;
             border-radius: 50%;
             animation: spin 1s linear infinite;
             margin: 0 auto 20px;
@@ -499,7 +511,7 @@ const CashfreePaymentScreen = ({navigation}) => {
         }
         
         .retry-button {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
             color: white;
             border: none;
             padding: 12px 24px;
@@ -526,10 +538,10 @@ const CashfreePaymentScreen = ({navigation}) => {
     <div class="payment-container">
         <div class="header">
             <div class="logo-container">
-                <div class="logo">💳</div>
+                <div class="logo">📚</div>
             </div>
-            <h1 class="title">Secure Payment</h1>
-            <p class="subtitle">Initializing payment gateway...</p>
+            <h1 class="title">Test Series Payment</h1>
+            <p class="subtitle">Initializing secure payment gateway...</p>
         </div>
 
         <div class="initializing-container">
@@ -597,14 +609,14 @@ const CashfreePaymentScreen = ({navigation}) => {
                 paymentStarted = true;
                 errorDiv.style.display = 'none';
                 
-                console.log("🚀 Starting payment with session ID: ${sessionData.payment_session_id}");
+                console.log("🚀 Starting test series payment with session ID: ${sessionData.payment_session_id}");
                 
                 // Start payment with Cashfree - this will open the payment modal directly
                 cashfreeInstance.checkout({
                     paymentSessionId: "${sessionData.payment_session_id}",
                     redirectTarget: "_modal",
                     appearance: {
-                        primaryColor: "#667eea",
+                        primaryColor: "#4f46e5",
                         backgroundColor: "#ffffff"
                     }
                 }).then(function(result) {
@@ -735,8 +747,8 @@ const CashfreePaymentScreen = ({navigation}) => {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#007bff" />
-          <Text style={styles.loadingText}>Initializing Payment...</Text>
+          <ActivityIndicator size="large" color="#4f46e5" />
+          <Text style={styles.loadingText}>Initializing Test Series Payment...</Text>
           <Text style={styles.loadingSubtext}>
             Setting up secure payment gateway
           </Text>
@@ -752,16 +764,13 @@ const CashfreePaymentScreen = ({navigation}) => {
           <TouchableOpacity onPress={goBack} style={styles.backButton}>
             <Text style={styles.backButtonText}>← Back</Text>
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Secure Payment</Text>
+          <Text style={styles.headerTitle}>Test Series Payment</Text>
         </View>
 
         {/* Payment Summary */}
         <View style={styles.summaryContainer}>
           <Text style={styles.summaryTitle}>Payment Summary</Text>
-          <View style={styles.summaryItem}>
-            <Text style={styles.summaryLabel}>Item:</Text>
-            <Text style={styles.summaryValue}>{materialName}</Text>
-          </View>
+          
           <View style={styles.summaryItem}>
             <Text style={styles.summaryLabel}>Amount:</Text>
             <Text style={styles.summaryValue}>{formatCurrency(amount)}</Text>
@@ -783,13 +792,13 @@ const CashfreePaymentScreen = ({navigation}) => {
             <TouchableOpacity onPress={closeWebView} style={styles.closeButton}>
               <Text style={styles.closeButtonText}>✕ Close</Text>
             </TouchableOpacity>
-            <Text style={styles.modalTitle}>Secure Payment</Text>
+            <Text style={styles.modalTitle}>Test Series Payment</Text>
             <View style={styles.headerSpacer} />
           </View>
 
           {webViewLoading && (
             <View style={styles.webViewLoadingContainer}>
-              <ActivityIndicator size="large" color="#007bff" />
+              <ActivityIndicator size="large" color="#4f46e5" />
               <Text style={styles.webViewLoadingText}>Loading Payment Gateway...</Text>
             </View>
           )}
@@ -840,7 +849,7 @@ const styles = StyleSheet.create({
   },
   backButtonText: {
     fontSize: 16,
-    color: '#007bff',
+    color: '#4f46e5',
     fontWeight: '600',
   },
   headerTitle: {
@@ -951,7 +960,7 @@ const styles = StyleSheet.create({
     color: '#495057',
     marginTop: 12,
   },
-  webview: {flex: 1}
-})
+  webview: {flex: 1},
+});
 
-export default CashfreePaymentScreen;
+export default TestSeriesPaymentScreen;

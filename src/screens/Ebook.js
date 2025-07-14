@@ -15,7 +15,7 @@ import {
 import {WebView} from 'react-native-webview';
 import {useNavigation} from '@react-navigation/native';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
-import {Picker} from '@react-native-picker/picker';
+import DropDownPicker from 'react-native-dropdown-picker';
 import Header from '../Components/Header';
 import Footer from '../Components/Footer';
 import {getAllMaterials, materialtype} from '../util/apiCall';
@@ -52,6 +52,12 @@ const Ebook = () => {
   const [showPdfModal, setShowPdfModal] = useState(false);
   const [error, setError] = useState(null);
 
+  // Dropdown state
+  const [open, setOpen] = useState(false);
+  const [dropdownItems, setDropdownItems] = useState([
+    {label: 'All Materials', value: 'all'},
+  ]);
+
   useEffect(() => {
     fetchInitialData();
   }, []);
@@ -71,6 +77,7 @@ const Ebook = () => {
 
       setMaterials(materialsResponse || []);
       setMaterialTypes(typesResponse || []);
+      updateDropdownItems(typesResponse || []);
     } catch (error) {
       console.error('Error fetching data:', error);
       setError(error.message || 'Failed to fetch data');
@@ -79,6 +86,18 @@ const Ebook = () => {
       setLoading(false);
       setRefreshing(false);
     }
+  };
+
+  // Update dropdown items when material types change
+  const updateDropdownItems = materialTypesData => {
+    const items = [
+      {label: 'All Materials', value: 'all'},
+      ...materialTypesData.map(type => ({
+        label: type.materialtype,
+        value: type.materialtype,
+      })),
+    ];
+    setDropdownItems(items);
   };
 
   const filterMaterials = () => {
@@ -92,6 +111,12 @@ const Ebook = () => {
       );
       setFilteredMaterials(filtered);
     }
+  };
+
+  // Handle material type selection
+  const handleMaterialTypeChange = materialTypeValue => {
+    setSelectedMaterialType(materialTypeValue);
+    filterMaterials();
   };
 
   const onRefresh = () => {
@@ -114,25 +139,13 @@ const Ebook = () => {
     }
   };
 
-  const handleBuy = item => {
-    Alert.alert(
-      'Purchase Item',
-      `Do you want to buy "${item.chapterName}" for ₹${item.price}?`,
-      [
-        {text: 'Cancel', style: 'cancel'},
-        {
-          text: 'Buy Now',
-          onPress: () => {
-            navigation.navigate('PaymentScreen', {
-              materialId: item.id,
-              materialName: item.chapterName,
-              amount: item.price,
-            });
-          },
-        },
-      ],
-    );
-  };
+ const handleBuy = (item) => {
+  navigation.navigate('PaymentScreen', {
+    materialId: item.id,
+    materialName: item.chapterName,
+    amount: item.price,
+  });
+};
 
   const hasDemo = demoPdf => {
     return (
@@ -166,8 +179,7 @@ const Ebook = () => {
               showDemo && styles.halfButton,
             ]}
             onPress={() => handleBuy(item)}>
-            <MaterialIcons name="shopping-cart" size={16} color="#fff" />
-            <Text style={styles.buttonText}>₹{price}</Text>
+            <Text style={styles.buttonText}>Get Access</Text>
           </TouchableOpacity>
 
           {showDemo && (
@@ -191,37 +203,40 @@ const Ebook = () => {
     return null;
   };
 
-  const renderFilterPicker = () => (
+  const renderFilterDropdown = () => (
     <View style={styles.filterContainer}>
-      <Text
-        style={{
-          textAlign: 'center',
-          color: '#667EEA',
-          padding: 2,
-          fontWeight: '500',
-        }}>
-        Matrial Type
-      </Text>
-      <View style={styles.pickerRow}>
-        <MaterialIcons name="tune" size={18} color={COLORS.primary} />
-        <View style={styles.compactPickerContainer}>
-          <Picker
-            selectedValue={selectedMaterialType}
-            onValueChange={itemValue => setSelectedMaterialType(itemValue)}
-            style={styles.compactPicker}
-            dropdownIconColor={COLORS.primary}
-            mode="dropdown">
-            <Picker.Item label="All" value="all" />
-            {materialTypes.map(type => (
-              <Picker.Item
-                key={type.id}
-                label={type.materialtype}
-                value={type.materialtype}
-              />
-            ))}
-          </Picker>
+      <View style={styles.dropdownContainer}>
+        <View style={{position: 'relative', zIndex: 3000}}>
+          {(open || selectedMaterialType !== 'all') && (
+            <Text style={styles.floatingLabelText}>Material Type</Text>
+          )}
+          <DropDownPicker
+            open={open}
+            value={selectedMaterialType}
+            items={dropdownItems}
+            setOpen={setOpen}
+            setValue={setSelectedMaterialType}
+            setItems={setDropdownItems}
+            onChangeValue={handleMaterialTypeChange}
+            placeholder="Select Material Type"
+            placeholderStyle={styles.dropdownPlaceholder}
+            style={styles.dropdown}
+            textStyle={styles.dropdownText}
+            dropDownContainerStyle={styles.dropdownList}
+            zIndex={3000}
+            zIndexInverse={1000}
+            listItemContainerStyle={styles.listItemContainer}
+            listItemLabelStyle={styles.listItemLabel}
+            selectedItemContainerStyle={styles.selectedItemContainer}
+            selectedItemLabelStyle={styles.selectedItemLabel}
+            arrowIconStyle={styles.arrowIcon}
+            tickIconStyle={styles.tickIcon}
+            closeIconStyle={styles.closeIcon}
+            searchable={false}
+            theme="LIGHT"
+            multiple={false}
+          />
         </View>
-        <Text style={styles.compactCountText}>{filteredMaterials.length}</Text>
       </View>
     </View>
   );
@@ -230,11 +245,7 @@ const Ebook = () => {
     <View style={styles.card}>
       <View style={styles.imageContainer}>
         {item.thumbnailFile ? (
-          <Image
-            source={{uri: item.thumbnailFile}}
-            style={styles.cardImage}
-            resizeMode="stretch"
-          />
+          <Image source={{uri: item.thumbnailFile}} style={styles.cardImage} />
         ) : (
           <View style={styles.placeholderImage}>
             <MaterialIcons
@@ -242,23 +253,6 @@ const Ebook = () => {
               size={48}
               color={COLORS.text.light}
             />
-          </View>
-        )}
-
-        <View
-          style={[
-            styles.statusBadge,
-            item.status === 'free' ? styles.freeBadge : styles.paidBadge,
-          ]}>
-          <Text style={styles.statusText}>
-            {item.status === 'free' ? 'FREE' : `₹${item.price}`}
-          </Text>
-        </View>
-
-        {item.status === 'paid' && hasDemo(item.demoPdf) && (
-          <View style={styles.demoBadge}>
-            <MaterialIcons name="preview" size={12} color="#fff" />
-            <Text style={styles.demoText}>Demo</Text>
           </View>
         )}
 
@@ -379,7 +373,7 @@ const Ebook = () => {
           renderError()
         ) : (
           <>
-            {renderFilterPicker()}
+            {renderFilterDropdown()}
             <FlatList
               data={filteredMaterials}
               renderItem={renderMaterialItem}
@@ -445,6 +439,7 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
+    zIndex: 0,
   },
   loadingContainer: {
     flex: 1,
@@ -459,10 +454,9 @@ const styles = StyleSheet.create({
   },
   listContainer: {
     padding: 16,
-    paddingBottom: 120, // Much more space for footer
+    paddingBottom: 120,
   },
 
-  // Filter Picker Styles
   filterContainer: {
     backgroundColor: COLORS.surface,
     marginHorizontal: 16,
@@ -476,73 +470,82 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.8,
     shadowRadius: 6,
     elevation: 3,
+    zIndex: 3000,
   },
-  pickerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    gap: 12,
+  dropdownContainer: {
+    zIndex: 4000,
   },
-  compactPickerContainer: {
-    flex: 1,
-    backgroundColor: '#F8FAFC',
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    height: 36,
-    justifyContent: 'center',
-  },
-  compactPicker: {
-    height: 36,
-    color: COLORS.text.primary,
-    fontSize: 14,
-  },
-  compactCountText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: COLORS.primary,
-    backgroundColor: '#EBF4FF',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
+
+  dropdown: {
+    borderWidth: 1.5,
+    borderColor: '#f5f5f5',
     borderRadius: 12,
-    minWidth: 28,
-    textAlign: 'center',
+    backgroundColor: '#FAFAFA',
+    paddingHorizontal: 12,
+    minHeight: 50,
   },
-  pickerWrapper: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    gap: 12,
-  },
-  filterLabel: {
+  dropdownPlaceholder: {
+    color: '#999',
     fontSize: 14,
-    fontWeight: '600',
+  },
+  dropdownText: {
+    fontSize: 14,
     color: COLORS.text.primary,
-  },
-  pickerContainer: {
-    flex: 1,
-    backgroundColor: '#F8FAFC',
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: COLORS.cardBorder,
-  },
-  picker: {
-    height: 40,
-    color: COLORS.text.primary,
-  },
-  resultCount: {
-    paddingHorizontal: 16,
-    paddingBottom: 12,
-    borderTopWidth: 1,
-    borderTopColor: '#F1F5F9',
-  },
-  countText: {
-    fontSize: 12,
-    color: COLORS.text.secondary,
     fontWeight: '500',
-    textAlign: 'center',
+  },
+  dropdownList: {
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+    borderRadius: 12,
+    backgroundColor: COLORS.surface,
+    shadowColor: '#000',
+    shadowOffset: {width: 0, height: 8},
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 10,
+    marginTop: 5,
+    maxHeight: 200,
+  },
+  listItemContainer: {
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+  },
+  listItemLabel: {
+    fontSize: 14,
+    color: COLORS.text.primary,
+  },
+  selectedItemContainer: {
+    backgroundColor: '#EBF4FF',
+  },
+  selectedItemLabel: {
+    color: COLORS.primary,
+    fontWeight: '600',
+  },
+  arrowIcon: {
+    width: 20,
+    height: 20,
+    tintColor: COLORS.primary,
+  },
+  tickIcon: {
+    width: 20,
+    height: 20,
+    tintColor: COLORS.primary,
+  },
+  closeIcon: {
+    width: 20,
+    height: 20,
+    tintColor: COLORS.primary,
+  },
+  floatingLabelText: {
+    position: 'absolute',
+    top: -10,
+    left: 12,
+    backgroundColor: COLORS.surface,
+    paddingHorizontal: 6,
+    fontSize: 12,
+    color: COLORS.primary,
+    fontWeight: '600',
+    zIndex: 9999,
   },
 
   // Card Styles
@@ -561,12 +564,16 @@ const styles = StyleSheet.create({
   },
   imageContainer: {
     position: 'relative',
+    width: '100%',
     height: 200,
     backgroundColor: '#F8FAFC',
+    overflow: 'hidden',
+    
   },
   cardImage: {
-    width: '100%',
-    height: '100%',
+    height: '97%',
+    resizeMode: 'contain',
+    margin:5
   },
   placeholderImage: {
     width: '100%',
@@ -577,52 +584,8 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: COLORS.cardBorder,
   },
-  statusBadge: {
-    position: 'absolute',
-    top: 16,
-    right: 16,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
-    shadowColor: 'rgba(0, 0, 0, 0.2)',
-    shadowOffset: {width: 0, height: 2},
-    shadowOpacity: 1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  freeBadge: {
-    backgroundColor: COLORS.success,
-  },
-  paidBadge: {
-    backgroundColor: '#E53E3E', // Nice red for paid items
-  },
-  statusText: {
-    color: '#fff',
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  demoBadge: {
-    position: 'absolute',
-    top: 16,
-    left: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: COLORS.accent,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-    gap: 3,
-    shadowColor: 'rgba(0, 0, 0, 0.2)',
-    shadowOffset: {width: 0, height: 2},
-    shadowOpacity: 1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  demoText: {
-    color: '#fff',
-    fontSize: 10,
-    fontWeight: '600',
-  },
+
+ 
   typeBadge: {
     position: 'absolute',
     bottom: 16,
