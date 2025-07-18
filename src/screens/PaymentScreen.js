@@ -108,7 +108,6 @@ const CashfreePaymentScreen = ({navigation}) => {
       
       // Get user data
       const email = await getUserEmail();
-      console.log('📧 Email from AuthContext:', email);
 
       if (!email || !email.trim()) {
         Alert.alert('Error', 'Email not found. Please login again.', [
@@ -118,7 +117,6 @@ const CashfreePaymentScreen = ({navigation}) => {
       }
 
       const response = await getUserByEmail(email);
-      console.log('👤 getUserByEmail response:', response);
 
       if (!response) {
         throw new Error('User data not found.');
@@ -181,8 +179,6 @@ const CashfreePaymentScreen = ({navigation}) => {
       setSessionData(sessionResponse);
       setShowWebView(true);
       setLoading(false);
-
-      console.log('✅ Payment initialized successfully');
       
     } catch (error) {
       console.error('❌ Payment initialization error:', error);
@@ -201,7 +197,6 @@ const CashfreePaymentScreen = ({navigation}) => {
   const handleWebViewMessage = event => {
     try {
       const data = JSON.parse(event.nativeEvent.data);
-      console.log('📨 WebView message:', data);
 
       if (data.type === 'payment_result') {
         // Only process if we have actual payment details or confirmed status
@@ -211,13 +206,11 @@ const CashfreePaymentScreen = ({navigation}) => {
         ) {
           handlePaymentResult(data.result);
         } else {
-          console.log('⚠️ Ignoring incomplete payment result:', data.result);
         }
       } else if (data.type === 'payment_error') {
         handlePaymentResult({status: 'FAILED', error: data.error});
       }
     } catch (error) {
-      console.log('📨 WebView message (raw):', event.nativeEvent.data);
 
       // Handle simple string messages with more validation
       const message = event.nativeEvent.data.toLowerCase();
@@ -245,7 +238,6 @@ const CashfreePaymentScreen = ({navigation}) => {
 
   const handlePaymentResult = async result => {
     try {
-      console.log('🔍 Processing payment result:', result);
       setShowWebView(false);
       setWebViewLoading(true);
 
@@ -266,7 +258,6 @@ const CashfreePaymentScreen = ({navigation}) => {
       const orderId =
         result.orderId || result.order_id || sessionData?.order_id;
 
-      console.log('🔍 Extracted values:', {txStatus, orderId});
 
       if (
         txStatus === 'SUCCESS' ||
@@ -277,7 +268,6 @@ const CashfreePaymentScreen = ({navigation}) => {
         try {
           // Verify payment on server if we have order details
           if (orderId && sessionData) {
-            console.log('🔄 Verifying payment on server...');
             await verifyPayment(orderId, sessionData.payment_session_id);
           }
 
@@ -568,7 +558,6 @@ const CashfreePaymentScreen = ({navigation}) => {
                     cashfreeInstance = new window.Cashfree({
                         mode: "production" // Change to "sandbox" for testing
                     });
-                    console.log("✅ Cashfree initialized successfully");
                     
                     // Start payment immediately
                     startPayment();
@@ -583,7 +572,6 @@ const CashfreePaymentScreen = ({navigation}) => {
         
         function startPayment() {
             if (paymentStarted) {
-                console.log("⚠️ Payment already started");
                 return;
             }
             
@@ -596,9 +584,7 @@ const CashfreePaymentScreen = ({navigation}) => {
                 
                 paymentStarted = true;
                 errorDiv.style.display = 'none';
-                
-                console.log("🚀 Starting payment with session ID: ${sessionData.payment_session_id}");
-                
+                                
                 // Start payment with Cashfree - this will open the payment modal directly
                 cashfreeInstance.checkout({
                     paymentSessionId: "${sessionData.payment_session_id}",
@@ -608,12 +594,10 @@ const CashfreePaymentScreen = ({navigation}) => {
                         backgroundColor: "#ffffff"
                     }
                 }).then(function(result) {
-                    console.log("✅ Payment completed:", result);
                     paymentStarted = false;
                     
                     // Send result to React Native
                     if (result && result.paymentDetails) {
-                        console.log("✅ Payment successful with details");
                         if (window.ReactNativeWebView) {
                             window.ReactNativeWebView.postMessage(JSON.stringify({
                                 type: 'payment_result',
@@ -627,7 +611,6 @@ const CashfreePaymentScreen = ({navigation}) => {
                             }));
                         }
                     } else {
-                        console.log("⚠️ Payment result incomplete:", result);
                         if (window.ReactNativeWebView) {
                             window.ReactNativeWebView.postMessage(JSON.stringify({
                                 type: 'payment_error',
@@ -666,12 +649,10 @@ const CashfreePaymentScreen = ({navigation}) => {
         
         // Listen for payment events from Cashfree
         window.addEventListener('message', function(event) {
-            console.log("📨 Received message:", event.data);
             
             if (event.data && event.data.type) {
                 switch(event.data.type) {
                     case 'payment_success':
-                        console.log("✅ Payment success event received");
                         if (window.ReactNativeWebView) {
                             window.ReactNativeWebView.postMessage(JSON.stringify({
                                 type: 'payment_result',
@@ -685,7 +666,6 @@ const CashfreePaymentScreen = ({navigation}) => {
                         }
                         break;
                     case 'payment_failed':
-                        console.log("❌ Payment failed event received");
                         if (window.ReactNativeWebView) {
                             window.ReactNativeWebView.postMessage(JSON.stringify({
                                 type: 'payment_error',
@@ -694,7 +674,6 @@ const CashfreePaymentScreen = ({navigation}) => {
                         }
                         break;
                     case 'payment_cancelled':
-                        console.log("❌ Payment cancelled event received");
                         if (window.ReactNativeWebView) {
                             window.ReactNativeWebView.postMessage(JSON.stringify({
                                 type: 'payment_result',
@@ -712,7 +691,6 @@ const CashfreePaymentScreen = ({navigation}) => {
         // Handle page visibility changes
         document.addEventListener('visibilitychange', function() {
             if (document.visibilityState === 'visible' && paymentStarted) {
-                console.log("📱 Page became visible during payment");
             }
         });
         

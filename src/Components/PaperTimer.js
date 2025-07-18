@@ -7,11 +7,9 @@ const PaperTimer = ({ duration, onTimeUp, testStarted, isTestCompleted }) => {
 
   useEffect(() => {
     if (testStarted && !isTestCompleted) {
-      // Start the timer only when test has started and not completed
       intervalRef.current = setInterval(() => {
         setTimeLeft((prevTime) => {
           if (prevTime <= 1) {
-            // Time is up
             clearInterval(intervalRef.current);
             onTimeUp();
             return 0;
@@ -20,14 +18,12 @@ const PaperTimer = ({ duration, onTimeUp, testStarted, isTestCompleted }) => {
         });
       }, 1000);
     } else {
-      // Clear timer if test is completed or not started
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
         intervalRef.current = null;
       }
     }
 
-    // Cleanup on unmount or when dependencies change
     return () => {
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
@@ -35,19 +31,17 @@ const PaperTimer = ({ duration, onTimeUp, testStarted, isTestCompleted }) => {
     };
   }, [testStarted, isTestCompleted, onTimeUp]);
 
-  // Format time as MM:SS
   const formatTime = (seconds) => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
-  // Determine timer color based on remaining time
   const getTimerColor = () => {
-    if (isTestCompleted) return '#6B7280'; // Gray when completed
+    if (isTestCompleted) return '#9CA3AF'; // Gray when completed
     if (timeLeft <= 300) return '#EF4444'; // Red for last 5 minutes
-    if (timeLeft <= 600) return '#F59E0B'; // Orange for last 10 minutes
-    return '#10B981'; // Green for normal time
+    if (timeLeft <= 600) return '#FBBF24'; // Amber for last 10 minutes
+    return '#3B82F6'; // Sky blue for normal time
   };
 
   return (
@@ -82,10 +76,10 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '700',
-    fontFamily: 'monospace', // For consistent digit spacing
+    fontFamily: 'monospace',
   },
   completedText: {
-    color: '#6B7280',
+    color: '#9CA3AF',
     fontSize: 12,
     marginTop: 4,
     fontWeight: '500',

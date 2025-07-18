@@ -13,7 +13,7 @@ import {
   marqueeUrl,
   registerUrl,
   championpaperUrl,
-  championtestUrl,
+  TestPaperByIdUrl,
   champresultUrl,
   submitchamptestUrl,
   AllAanalysis,
@@ -59,10 +59,20 @@ const getToken = async () => {
   }
 };
 
-const getUserId = async () => {
+export const getUserId = async () => {
   try {
-    return await AsyncStorage.getItem('userId');
+    // First, try to get from userData (which is what AuthContext stores)
+    const userData = await AsyncStorage.getItem('userData');
+    if (userData) {
+      const parsedUserData = JSON.parse(userData);
+      return parsedUserData.id;
+    }
+    
+    // Fallback to the old method if userData doesn't exist
+    const userId = await AsyncStorage.getItem('userId');
+    return userId;
   } catch (error) {
+    console.error('Error getting user ID:', error);
     return null;
   }
 };
@@ -260,9 +270,9 @@ export const materialtype = payload =>
 
 export const championtest = (headers = {}, testId = null) => {
   if (testId) {
-    return getAPI(championtestUrl, headers, testId, true);
+    return getAPI(TestPaperByIdUrl, headers, testId, true);
   }
-  return getAPI(championtestUrl, headers, null, true);
+  return getAPI(TestPaperByIdUrl, headers, null, true);
 };
 
 export const champresult = (headers = {}, urlParams = null) => {
@@ -957,40 +967,14 @@ export const generateOrderId = () => {
 
 export const getPapersBySeries = async seriesId => {
   try {
-    const fullUrl = `${paperbyseriesUrl}${seriesId}`;
-    console.log('=== API Debug Info ===');
-    console.log('paperbyseriesUrl:', paperbyseriesUrl);
-    console.log('seriesId:', seriesId);
-    console.log('Full URL:', fullUrl);
-
-    const response = await fetch(fullUrl, {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    });
-
-    console.log('Response status:', response.status);
-    console.log('Response ok:', response.ok);
-
-    if (!response.ok) {
-      // Get more details about the error
-      const errorText = await response.text();
-      console.log('Error response body:', errorText);
-      console.log(
-        'Response headers:',
-        Object.fromEntries(response.headers.entries()),
-      );
-      throw new Error(`HTTP error! status: ${response.status} - ${errorText}`);
-    }
-
-    const data = await response.json();
-    return data;
+    const response = await getAPI(paperbyseriesUrl, {}, seriesId, true); // ✅ token is automatically added
+    return response;
   } catch (error) {
-    console.error('Error fetching papers by series:', error);
+    console.error('❌ Error fetching papers by series:', error);
     throw error;
   }
 };
+
 
 export const fetchVTCategories = async () => {
   try {
@@ -1062,4 +1046,4 @@ export const verifyTestSeriesPayment = async (orderId, sessionId) => {
   }
 };
 
-export {postAPI, getAPI, getUserId, validateRegistrationPayload};
+export {postAPI, getAPI, validateRegistrationPayload};

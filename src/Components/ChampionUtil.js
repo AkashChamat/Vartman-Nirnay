@@ -56,7 +56,6 @@ export const fetchTestQuestions = async (testId, setTestData, setError, setLoadi
 // Time tracking utilities
 export const initializeTestTimer = () => {
   const startTime = new Date().toISOString();
-  console.log('🕐 Test started at:', startTime);
   return startTime;
 };
 
@@ -70,13 +69,6 @@ export const calculateTestDuration = (startTime) => {
   
   // Format as ISO 8601 duration (PT15S format)
   const timeTaken = `PT${durationInSeconds}S`;
-  
-  console.log('🕐 Test timing details:', {
-    startTime,
-    endTime,
-    durationInSeconds,
-    timeTaken
-  });
   
   return {
     endTime,
@@ -100,15 +92,6 @@ export const submitTest = async (paperId, selectedAnswers, userId, startTime, en
       } else {
         formattedAnswers[qid] = val;
       }
-    });
-
-    console.log('📤 Submitting test with timing data:', {
-      paperId,
-      userId,
-      startTime,
-      endTime,
-      timeTaken,
-      answersCount: Object.keys(formattedAnswers).length
     });
 
     // Submit the test using the API function with time parameters
@@ -143,9 +126,7 @@ export const handleTestSubmission = async (
     
     // Calculate timing data
     const { endTime, timeTaken } = calculateTestDuration(testStartTime);
-    
-    console.log('🚀 Starting test submission process...');
-    
+        
     const response = await submitTest(
       paperId, 
       selectedAnswers, 
@@ -154,9 +135,7 @@ export const handleTestSubmission = async (
       endTime, 
       timeTaken
     );
-    
-    console.log('✅ Test submitted successfully:', response);
-    
+        
     if (onSuccess) {
       onSuccess(response);
     } else {

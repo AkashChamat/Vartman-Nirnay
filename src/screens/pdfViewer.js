@@ -6,7 +6,6 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   SafeAreaView,
-  StatusBar,
   BackHandler,
 } from 'react-native';
 import {WebView} from 'react-native-webview';
@@ -77,7 +76,6 @@ const PdfViewer = ({route, navigation}) => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar backgroundColor="#5B95C4" barStyle="light-content" />
       <View style={styles.header}>
         <TouchableOpacity
           style={styles.backButton}

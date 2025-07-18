@@ -7,7 +7,6 @@ import {
   ScrollView,
   TouchableOpacity,
   Dimensions,
-  StatusBar,
   Linking,
   ActivityIndicator,
   Modal,
@@ -239,7 +238,6 @@ const Home = () => {
 
   return (
     <View style={styles.container}>
-      <StatusBar backgroundColor="#0288D1" barStyle="light-content" />
       <Header />
 
       {/* Body Scroll */}

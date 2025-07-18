@@ -14,7 +14,7 @@ import {
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import Header from '../Components/Header';
-import TestTimer from '../Components/TestTimer'; // Import the reusable TestTimer component
+import TestTimer from '../Components/TestTimer'; 
 import {
   championpaper,
   getpaperbyid,
@@ -22,6 +22,7 @@ import {
   getUserId,
 } from '../util/apiCall';
 import Footer from '../Components/Footer';
+import { useAuth } from '../Auth/AuthContext';
 
 const {width} = Dimensions.get('window');
 
@@ -31,7 +32,7 @@ const ChampionSeries = ({navigation}) => {
   const [error, setError] = useState(null);
   const [attemptCounts, setAttemptCounts] = useState({});
   const [loadingAttempts, setLoadingAttempts] = useState(false);
-
+const { getUserId: getAuthUserId } = useAuth();
   const fetchAttemptCounts = async papers => {
     try {
       setLoadingAttempts(true);
@@ -141,9 +142,9 @@ const ChampionSeries = ({navigation}) => {
               useNativeDriver: true,
             }),
           ]),
-          {iterations: -1}
+          {iterations: -1},
         );
-        
+
         animationRef.current.start();
       };
 
@@ -308,8 +309,9 @@ const ChampionSeries = ({navigation}) => {
     const attemptCount = getAttemptCountForPaper(testPaper.id);
     navigation.navigate('ChampionTest', {
       testId: testPaper.id,
-      testTitle: testPaper.testTitle,
+      testTitle: testPaper.testTitle || 'Champion Test',
       currentAttempts: attemptCount,
+      source: 'ChampionSeries',
       maxAttemptsAllowed: testPaper.maxAttemptsAllowed,
       multipleAttemptsAllowed: testPaper.multipleAttemptsAllowed,
     });
@@ -333,82 +335,112 @@ const ChampionSeries = ({navigation}) => {
   };
 
   // Handle test press from timer component
-  const handleTestPress = (latestPaper) => {
+  const handleTestPress = latestPaper => {
     if (latestPaper) {
       handleStartTest(latestPaper);
     }
   };
 
- const handleViewAllResult = (testPaper) => {
-  console.log(`📊 ==> Viewing all results for test: ${testPaper.testTitle}`);
-  console.log(`📋 ==> Test ID: ${testPaper.id}`);
-  
-  // Navigate to AllResults screen with test details
-  navigation.navigate('AllResult', {
-    testId: testPaper.id,
-    testTitle: testPaper.testTitle,
-    pdfUrl: testPaper.allResultPdf || null, // Optional PDF URL if available
-  });
+  const handleViewAllResult = testPaper => {
+
+    // Navigate to AllResults screen with test details
+    navigation.navigate('AllResult', {
+      testId: testPaper.id,
+      testTitle: testPaper.testTitle,
+      pdfUrl: testPaper.allResultPdf || null, // Optional PDF URL if available
+    });
+  };
+ const handleViewMyResult = async testPaper => {
+  try {
+    const userId = getAuthUserId();
+
+    if (!userId) {
+      Alert.alert('Error', 'User not authenticated');
+      return;
+    }
+
+    // Check if user has attempted the test
+    const attemptCount = getAttemptCountForPaper(testPaper.id);
+
+    if (attemptCount === 0) {
+      Alert.alert(
+        'No Attempts Found',
+        'Please complete the test first to view your result.',
+        [
+          {
+            text: 'OK',
+            style: 'default',
+          },
+        ],
+      );
+      return;
+    }
+
+    // Navigate to ChampionResult
+    navigation.navigate('ChampionResult', {
+      userId: userId,
+      testPaperId: testPaper.id,
+      testTitle: testPaper.testTitle,
+      source: 'ChampionSeries',
+    });
+  } catch (error) {
+    console.error('Error in handleViewMyResult:', error);
+    Alert.alert('Error', 'Failed to load result');
+  }
 };
-  const handleViewMyResult = (testPaper) => {
-  navigation.navigate('ChampionResult', {
-    testId: testPaper.id,
-    testTitle: testPaper.testTitle,
-  });
-};
 
-const renderTestCard = ({item}) => {
-  const attemptCount = getAttemptCountForPaper(item.id);
-  const isNew = isLatestPaper(item); // Show badge for the latest paper
-  
-  // Check if image exists and is valid
-  const hasValidImage = item.image && item.image.trim() !== '';
+  const renderTestCard = ({item}) => {
+    const attemptCount = getAttemptCountForPaper(item.id);
+    const isNew = isLatestPaper(item); // Show badge for the latest paper
 
-  return (
-    <View style={styles.card}>
-      <View style={styles.imageContainer}>
-        {hasValidImage ? (
-          <Image
-            source={{uri: item.image}}
-            style={styles.testImage}
-            resizeMode="contain"
-            onError={(error) => {
-              console.warn('Image failed to load:', item.image, error);
-            }}
-          />
-        ) : (
-          <View style={styles.noImageContainer}>
-            <MaterialIcons name="image" size={40} color="#DFE3E8" />
-            <Text style={styles.noImageText}>No Image</Text>
-          </View>
-        )}
-        {isNew && <BlinkingNewBadge testTitle={item.testTitle} />}
-      </View>
+    // Check if image exists and is valid
+    const hasValidImage = item.image && item.image.trim() !== '';
 
-      <View style={styles.cardContent}>
-        <Text style={styles.cardTitle} numberOfLines={2}>
-          {item.testTitle}
-        </Text>
-
-        <View style={styles.detailsContainer}>
-          <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>Questions:</Text>
-            <Text style={styles.detailValue}>{item.noOfQuestions}</Text>
-          </View>
-
-          <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>Marks:</Text>
-            <Text style={styles.detailValue}>{item.totalMarks}</Text>
-          </View>
-
-          <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>Time:</Text>
-            <Text style={styles.detailValue}>{item.duration} min</Text>
-          </View>
+    return (
+      <View style={styles.card}>
+        <View style={styles.imageContainer}>
+          {hasValidImage ? (
+            <Image
+              source={{uri: item.image}}
+              style={styles.testImage}
+              resizeMode="contain"
+              onError={error => {
+                console.warn('Image failed to load:', item.image, error);
+              }}
+            />
+          ) : (
+            <View style={styles.noImageContainer}>
+              <MaterialIcons name="image" size={40} color="#DFE3E8" />
+              <Text style={styles.noImageText}>No Image</Text>
+            </View>
+          )}
+          {isNew && <BlinkingNewBadge testTitle={item.testTitle} />}
         </View>
 
-        {/* Result availability message */}
-        {/* {!item.showTestResult && !item.showAllResult && (
+        <View style={styles.cardContent}>
+          <Text style={styles.cardTitle} numberOfLines={2}>
+            {item.testTitle}
+          </Text>
+
+          <View style={styles.detailsContainer}>
+            <View style={styles.detailRow}>
+              <Text style={styles.detailLabel}>Questions:</Text>
+              <Text style={styles.detailValue}>{item.noOfQuestions}</Text>
+            </View>
+
+            <View style={styles.detailRow}>
+              <Text style={styles.detailLabel}>Marks:</Text>
+              <Text style={styles.detailValue}>{item.totalMarks}</Text>
+            </View>
+
+            <View style={styles.detailRow}>
+              <Text style={styles.detailLabel}>Time:</Text>
+              <Text style={styles.detailValue}>{item.duration} min</Text>
+            </View>
+          </View>
+
+          {/* Result availability message */}
+          {/* {!item.showTestResult && !item.showAllResult && (
           <View style={styles.attemptInfoContainer}>
             <Text style={styles.resultMessage}>
               Results will not be shown
@@ -416,51 +448,44 @@ const renderTestCard = ({item}) => {
           </View>
         )} */}
 
-        <View style={styles.buttonContainerCompact}>
-          <TouchableOpacity style={styles.startButtonCompact} onPress={() => handleStartTest(item)}>
-            <Text style={styles.startButtonText}>Start Test</Text>
-          </TouchableOpacity>
-          
-          <View style={styles.resultActionsGroup}>
-            {/* All Result Button - Only show if showAllResult is true */}
-            {item.showAllResult && (
-              <TouchableOpacity 
-                style={styles.resultButtonCompact} 
-                onPress={() => handleViewAllResult(item)}>
-                <Text style={styles.resultButtonTextCompact}>
-                  All Result
-                </Text>
-              </TouchableOpacity>
-            )}
-            
-            {/* My Result Button - Only show if showTestResult is true */}
-            {item.showTestResult && (
-              <TouchableOpacity 
-                style={styles.resultButtonCompact} 
-                onPress={() => handleViewMyResult(item)}>
-                <Text style={styles.resultButtonTextCompact}>
-                  My Result
-                </Text>
-              </TouchableOpacity>
-            )}
-            
-            {/* Download Button - Always visible */}
-            <TouchableOpacity 
-              style={styles.downloadIconButton}
-              onPress={() => handleDownloadTestPaper(item)}>
-              <Icon 
-                name="file-download" 
-                size={18} 
-                color="#3182CE" 
-              />
+          <View style={styles.buttonContainerCompact}>
+            <TouchableOpacity
+              style={styles.startButtonCompact}
+              onPress={() => handleStartTest(item)}>
+              <Text style={styles.startButtonText}>Start Test</Text>
             </TouchableOpacity>
+
+            <View style={styles.resultActionsGroup}>
+              {/* All Result Button - Only show if showAllResult is true */}
+              {item.showAllResult && (
+                <TouchableOpacity
+                  style={styles.resultButtonCompact}
+                  onPress={() => handleViewAllResult(item)}>
+                  <Text style={styles.resultButtonTextCompact}>All Result</Text>
+                </TouchableOpacity>
+              )}
+
+              {/* My Result Button - Only show if showTestResult is true */}
+              {item.showTestResult && (
+                <TouchableOpacity
+                  style={styles.resultButtonCompact}
+                  onPress={() => handleViewMyResult(item)}>
+                  <Text style={styles.resultButtonTextCompact}>My Result</Text>
+                </TouchableOpacity>
+              )}
+
+              {/* Download Button - Always visible */}
+              <TouchableOpacity
+                style={styles.downloadIconButton}
+                onPress={() => handleDownloadTestPaper(item)}>
+                <Icon name="file-download" size={18} color="#3182CE" />
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </View>
-    </View>
-  );
-};
-
+    );
+  };
 
   const renderEmptyState = () => (
     <View style={styles.emptyState}>
@@ -505,13 +530,9 @@ const renderTestCard = ({item}) => {
             Choose a test to begin your challenge
           </Text>
         </View>
-        
-        {/* Use the reusable TestTimer component */}
-        <TestTimer 
-          navigation={navigation} 
-          onTestPress={handleTestPress}
-        />
-        
+
+        <TestTimer navigation={navigation} onTestPress={handleTestPress} />
+
         {error ? (
           renderErrorState()
         ) : (
@@ -543,7 +564,7 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingHorizontal: 16,
   },
-    noImageContainer: {
+  noImageContainer: {
     width: '100%',
     height: '100%',
     backgroundColor: '#F7FAFC',
@@ -761,7 +782,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: '#3182CE'
+    borderColor: '#3182CE',
   },
   downloadIconButton: {
     padding: 8,
@@ -770,7 +791,7 @@ const styles = StyleSheet.create({
     minWidth: 36,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: '#3182CE'
+    borderColor: '#3182CE',
   },
   resultButtonTextCompact: {
     color: '#3182CE',

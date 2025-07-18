@@ -64,7 +64,6 @@ const TestSeriesPaymentScreen = ({navigation}) => {
   const route = useRoute();
    const {seriesId} = route.params || {};
    const {amount} = route.params || {};
-   console.log('amount',amount);
 
   const {getUserEmail} = useAuth();
   const [loading, setLoading] = useState(true);
@@ -105,15 +104,9 @@ const TestSeriesPaymentScreen = ({navigation}) => {
 
     const fetchSeriesData = async () => {
     try {
-      // Debug: Log all route params
-      console.log('🔍 Route params received:', route.params);
-      console.log('🔍 Test Series ID from route:', testSeriesId);
-      console.log('🔍 Resolved Series ID:', routeSeriesId);
 
       // If we have seriesId, we need to fetch the series details from API
-      if (routeSeriesId) {
-        console.log('📚 Fetching series data for ID:', routeSeriesId);
-        
+      if (routeSeriesId) {        
         return {
           seriesId: routeSeriesId,
           seriesName: seriesName || 'Test Series', // You'll need to fetch this
@@ -135,7 +128,6 @@ const TestSeriesPaymentScreen = ({navigation}) => {
       
       // Get user data
       const email = await getUserEmail();
-      console.log('📧 Email from AuthContext:', email);
 
       if (!email || !email.trim()) {
         Alert.alert('Error', 'Email not found. Please login again.', [
@@ -145,8 +137,6 @@ const TestSeriesPaymentScreen = ({navigation}) => {
       }
 
       const response = await getUserByEmail(email);
-      console.log('👤 getUserByEmail response:', response);
-
       if (!response) {
         throw new Error('User data not found.');
       }
@@ -208,8 +198,6 @@ const TestSeriesPaymentScreen = ({navigation}) => {
       setSessionData(sessionResponse);
       setShowWebView(true);
       setLoading(false);
-
-      console.log('✅ Test Series Payment initialized successfully');
       
     } catch (error) {
       console.error('❌ Test Series Payment initialization error:', error);
@@ -228,7 +216,6 @@ const TestSeriesPaymentScreen = ({navigation}) => {
   const handleWebViewMessage = event => {
     try {
       const data = JSON.parse(event.nativeEvent.data);
-      console.log('📨 WebView message:', data);
 
       if (data.type === 'payment_result') {
         // Only process if we have actual payment details or confirmed status
@@ -238,13 +225,11 @@ const TestSeriesPaymentScreen = ({navigation}) => {
         ) {
           handlePaymentResult(data.result);
         } else {
-          console.log('⚠️ Ignoring incomplete payment result:', data.result);
         }
       } else if (data.type === 'payment_error') {
         handlePaymentResult({status: 'FAILED', error: data.error});
       }
     } catch (error) {
-      console.log('📨 WebView message (raw):', event.nativeEvent.data);
 
       // Handle simple string messages with more validation
       const message = event.nativeEvent.data.toLowerCase();
@@ -272,7 +257,6 @@ const TestSeriesPaymentScreen = ({navigation}) => {
 
   const handlePaymentResult = async result => {
     try {
-      console.log('🔍 Processing payment result:', result);
       setShowWebView(false);
       setWebViewLoading(true);
 
@@ -292,8 +276,6 @@ const TestSeriesPaymentScreen = ({navigation}) => {
         result.orderStatus;
       const orderId =
         result.orderId || result.order_id || sessionData?.order_id;
-
-      console.log('🔍 Extracted values:', {txStatus, orderId});
 
       if (
         txStatus === 'SUCCESS' ||
@@ -580,7 +562,6 @@ const TestSeriesPaymentScreen = ({navigation}) => {
                     cashfreeInstance = new window.Cashfree({
                         mode: "production" // Change to "sandbox" for testing
                     });
-                    console.log("✅ Cashfree initialized successfully");
                     
                     // Start payment immediately
                     startPayment();
@@ -595,7 +576,6 @@ const TestSeriesPaymentScreen = ({navigation}) => {
         
         function startPayment() {
             if (paymentStarted) {
-                console.log("⚠️ Payment already started");
                 return;
             }
             
@@ -608,9 +588,7 @@ const TestSeriesPaymentScreen = ({navigation}) => {
                 
                 paymentStarted = true;
                 errorDiv.style.display = 'none';
-                
-                console.log("🚀 Starting test series payment with session ID: ${sessionData.payment_session_id}");
-                
+                                
                 // Start payment with Cashfree - this will open the payment modal directly
                 cashfreeInstance.checkout({
                     paymentSessionId: "${sessionData.payment_session_id}",
@@ -620,12 +598,10 @@ const TestSeriesPaymentScreen = ({navigation}) => {
                         backgroundColor: "#ffffff"
                     }
                 }).then(function(result) {
-                    console.log("✅ Payment completed:", result);
                     paymentStarted = false;
                     
                     // Send result to React Native
                     if (result && result.paymentDetails) {
-                        console.log("✅ Payment successful with details");
                         if (window.ReactNativeWebView) {
                             window.ReactNativeWebView.postMessage(JSON.stringify({
                                 type: 'payment_result',
@@ -639,7 +615,6 @@ const TestSeriesPaymentScreen = ({navigation}) => {
                             }));
                         }
                     } else {
-                        console.log("⚠️ Payment result incomplete:", result);
                         if (window.ReactNativeWebView) {
                             window.ReactNativeWebView.postMessage(JSON.stringify({
                                 type: 'payment_error',
@@ -678,12 +653,10 @@ const TestSeriesPaymentScreen = ({navigation}) => {
         
         // Listen for payment events from Cashfree
         window.addEventListener('message', function(event) {
-            console.log("📨 Received message:", event.data);
             
             if (event.data && event.data.type) {
                 switch(event.data.type) {
                     case 'payment_success':
-                        console.log("✅ Payment success event received");
                         if (window.ReactNativeWebView) {
                             window.ReactNativeWebView.postMessage(JSON.stringify({
                                 type: 'payment_result',
@@ -697,7 +670,6 @@ const TestSeriesPaymentScreen = ({navigation}) => {
                         }
                         break;
                     case 'payment_failed':
-                        console.log("❌ Payment failed event received");
                         if (window.ReactNativeWebView) {
                             window.ReactNativeWebView.postMessage(JSON.stringify({
                                 type: 'payment_error',
@@ -706,7 +678,6 @@ const TestSeriesPaymentScreen = ({navigation}) => {
                         }
                         break;
                     case 'payment_cancelled':
-                        console.log("❌ Payment cancelled event received");
                         if (window.ReactNativeWebView) {
                             window.ReactNativeWebView.postMessage(JSON.stringify({
                                 type: 'payment_result',
@@ -724,7 +695,6 @@ const TestSeriesPaymentScreen = ({navigation}) => {
         // Handle page visibility changes
         document.addEventListener('visibilitychange', function() {
             if (document.visibilityState === 'visible' && paymentStarted) {
-                console.log("📱 Page became visible during payment");
             }
         });
         

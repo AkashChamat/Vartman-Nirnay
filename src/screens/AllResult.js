@@ -8,7 +8,6 @@ import {
   Alert,
   TouchableOpacity,
   SafeAreaView,
-  StatusBar,
 } from 'react-native';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import { getAllResults } from '../util/apiCall';
@@ -32,7 +31,6 @@ const AllResults = ({ route, navigation }) => {
       setLoading(true);
       setError(null);
       
-      // console.log(`📊 ==> Fetching all results for test ID: ${testId}`);
       const response = await getAllResults(testId);
       
       // Handle different response structures
@@ -57,7 +55,6 @@ const AllResults = ({ route, navigation }) => {
       
       setResults(sortedResults);
       setCurrentPage(1); // Reset to first page when new data is loaded
-      // console.log(`✅ ==> Successfully loaded ${sortedResults.length} results`);
       
     } catch (err) {
       const errorMessage = err.message || 'Failed to load results';
@@ -149,7 +146,7 @@ const AllResults = ({ route, navigation }) => {
         </View>
         
         <View style={styles.scoreContainer}>
-          <Text style={styles.scoreValue}>{item.score || 0}</Text>
+          <Text style={styles.scoreValue}>{item.totalScore || 0}</Text>
         </View>
         
         <View style={[styles.rankContainer, { backgroundColor: rankColor + '20' }]}>
@@ -297,11 +294,10 @@ const AllResults = ({ route, navigation }) => {
   if (loading) {
     return (
       <SafeAreaView style={styles.container}>
-        <StatusBar barStyle="dark-content" backgroundColor="#FAFBFD" />
         <Header />
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#0288D1" />
-          <Text style={styles.loadingText}>Loading results...</Text>
+          <Text style={styles.loadingText}>Loading ranks...</Text>
         </View>
       </SafeAreaView>
     );
@@ -309,7 +305,6 @@ const AllResults = ({ route, navigation }) => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor="#FAFBFD" />
       <Header />
       
       <View style={styles.content}>
@@ -317,7 +312,7 @@ const AllResults = ({ route, navigation }) => {
         <View style={styles.titleSection}>
           <View style={styles.titleHeader}>
             <MaterialIcons name="emoji-events" size={24} color="#FFD700" />
-            <Text style={styles.pageTitle}>All Results</Text>
+            <Text style={styles.pageTitle}>All Ranks</Text>
           </View>
         </View>
 

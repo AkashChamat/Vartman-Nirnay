@@ -10,7 +10,6 @@ import {
   Platform,
   Dimensions,
   Modal,
-  StatusBar 
 } from 'react-native';
 import {WebView} from 'react-native-webview';
 import DropDownPicker from 'react-native-dropdown-picker';
@@ -21,11 +20,13 @@ import Footer from '../Components/Footer';
 import {useAuth} from '../Auth/AuthContext';
 import {getUserByEmail, getAPI} from '../util/apiCall';
 import {ebookordersUrl, testseriesordersUrl} from '../util/Url';
+import {useNavigation} from '@react-navigation/native'; // Add this import for navigation
 
 const {width, height} = Dimensions.get('window');
 
 const Purchase = () => {
   const {getUserEmail} = useAuth();
+  const navigation = useNavigation(); // Add navigation hook
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [orders, setOrders] = useState([]);
@@ -158,9 +159,6 @@ const Purchase = () => {
       url,
     )}&embedded=true`;
 
-    console.log('Opening PDF:', item?.vmMaterial?.chapterName);
-    console.log('PDF URL:', url);
-    console.log('Viewer URL:', viewerUrl);
 
     setViewingPdf({
       url: viewerUrl,
@@ -168,6 +166,14 @@ const Purchase = () => {
       originalUrl: url,
     });
   };
+
+  const handleViewTestPapers = item => {
+    navigation.navigate('TestPaper', {
+      seriesId: item?.testSeries?.id || item.id || item.orderId,
+      seriesName: item?.testSeries?.examTitle || 'Test Series',
+    });
+  };
+
   const closePdfViewer = () => {
     setViewingPdf(null);
     setPdfLoading(false);
@@ -201,12 +207,27 @@ const Purchase = () => {
   };
 
   const renderActionButtons = item => {
+    // For test series, show "View Papers" button
+    if (item.type === 'testseries') {
+      return (
+        <View style={styles.actionButtonsContainer}>
+          <TouchableOpacity
+            style={styles.viewPapersButton}
+            onPress={() => handleViewTestPapers(item)}>
+            <Icon name="assignment" size={16} color="#FFFFFF" />
+            <Text style={styles.viewPapersButtonText}>View Papers</Text>
+          </TouchableOpacity>
+        </View>
+      );
+    }
+
+    // For ebooks, show the original View/Download buttons
     const canDownload = item?.vmMaterial?.saveToDevice;
     const isDownloading = downloadProgress[item.orderId]?.isDownloading;
 
     return (
       <View style={styles.actionButtonsContainer}>
-        {/* View Button - Always visible */}
+        {/* View Button - Always visible for ebooks */}
         <TouchableOpacity
           style={styles.viewButton}
           onPress={() => handleViewPDF(item)}>
@@ -249,7 +270,9 @@ const Purchase = () => {
                 color={getTypeColor(item.type)}
               />
               <Text style={styles.chapterTitle} numberOfLines={2}>
-                {item?.vmMaterial?.chapterName || 'Untitled'}
+                {item?.vmMaterial?.chapterName ||
+                  item?.testSeries?.examTitle ||
+                  'Untitled'}
               </Text>
             </View>
           </View>
@@ -361,7 +384,7 @@ const Purchase = () => {
         visible={!!viewingPdf}
         animationType="slide"
         onRequestClose={closePdfViewer}
-        statusBarTranslucent={false}>
+        >
         <View style={styles.pdfModalContainer}>
           <View style={styles.pdfHeader}>
             <TouchableOpacity
@@ -386,11 +409,9 @@ const Purchase = () => {
               source={{uri: viewingPdf.url}}
               style={styles.webView}
               onLoadStart={() => {
-                console.log('PDF loading started');
                 setPdfLoading(true);
               }}
               onLoadEnd={() => {
-                console.log('PDF loading completed');
                 setPdfLoading(false);
               }}
               onError={error => {
@@ -410,7 +431,6 @@ const Purchase = () => {
                 </View>
               )}
               onShouldStartLoadWithRequest={request => {
-                console.log('Navigation request:', request.url);
                 return (
                   request.url.includes('docs.google.com') ||
                   request.url.includes('googleusercontent.com')
@@ -631,6 +651,27 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginLeft: 4,
   },
+  // New style for View Papers button
+  viewPapersButton: {
+    backgroundColor: '#8B5CF6',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    shadowColor: '#8B5CF6',
+    shadowOffset: {width: 0, height: 1},
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  viewPapersButtonText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '600',
+    marginLeft: 4,
+  },
   progressBarContainer: {
     height: 3,
     backgroundColor: '#E5E7EB',
@@ -671,8 +712,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#3B82F6',
     paddingHorizontal: 16,
     paddingVertical: 12,
-    paddingTop: Platform.OS === 'ios' ? 44 : (StatusBar.currentHeight || 0) + 12,
-    shadowColor: '#000',
+      shadowColor: '#000',
     shadowOffset: {
       width: 0,
       height: 2,
@@ -683,13 +723,13 @@ const styles = StyleSheet.create({
   },
   closeButton: {
     marginRight: 16,
-    padding:4
+    padding: 4,
   },
   pdfHeaderTitle: {
     color: '#FFFFFF',
     fontSize: 18,
     fontWeight: '600',
-    flex:1
+    flex: 1,
   },
   webView: {
     flex: 1,

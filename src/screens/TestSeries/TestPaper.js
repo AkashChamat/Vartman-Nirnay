@@ -1,4 +1,4 @@
-import React, {useState, useEffect} from 'react';
+import React, {useState, useEffect, useRef} from 'react';
 import {
   View,
   Text,
@@ -6,467 +6,700 @@ import {
   TouchableOpacity,
   StyleSheet,
   Dimensions,
+  ActivityIndicator,
+  Alert,
+  Image,
+  Animated,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useAuth } from '../../Auth/AuthContext';
 import {useRoute, useNavigation} from '@react-navigation/native';
+import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
+import Icon from 'react-native-vector-icons/MaterialIcons';
 import Header from '../../Components/Header';
 import Footer from '../../Components/Footer';
+import {
+  getPapersBySeries,
+  getUserId,
+  getAttemptCount,
+} from '../../util/apiCall';
+
+// CHANGE THIS PATH TO MATCH YOUR ACTUAL FILE LOCATION
+import { generateAndDownloadTestPaper } from '../../Components/PDFGenerator';
 
 const {width} = Dimensions.get('window');
 
 const TestPaper = () => {
   const route = useRoute();
   const navigation = useNavigation();
-  const [papers, setPapers] = useState([]);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const itemsPerPage = 10;
-
-  const {seriesId, seriesData} = route.params;
-  console.log('📘 seriesData:', seriesData);
-
-  const isPaid = seriesData?.pricing > 0 || seriesData?.mrp > 0;
-  console.log('💰 isPaid:', isPaid);
+  const {seriesId} = route.params;
+  const { getUserId: getAuthUserId } = useAuth();
+  const [testPapers, setTestPapers] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [attemptCounts, setAttemptCounts] = useState({});
+  const [error, setError] = useState(null);
+  const [loadingAttempts, setLoadingAttempts] = useState(false);
 
   useEffect(() => {
-    if (seriesData && seriesData.testPapers) {
-      const activePapers = seriesData.testPapers.filter(
-        paper => paper.status === true,
+    fetchTestPapers();
+  }, []);
+
+  const fetchTestPapers = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await getPapersBySeries(seriesId);
+      const papers =
+        (response.data || response)?.filter(p => p.status === true) || [];
+      // Sort papers by ID in descending order (latest first)
+      const sortedPapers = papers.sort((a, b) => b.id - a.id);
+      setTestPapers(sortedPapers);
+      await fetchAttemptCounts(sortedPapers);
+    } catch (err) {
+      setError('Failed to load test papers');
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchAttemptCounts = async papers => {
+    try {
+      setLoadingAttempts(true);
+      const userId = await getUserId();
+      if (!userId) return;
+
+      const attemptData = {};
+      await Promise.all(
+        papers.map(async paper => {
+          try {
+            const result = await getAttemptCount(userId, paper.id);
+            let count = 0;
+
+            if (typeof result === 'number') {
+              count = result;
+            } else if (result?.attemptCount !== undefined) {
+              count = result.attemptCount;
+            } else if (result?.count !== undefined) {
+              count = result.count;
+            } else if (result?.data?.attemptCount !== undefined) {
+              count = result.data.attemptCount;
+            } else if (result?.data?.count !== undefined) {
+              count = result.data.count;
+            }
+
+            attemptData[paper.id] = count;
+          } catch (e) {
+            console.error(
+              `Failed to fetch attempt count for paper ${paper.id}`,
+              e,
+            );
+            attemptData[paper.id] = 0;
+          }
+        }),
       );
-      setPapers(activePapers);
-      setTotalPages(Math.ceil(activePapers.length / itemsPerPage));
+
+      setAttemptCounts(attemptData);
+    } catch (err) {
+      console.error('Error in fetchAttemptCounts:', err);
+    } finally {
+      setLoadingAttempts(false);
     }
-  }, [seriesData]);
-
-  const getCurrentPageData = () => {
-    const startIndex = (currentPage - 1) * itemsPerPage;
-    const endIndex = startIndex + itemsPerPage;
-    return papers.slice(startIndex, endIndex);
   };
 
-  const handleStartTest = paper => {
-    if (!paper.status) {
-      alert('This test is currently not active.');
-      return;
-    }
-    alert(`Starting test: ${paper.testTitle}`);
+  const getAttemptCountForPaper = paperId => {
+    return attemptCounts?.[paperId] || 0;
   };
 
-  const formatDate = dateString => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-    });
-  };
+  // Optimized BlinkingNewBadge component
+  const BlinkingNewBadge = ({testTitle}) => {
+    const [fadeAnim] = useState(new Animated.Value(1));
+    const [shouldBlink, setShouldBlink] = useState(true);
+    const animationRef = useRef(null);
+    const timeoutRef = useRef(null);
 
-  const formatTime = timeString => {
-    const [hours, minutes] = timeString.split(':');
-    const date = new Date();
-    date.setHours(parseInt(hours), parseInt(minutes));
-    return date.toLocaleTimeString('en-US', {
-      hour: 'numeric',
-      minute: '2-digit',
-      hour12: true,
-    });
-  };
+    useEffect(() => {
+      if (!shouldBlink) return;
 
-  const renderPaper = ({item, index}) => (
-    <View
-      style={[
-        styles.paperCard,
-        {backgroundColor: index % 2 === 0 ? '#ffffff' : '#fafbfc'},
-      ]}>
-      <View style={styles.cardHeader}>
-        <View style={styles.titleContainer}>
-          <Text style={styles.paperTitle} numberOfLines={1}>
-            {item.testTitle}
-          </Text>
-          <View style={styles.statusContainer}>
-            <View
-              style={[
-                styles.statusDot,
-                {backgroundColor: item.status ? '#10b981' : '#ef4444'},
-              ]}
-            />
-            <Text
-              style={[
-                styles.statusText,
-                {color: item.status ? '#10b981' : '#ef4444'},
-              ]}>
-              {item.status ? 'Live' : 'Inactive'}
-            </Text>
-          </View>
+      const startBlinking = () => {
+        animationRef.current = Animated.loop(
+          Animated.sequence([
+            Animated.timing(fadeAnim, {
+              toValue: 0.3,
+              duration: 350,
+              useNativeDriver: true,
+            }),
+            Animated.timing(fadeAnim, {
+              toValue: 1,
+              duration: 350,
+              useNativeDriver: true,
+            }),
+          ]),
+          {iterations: -1},
+        );
+
+        animationRef.current.start();
+      };
+
+      startBlinking();
+
+      // Stop blinking after 10 seconds to reduce resource usage
+      timeoutRef.current = setTimeout(() => {
+        setShouldBlink(false);
+      }, 10000);
+
+      return () => {
+        if (animationRef.current) {
+          animationRef.current.stop();
+          animationRef.current = null;
+        }
+        if (timeoutRef.current) {
+          clearTimeout(timeoutRef.current);
+          timeoutRef.current = null;
+        }
+      };
+    }, [fadeAnim, shouldBlink]);
+
+    if (!shouldBlink) {
+      return (
+        <View style={styles.newBadge}>
+          <Text style={styles.newBadgeText}>NEW</Text>
         </View>
-      </View>
-
-      <View style={styles.cardContent}>
-        <View style={styles.statsContainer}>
-          <View style={styles.statItem}>
-            <Text style={styles.statNumber}>{item.noOfQuestions}</Text>
-            <Text style={styles.statLabel}>Questions</Text>
-          </View>
-          <View style={styles.statDivider} />
-          <View style={styles.statItem}>
-            <Text style={styles.statNumber}>{item.totalMarks}</Text>
-            <Text style={styles.statLabel}>Marks</Text>
-          </View>
-          <View style={styles.statDivider} />
-          <View style={styles.statItem}>
-            <Text style={styles.statNumber}>{item.duration}</Text>
-            <Text style={styles.statLabel}>Minutes</Text>
-          </View>
-        </View>
-
-        <View style={styles.timeContainer}>
-          <View style={styles.timeItem}>
-            <Text style={styles.timeLabel}>
-              📅 {formatDate(item.testStartDate)}
-            </Text>
-          </View>
-          <View style={styles.timeItem}>
-            <Text style={styles.timeLabel}>
-              🕐 {formatTime(item.startTime)} - {formatTime(item.endTime)}
-            </Text>
-          </View>
-        </View>
-      </View>
-
-      <View style={styles.actionContainer}>
-        {seriesData?.pricing === 0 && (
-          <TouchableOpacity
-            style={[
-              styles.actionButton,
-              {
-                backgroundColor: item.status ? '#3b82f6' : '#e5e7eb',
-                opacity: item.status ? 1 : 0.6,
-              },
-            ]}
-            onPress={() => handleStartTest(item)}
-            disabled={!item.status}>
-            <Text
-              style={[
-                styles.actionText,
-                {color: item.status ? '#ffffff' : '#9ca3af'},
-              ]}>
-              {item.status ? 'Start Test' : 'Unavailable'}
-            </Text>
-          </TouchableOpacity>
-        )}
-
-        {item.showTestResult && (
-          <TouchableOpacity style={styles.resultButton}>
-            <Text style={styles.resultText}>Results</Text>
-          </TouchableOpacity>
-        )}
-      </View>
-    </View>
-  );
-
-  const renderPagination = () => {
-    if (totalPages <= 1) return null;
-
-    const pageNumbers = [];
-    const maxVisiblePages = 5;
-    let startPage = Math.max(1, currentPage - Math.floor(maxVisiblePages / 2));
-    let endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
-
-    if (endPage - startPage + 1 < maxVisiblePages) {
-      startPage = Math.max(1, endPage - maxVisiblePages + 1);
-    }
-
-    for (let i = startPage; i <= endPage; i++) {
-      pageNumbers.push(i);
+      );
     }
 
     return (
-      <View style={styles.paginationContainer}>
-        <TouchableOpacity
-          style={[
-            styles.paginationButton,
-            {opacity: currentPage === 1 ? 0.3 : 1},
-          ]}
-          onPress={() => setCurrentPage(Math.max(1, currentPage - 1))}
-          disabled={currentPage === 1}>
-          <Text style={styles.paginationText}>‹</Text>
-        </TouchableOpacity>
+      <Animated.View style={[styles.newBadge, {opacity: fadeAnim}]}>
+        <Text style={styles.newBadgeText}>NEW</Text>
+      </Animated.View>
+    );
+  };
 
-        {pageNumbers.map(page => (
-          <TouchableOpacity
-            key={page}
-            style={[
-              styles.paginationButton,
-              currentPage === page && styles.paginationButtonActive,
-            ]}
-            onPress={() => setCurrentPage(page)}>
-            <Text
-              style={[
-                styles.paginationText,
-                currentPage === page && styles.paginationTextActive,
-              ]}>
-              {page}
-            </Text>
-          </TouchableOpacity>
-        ))}
+  // Check if paper is the latest (first in sorted array)
+  const isLatestPaper = testPaper => {
+    return testPapers.length > 0 && testPapers[0].id === testPaper.id;
+  };
 
-        <TouchableOpacity
-          style={[
-            styles.paginationButton,
-            {opacity: currentPage === totalPages ? 0.3 : 1},
-          ]}
-          onPress={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
-          disabled={currentPage === totalPages}>
-          <Text style={styles.paginationText}>›</Text>
-        </TouchableOpacity>
+  const handleStartTest = paper => {
+    const attemptCount = getAttemptCountForPaper(paper.id);
+    if (!paper.multipleAttemptsAllowed && attemptCount >= 1) {
+      Alert.alert('Attempts Over', 'You have already attempted this test.');
+      return;
+    }
+    if (paper.maxAttemptsAllowed && attemptCount >= paper.maxAttemptsAllowed) {
+      Alert.alert('Limit Exceeded', 'Maximum attempts reached for this test.');
+      return;
+    }
+
+    navigation.navigate('ChampionTest', {
+      testId: paper.id,
+      testTitle: paper.testTitle || 'Test Paper',
+      currentAttempts: attemptCount,
+      source: 'TestPaper',
+      maxAttemptsAllowed: paper.maxAttemptsAllowed,
+      multipleAttemptsAllowed: paper.multipleAttemptsAllowed,
+    });
+  };
+
+  const handleViewAllResult = testPaper => {
+
+    navigation.navigate('AllResult', {
+      testId: testPaper.id,
+      testTitle: testPaper.testTitle,
+      pdfUrl: testPaper.allResultPdf || null,
+    });
+  };
+
+  const handleViewMyResult = async testPaper => {
+    try {
+      
+      let userId = null;
+            try {
+        userId = getAuthUserId();
+        if (userId) {
+        }
+      } catch (authError) {
+        console.error('❌ AuthContext getUserId failed:', authError);
+      }
+      
+      // Method 2: Try apiCall method
+      if (!userId) {
+        userId = await getUserId();
+      }
+      
+      // Method 3: Try AsyncStorage userData
+      if (!userId) {
+        try {
+          const storedUserData = await AsyncStorage.getItem('userData');
+          if (storedUserData) {
+            const parsedUserData = JSON.parse(storedUserData);
+            userId = parsedUserData.id;
+          }
+        } catch (storageError) {
+          console.error('❌ AsyncStorage userData error:', storageError);
+        }
+      }
+      
+      // Method 4: Try AsyncStorage userId key
+      if (!userId) {
+        try {
+          const storedUserId = await AsyncStorage.getItem('userId');
+          if (storedUserId) {
+            userId = storedUserId;
+          }
+        } catch (storageError) {
+          console.error('❌ AsyncStorage userId error:', storageError);
+        }
+      }
+      
+      if (!userId) {
+        console.error('❌ Could not get user ID from any method');
+        Alert.alert('Error', 'User not authenticated. Please login again.');
+        return;
+      }
+
+      // Check if user has attempted the test
+      const attemptCount = getAttemptCountForPaper(testPaper.id);
+
+      if (attemptCount === 0) {
+        Alert.alert(
+          'No Attempts Found',
+          'Please complete the test first to view your result.',
+          [{ text: 'OK', style: 'default' }],
+        );
+        return;
+      }
+
+      navigation.navigate('ChampionResult', {
+        userId: userId,
+        testPaperId: testPaper.id,
+        testTitle: testPaper.testTitle,
+        source: 'TestPaper',
+      });
+    } catch (error) {
+      console.error('Error in handleViewMyResult:', error);
+      Alert.alert('Error', 'Failed to load result');
+    }
+  };
+
+  const handleDownloadTestPaper = async (testPaper) => {
+    try {
+      if (!testPaper) {
+        Alert.alert('Error', 'Test paper data is not available');
+        return;
+      }
+
+      if (!testPaper.testTitle) {
+        Alert.alert('Error', 'Test paper title is missing');
+        return;
+      }
+
+      Alert.alert('Please Wait', 'Generating PDF... This may take a moment.');
+
+      // Call the PDF generator utility with proper error handling
+      await generateAndDownloadTestPaper(testPaper);
+            
+    } catch (error) {
+      console.error('❌ Download Error:', error);
+      
+      // Enhanced error messages
+      let errorMessage = 'Unable to download the test paper. Please try again.';
+      
+      if (error.message?.includes('Permission')) {
+        errorMessage = 'Storage permission is required to download the PDF. Please grant permission and try again.';
+      } else if (error.message?.includes('network') || error.message?.includes('Network')) {
+        errorMessage = 'Network error occurred. Please check your connection and try again.';
+      } else if (error.message?.includes('space') || error.message?.includes('storage')) {
+        errorMessage = 'Insufficient storage space. Please free up some space and try again.';
+      }
+      
+      Alert.alert(
+        'Download Failed', 
+        errorMessage + '\n\nError details: ' + (error.message || 'Unknown error')
+      );
+    }
+  };
+
+  const renderTestCard = ({item}) => {
+    const attemptCount = getAttemptCountForPaper(item.id);
+    const isNew = isLatestPaper(item);
+    const hasValidImage = item.image && item.image.trim() !== '';
+
+    return (
+      <View style={styles.card}>
+        <View style={styles.imageContainer}>
+          {hasValidImage ? (
+            <Image
+              source={{uri: item.image}}
+              style={styles.testImage}
+              resizeMode="contain"
+              onError={error => {
+                console.warn('Image failed to load:', item.image, error);
+              }}
+            />
+          ) : (
+            <View style={styles.noImageContainer}>
+              <MaterialIcons name="image" size={40} color="#DFE3E8" />
+              <Text style={styles.noImageText}>No Image</Text>
+            </View>
+          )}
+          {isNew && <BlinkingNewBadge testTitle={item.testTitle} />}
+        </View>
+
+        <View style={styles.cardContent}>
+          <Text style={styles.cardTitle} numberOfLines={2}>
+            {item.testTitle}
+          </Text>
+
+          <View style={styles.detailsContainer}>
+            <View style={styles.detailRow}>
+              <Text style={styles.detailLabel}>Questions:</Text>
+              <Text style={styles.detailValue}>{item.noOfQuestions}</Text>
+            </View>
+
+            <View style={styles.detailRow}>
+              <Text style={styles.detailLabel}>Marks:</Text>
+              <Text style={styles.detailValue}>{item.totalMarks}</Text>
+            </View>
+
+            <View style={styles.detailRow}>
+              <Text style={styles.detailLabel}>Time:</Text>
+              <Text style={styles.detailValue}>{item.duration} min</Text>
+            </View>
+          </View>
+
+          <View style={styles.buttonContainerCompact}>
+            <TouchableOpacity
+              style={styles.startButtonCompact}
+              onPress={() => handleStartTest(item)}>
+              <Text style={styles.startButtonText}>Start Test</Text>
+            </TouchableOpacity>
+
+            <View style={styles.resultActionsGroup}>
+              {/* All Result Button */}
+              {item.showAllResult && (
+                <TouchableOpacity
+                  style={styles.resultButtonCompact}
+                  onPress={() => handleViewAllResult(item)}>
+                  <Text style={styles.resultButtonTextCompact}>All Result</Text>
+                </TouchableOpacity>
+              )}
+
+              {/* My Result Button */}
+              {item.showTestResult && (
+                <TouchableOpacity
+                  style={styles.resultButtonCompact}
+                  onPress={() => handleViewMyResult(item)}>
+                  <Text style={styles.resultButtonTextCompact}>My Result</Text>
+                </TouchableOpacity>
+              )}
+
+              {/* Download Button */}
+              {item.downloadTestPaper && (
+                <TouchableOpacity
+                  style={styles.downloadIconButton}
+                  onPress={() => handleDownloadTestPaper(item)}>
+                  <Icon name="file-download" size={18} color="#3182CE" />
+                </TouchableOpacity>
+              )}
+            </View>
+          </View>
+        </View>
       </View>
     );
   };
 
-  const renderEmptyComponent = () => (
-    <View style={styles.emptyContainer}>
-      <Text style={styles.emptyIcon}>📝</Text>
-      <Text style={styles.emptyTitle}>No Active Tests</Text>
-      <Text style={styles.emptyMessage}>
-        Check back later for new test papers
+  const renderEmptyState = () => (
+    <View style={styles.emptyState}>
+      <MaterialIcons name="assignment" size={60} color="#DFE3E8" />
+      <Text style={styles.emptyTitle}>No Test Papers Available</Text>
+      <Text style={styles.emptySubtitle}>
+        Check back later for new test papers!
       </Text>
     </View>
   );
 
+  const renderErrorState = () => (
+    <View style={styles.emptyState}>
+      <MaterialIcons name="error-outline" size={60} color="#F28B8B" />
+      <Text style={styles.emptyTitle}>Error Loading Tests</Text>
+      <Text style={styles.emptySubtitle}>{error}</Text>
+      <TouchableOpacity style={styles.retryButton} onPress={fetchTestPapers}>
+        <Text style={styles.retryText}>Retry</Text>
+      </TouchableOpacity>
+    </View>
+  );
+
+  if (loading) {
+    return (
+      <View style={styles.container}>
+        <Header />
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#0288D1" />
+          <Text style={styles.loadingText}>Loading test papers...</Text>
+        </View>
+        <Footer />
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
       <Header />
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>
-          {seriesData?.examTitle || 'Test Papers'}
-        </Text>
+      <View style={styles.content}>
+        <View style={styles.headerSection}>
+          <Text style={styles.pageTitle}>Test Papers</Text>
+          <Text style={styles.pageSubtitle}>
+            Choose a test to begin your challenge
+          </Text>
+        </View>
 
-        {seriesData?.pricing > 0 && (
-          <TouchableOpacity
-            style={styles.getAccessButton}
-            onPress={() =>
-              navigation.navigate('SeriesPayment', {
-                seriesId: seriesData.id,
-                amount:seriesData.pricing,
-              })
-            }>
-            <Text style={styles.getAccessText}>Get Access</Text>
-          </TouchableOpacity>
+        {error ? (
+          renderErrorState()
+        ) : (
+          <FlatList
+            data={testPapers}
+            renderItem={renderTestCard}
+            keyExtractor={item => item.id.toString()}
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={styles.listContainer}
+            ListEmptyComponent={renderEmptyState}
+            refreshing={loading}
+            onRefresh={fetchTestPapers}
+          />
         )}
       </View>
-
-      <FlatList
-        data={getCurrentPageData()}
-        renderItem={renderPaper}
-        keyExtractor={item => item.id.toString()}
-        contentContainerStyle={styles.listContainer}
-        showsVerticalScrollIndicator={false}
-        ListEmptyComponent={renderEmptyComponent}
-      />
-
-      {renderPagination()}
-      <Footer />
+      <Footer/>
     </View>
   );
 };
 
+export default TestPaper;
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8fafc',
+    backgroundColor: '#FAFBFD',
   },
-  header: {
-    backgroundColor: '#ffffff',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f1f5f9',
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#1e293b',
-    textAlign: 'center',
-  },
-  getAccessButton: {
-    backgroundColor: '#3b82f6',
-    marginTop: 10,
-    marginHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  getAccessText: {
-    color: '#ffffff',
-    fontWeight: '600',
-    fontSize: 16,
-  },
-  getAccessButtonText: {
-    color: '#1e293b',
-    fontWeight: '600',
-    fontSize: 14,
-  },
-  listContainer: {
-    padding: 16,
-    paddingBottom: 8,
-  },
-  paperCard: {
-    marginBottom: 12,
-    borderRadius: 12,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: '#f1f5f9',
-    shadowColor: '#000',
-    shadowOffset: {width: 0, height: 1},
-    shadowOpacity: 0.05,
-    shadowRadius: 3,
-    elevation: 1,
-  },
-  cardHeader: {
-    marginBottom: 12,
-  },
-  titleContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  paperTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1e293b',
+  content: {
     flex: 1,
-    marginRight: 12,
+    paddingHorizontal: 16,
   },
-  statusContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  statusDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    marginRight: 6,
-  },
-  statusText: {
-    fontSize: 12,
-    fontWeight: '500',
-  },
-  cardContent: {
-    marginBottom: 12,
-  },
-  statsContainer: {
-    flexDirection: 'row',
-    backgroundColor: '#f8fafc',
-    borderRadius: 8,
-    padding: 12,
+  headerSection: {
+    paddingVertical: 12,
     marginBottom: 8,
   },
-  statItem: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  statNumber: {
-    fontSize: 16,
+  pageTitle: {
+    fontSize: 18,
     fontWeight: '700',
-    color: '#3b82f6',
+    color: '#0288D1',
+    textAlign: 'center',
+    marginBottom: 4,
   },
-  statLabel: {
-    fontSize: 11,
-    color: '#64748b',
-    marginTop: 2,
-  },
-  statDivider: {
-    width: 1,
-    backgroundColor: '#e2e8f0',
-    marginHorizontal: 8,
-  },
-  timeContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  timeItem: {
-    flex: 1,
-  },
-  timeLabel: {
+  pageSubtitle: {
     fontSize: 12,
-    color: '#64748b',
+    color: '#0D47A1',
     textAlign: 'center',
   },
-  actionContainer: {
+  listContainer: {
+    paddingBottom: 100,
+  },
+  card: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    marginBottom: 16,
+    elevation: 3,
+    shadowColor: '#8B9DC3',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 6,
+    borderWidth: 0.5,
+    borderColor: '#F0F4F8',
+    overflow: 'hidden',
+  },
+  imageContainer: {
+    position: 'relative',
+    height: 180,
+  },
+  testImage: {
+    width: '100%',
+    height: '100%',
+  },
+  noImageContainer: {
+    width: '100%',
+    height: '100%',
+    backgroundColor: '#F7FAFC',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E2E8F0',
+  },
+  noImageText: {
+    fontSize: 12,
+    color: '#A0AEC0',
+    fontWeight: '500',
+    marginTop: 8,
+  },
+  cardContent: {
+    padding: 16,
+  },
+  cardTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#2D3748',
+    marginBottom: 12,
+    lineHeight: 22,
+    alignSelf: 'center',
+    textAlign: 'center',
+  },
+  detailsContainer: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+    paddingHorizontal: 8,
+  },
+  detailRow: {
+    alignItems: 'center',
+  },
+  detailLabel: {
+    fontSize: 12,
+    color: '#8B9DC3',
+    fontWeight: '500',
+    marginBottom: 2,
+  },
+  detailValue: {
+    fontSize: 16,
+    color: '#2D3748',
+    fontWeight: '700',
+  },
+  attemptInfoContainer: {
+    backgroundColor: '#F7FAFC',
+    borderRadius: 8,
+    padding: 8,
+    marginBottom: 12,
+    alignItems: 'center',
+  },
+  attemptText: {
+    fontSize: 12,
+    color: '#4A5568',
+    fontWeight: '500',
+  },
+  buttonContainerCompact: {
+    flexDirection: 'column',
     gap: 8,
   },
-  actionButton: {
-    flex: 2,
-    paddingVertical: 10,
-    borderRadius: 8,
+  startButtonCompact: {
+    backgroundColor: '#3182CE',
+    paddingVertical: 12,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  startButtonText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  resultActionsGroup: {
+    flexDirection: 'row',
+    gap: 6,
     alignItems: 'center',
   },
-  actionText: {
-    fontSize: 14,
+  resultButtonCompact: {
+    flex: 1,
+    paddingVertical: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#3182CE',
+  },
+  resultButtonTextCompact: {
+    color: '#3182CE',
+    fontSize: 12,
     fontWeight: '600',
   },
-  resultButton: {
-    flex: 1,
-    paddingVertical: 10,
-    borderRadius: 8,
+  downloadIconButton: {
+    padding: 8,
     alignItems: 'center',
-    backgroundColor: '#f1f5f9',
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-  },
-  resultText: {
-    color: '#64748b',
-    fontSize: 14,
-    fontWeight: '500',
-  },
-  paginationContainer: {
-    flexDirection: 'row',
     justifyContent: 'center',
-    alignItems: 'center',
-    paddingVertical: 16,
-    paddingHorizontal: 20,
-    backgroundColor: '#ffffff',
-    borderTopWidth: 1,
-    borderTopColor: '#f1f5f9',
-  },
-  paginationButton: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    marginHorizontal: 2,
-    borderRadius: 6,
-    backgroundColor: '#f8fafc',
     minWidth: 36,
-    alignItems: 'center',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#3182CE',
   },
-  paginationButtonActive: {
-    backgroundColor: '#3b82f6',
-  },
-  paginationText: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#64748b',
-  },
-  paginationTextActive: {
-    color: '#ffffff',
-  },
-  emptyContainer: {
-    alignItems: 'center',
+  loadingContainer: {
+    flex: 1,
     justifyContent: 'center',
-    paddingVertical: 60,
+    alignItems: 'center',
   },
-  emptyIcon: {
-    fontSize: 48,
-    marginBottom: 16,
+  loadingText: {
+    fontSize: 16,
+    color: '#0288D1',
+    marginTop: 12,
+  },
+  emptyState: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 32,
   },
   emptyTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#1e293b',
-    marginBottom: 8,
-  },
-  emptyMessage: {
-    fontSize: 14,
-    color: '#64748b',
+    color: '#4A5568',
+    marginTop: 12,
+    marginBottom: 6,
     textAlign: 'center',
   },
+  emptySubtitle: {
+    fontSize: 14,
+    color: '#8B9DC3',
+    textAlign: 'center',
+    lineHeight: 20,
+  },
+  retryButton: {
+    backgroundColor: '#7C9CBF',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 12,
+    marginTop: 16,
+  },
+  retryText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  newBadge: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    backgroundColor: 'red',
+    width: width * 0.3,
+    height: width * 0.06,
+    alignItems: 'center',
+    justifyContent: 'center',
+    transform: [
+      {rotate: '-45deg'},
+      {translateX: -width * 0.09},
+      {translateY: -width * 0.05},
+    ],
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: {width: 0, height: 2},
+    shadowOpacity: 0.2,
+    shadowRadius: 3,
+    zIndex: 10,
+  },
+  newBadgeText: {
+    color: 'yellow',
+    fontWeight: 'bold',
+    fontSize: width * 0.035,
+    letterSpacing: 0.5,
+    transform: [{rotate: '0deg'}],
+  },
 });
-export default TestPaper;

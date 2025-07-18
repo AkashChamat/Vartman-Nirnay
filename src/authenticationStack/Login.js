@@ -321,7 +321,6 @@ const handleRegister = async () => {
     const response = await registerAPI(payload);
 
     if (response) {
-      console.log('[registerAPI] Success Response:', response.data);
       let successMessage = 'Account created successfully!';
 
       if (response.message) {

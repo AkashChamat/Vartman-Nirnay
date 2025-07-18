@@ -46,9 +46,7 @@ const TestSeries = () => {
     try {
       setCategoriesLoading(true);
 
-      console.log('📡 Fetching categories from API...');
       const response = await fetchVTCategories();
-      console.log('✅ Categories API Response:', response);
 
       if (Array.isArray(response)) {
         setCategories(response);
@@ -105,10 +103,7 @@ const TestSeries = () => {
 
     setCategories(categoryObjects);
     updateDropdownItems(categoryObjects);
-    console.log(
-      '✅ Fallback - Extracted Categories from Test Series:',
-      categoryObjects,
-    );
+    
   };
 
   const fetchTestSeries = async () => {
@@ -121,7 +116,6 @@ const TestSeries = () => {
       }
 
       const response = await testseries();
-      console.log('✅ API Response:', response);
 
       let testData = [];
       if (response && response.data) {
@@ -187,7 +181,7 @@ const TestSeries = () => {
   // Get appropriate button text based on pricing
   const getButtonText = item => {
     if (item.pricing === 0 || item.pricing === 0.0) {
-      return 'View Test';
+      return 'View Papers';
     } else {
       return 'Explore';
     }
@@ -223,13 +217,13 @@ const TestSeries = () => {
           <Image
             source={{uri: item.image}}
             style={styles.testImage}
-            resizeMode="cover"
+            resizeMode="contain"
           />
 
           {/* Category Badge */}
-          <View style={styles.categoryBadge}>
+          {/* <View style={styles.categoryBadge}>
             <Text style={styles.categoryText}>{item.category}</Text>
-          </View>
+          </View> */}
         </View>
 
         {/* Content */}
@@ -239,7 +233,7 @@ const TestSeries = () => {
           </Text>
 
           {/* Features Section */}
-          {hasFeatures && (
+          {/* {hasFeatures && (
             <View style={styles.featuresSection}>
               <TouchableScale
                 style={styles.featuresHeader}
@@ -295,7 +289,7 @@ const TestSeries = () => {
                 </View>
               )}
             </View>
-          )}
+          )} */}
 
           {/* Action Section */}
           <View style={styles.bottomSection}>
@@ -386,6 +380,7 @@ const TestSeries = () => {
       seriesData: item,
     });
   };
+
 
   const handleRetry = () => {
     fetchTestSeries();
@@ -642,7 +637,7 @@ const styles = StyleSheet.create({
   },
   imageContainer: {
     position: 'relative',
-    height: 180,
+    height: 200,
   },
   testImage: {
     width: '100%',

@@ -15,7 +15,7 @@ export const winnerUrl = `${baseUrl}/AllVNWinners`;
 export const sponsorUrl = `${baseUrl}/AllVNSponsors`;
 export const marqueeUrl = `${baseUrl}/AllMarquees`;
 export const championpaperUrl = `${baseUrl}/AllTestPapers`;
-export const championtestUrl = `${baseUrl}/TestPaperById`;
+export const TestPaperByIdUrl = `${baseUrl}/TestPaperById`;
 export const submitchamptestUrl = `${baseUrl}/submitTest`;
 export const champresultUrl = `${baseUrl}/TestResult`;
 export const AllAanalysis = `${baseUrl}/QuestionAnalysisResponse`;
@@ -42,9 +42,6 @@ export const vtcategoriesUrl = `${baseUrl}/AllVTCategories`;
 export const ebookordersUrl = `${baseUrl}/user`;
 export const testseriesordersUrl = `${baseUrl}/testseries/user`;
 export const testseriesPaymentUrl = `${baseUrl}/createTestSeriesPayment`;
-
-
-
-
-
+export const bookpaymentUrl = `${baseUrl}/createBookPayment`;
+export const paidbooksUrl = `${baseUrl}//bookorders/user`;
 

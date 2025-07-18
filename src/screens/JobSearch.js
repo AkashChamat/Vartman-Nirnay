@@ -7,7 +7,6 @@ import {
   TouchableOpacity,
   Dimensions,
   SafeAreaView,
-  StatusBar,
   ActivityIndicator,
   Linking,
   Alert,
@@ -534,7 +533,6 @@ const JobAlerts = () => {
   if (loading) {
     return (
       <SafeAreaView style={styles.loadingContainer}>
-        <StatusBar backgroundColor="#5B95C4" barStyle="light-content" />
         <ActivityIndicator size="large" color="#5B95C4" />
         <Text style={styles.loadingText}>Loading job alerts...</Text>
       </SafeAreaView>
@@ -544,7 +542,6 @@ const JobAlerts = () => {
   if (error) {
     return (
       <SafeAreaView style={styles.errorContainer}>
-        <StatusBar backgroundColor="#5B95C4" barStyle="light-content" />
         <Text style={styles.errorText}>{error}</Text>
         <TouchableOpacity style={styles.retryButton} onPress={fetchJobAlerts}>
           <Text style={styles.retryButtonText}>Try Again</Text>
@@ -556,7 +553,6 @@ const JobAlerts = () => {
   if (alerts.length === 0) {
     return (
       <SafeAreaView style={styles.errorContainer}>
-        <StatusBar backgroundColor="#5B95C4" barStyle="light-content" />
         <Text style={styles.errorText}>No job alerts available</Text>
         <TouchableOpacity style={styles.retryButton} onPress={fetchJobAlerts}>
           <Text style={styles.retryButtonText}>Refresh</Text>
@@ -567,8 +563,6 @@ const JobAlerts = () => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar backgroundColor="#5B95C4" barStyle="light-content" />
-
       <Header title="Job Alerts" subtitle="Latest job opportunities" />
 
       <FlatList
@@ -591,7 +585,6 @@ const JobAlerts = () => {
     </SafeAreaView>
   );
 };
-
 const styles = StyleSheet.create({
   // Container styles
   container: {

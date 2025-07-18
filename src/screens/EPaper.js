@@ -1,3 +1,22 @@
+import React, {useState, useEffect} from 'react'; import { StyleSheet, Text, View, Image, TouchableOpacity, Dimensions, SafeAreaView, StatusBar, ScrollView, ActivityIndicator, Linking, Alert, Platform, Animated, } from 'react-native'; import {useNavigatio
+
+pasted
+
+import { decode, encode } from 'base-64';  global.atob = global.atob || decode; global.btoa = global.btoa || encode;  import React from 'react'; import { StatusBar } from 'react-native'; import { AuthProvider } from './src/Auth/AuthContext'; import AuthNavigator from './src/Auth/AuthNavigator';  const App = () => {   return (     <>       <StatusBar barStyle="light-content" backgroundColor="
+#5B9EED" />       <AuthProvider>         <AuthNavigator />       </AuthProvider>     </>   ); };  export default App;    i have implemented statusBar logic in app.js so remove it from epaper file
+
+Edit
+I'll help you remove the StatusBar logic from the EPapers component since it's already implemented in App.js. Here's the updated code:
+
+
+EPapers Component - StatusBar Removed
+Code 
+
+
+
+
+
+
 import React, {useState, useEffect} from 'react';
 import {
   StyleSheet,
@@ -7,7 +26,6 @@ import {
   TouchableOpacity,
   Dimensions,
   SafeAreaView,
-  StatusBar,
   ScrollView,
   ActivityIndicator,
   Linking,
@@ -426,7 +444,6 @@ const EPapers = () => {
   if (loading) {
     return (
       <SafeAreaView style={styles.loadingContainer}>
-        <StatusBar backgroundColor="#5B95C4" barStyle="light-content" />
         <ActivityIndicator size="large" color="#0288D1" />
         <Text style={styles.loadingText}>Loading your papers...</Text>
       </SafeAreaView>
@@ -436,7 +453,6 @@ const EPapers = () => {
   if (error) {
     return (
       <SafeAreaView style={styles.errorContainer}>
-        <StatusBar backgroundColor="#5B95C4" barStyle="light-content" />
         <Text style={styles.errorText}>{error}</Text>
         <TouchableOpacity style={styles.retryButton} onPress={fetchEPapers}>
           <Text style={styles.retryButtonText}>Try Again</Text>
@@ -448,7 +464,6 @@ const EPapers = () => {
   if (papers.length === 0) {
     return (
       <SafeAreaView style={styles.errorContainer}>
-        <StatusBar backgroundColor="#5B95C4" barStyle="light-content" />
         <Text style={styles.errorText}>No e-papers available</Text>
         <TouchableOpacity style={styles.retryButton} onPress={fetchEPapers}>
           <Text style={styles.retryButtonText}>Refresh</Text>
@@ -637,7 +652,6 @@ const EPapers = () => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar backgroundColor="#5B95C4" barStyle="light-content" />
       <Header />
       <ScrollView
         style={styles.scrollView}
@@ -651,6 +665,7 @@ const EPapers = () => {
     </SafeAreaView>
   );
 };
+
 
 const styles = StyleSheet.create({
   container: {

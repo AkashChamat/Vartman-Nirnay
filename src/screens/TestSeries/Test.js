@@ -7,19 +7,21 @@ import {
   Dimensions,
   Alert,
   TouchableOpacity,
+  ActivityIndicator,
 } from 'react-native';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
-import Header from '../Components/Header';
-import TestInstructions from '../Components/TestInstructions';
-import PaperTimer from '../Components/PaperTimer';
-import TestMenu from '../Components/TestMenu';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import {useAuth} from '../Auth/AuthContext';
+import {useRoute} from '@react-navigation/native';
+import {TestPaperByIdUrl} from '../../util/Url';
+import {getAPI} from '../../util/apiCall';
+import {useAuth} from '../../Auth/AuthContext';
 
-// Import API functions
-import {getAPI} from '../util/apiCall';
-import {TestPaperByIdUrl} from '../util/Url'; 
+// Import components from ChampionTest
+import Header from '../../Components/Header';
+import TestInstructions from '../../Components/TestInstructions';
+import PaperTimer from '../../Components/PaperTimer';
+import TestMenu from '../../Components/TestMenu';
 
+// Import utility functions from ChampionUtil
 import {
   handleTestSubmission,
   handleNextQuestion,
@@ -27,103 +29,93 @@ import {
   handleAnswerSelect,
   handleInstructionsAccept,
   handleInstructionsClose,
-  renderProgressBar,
   renderQuestionOptions,
   renderLoadingScreen,
   renderErrorScreen,
   renderNoQuestionsScreen,
-  renderExplanation,
-  renderNavigationButtons,
   renderSubmissionLoading,
   initializeTestTimer,
-} from '../Components/ChampionUtil';
+} from '../../Components/ChampionUtil';
 
 const {width} = Dimensions.get('window');
 
-const ChampionTest = ({route, navigation}) => {
-  const {testId, testTitle, source} = route.params || {};
+const Test = ({navigation}) => {
+  const route = useRoute();
+  const {paperId} = route.params;
   
-  // Determine which API to use based on source or route name
-  const isFromTestPaper = source === 'TestPaper' || route.name === 'TestFromPaper';
-  
-  // Get user ID from AuthContext instead of AsyncStorage
+  // Get user ID from AuthContext
   const {getUserId, isAuthenticated, loading: authLoading} = useAuth();
-
   const userId = getUserId();
-  const [testStartTime, setTestStartTime] = useState(null);
-
-  const [testData, setTestData] = useState(null);
+  
+  // State management
+  const [paperData, setPaperData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [selectedAnswers, setSelectedAnswers] = useState({});
   const [showInstructions, setShowInstructions] = useState(true);
   const [instructionsAccepted, setInstructionsAccepted] = useState(false);
+  const [testStartTime, setTestStartTime] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [testStarted, setTestStarted] = useState(false);
   const [isTestCompleted, setIsTestCompleted] = useState(false);
 
-  // Unified function to fetch test data from either API
-  const fetchTestData = async (testId) => {
+  // Fetch test paper data
+  const getTestPaperById = async (paperId) => {
     try {
       setLoading(true);
       setError(null);
       
-      if (!testId) throw new Error('Test ID is required');
+      if (!paperId) throw new Error('Paper ID is required');
       
-      let response;
+      const response = await getAPI(TestPaperByIdUrl, {}, paperId, true);
       
-      if (isFromTestPaper) {
-        // Use TestPaper API
-        response = await getAPI(TestPaperByIdUrl, {}, testId, true);
-      } else {
-        // Use ChampionTest API (replace with your actual champion test API)
-        response = await fetchTestQuestions(testId); // Your existing champion test API call
-      }
-      
-      // Transform the data to ensure consistent format
+      // Transform the data to match ChampionTest format if needed
       const transformedData = {
         ...response,
+        // Map questions to expected format
         questions: response.questions?.map(q => ({
           ...q,
           createQuestion: q.createQuestion || q.question,
           marks: q.marks || 1,
           section: q.section || 'General',
         })) || [],
+        // Ensure we have the required fields
         duration: response.duration || 60,
         totalMarks: response.totalMarks || response.questions?.length || 0,
         noOfQuestions: response.questions?.length || 0,
-        testTitle: response.testTitle || testTitle || 'Test',
+        testTitle: response.testTitle || 'Test',
         terms: response.terms || response.instructions || 'Please read all questions carefully and answer to the best of your ability.',
       };
       
-      setTestData(transformedData);
+      setPaperData(transformedData);
     } catch (err) {
-      console.error('❌ Error fetching test data:', err.message);
-      setError(err.message || 'Failed to load test data');
+      console.error('❌ Error in getTestPaperById:', err.message);
+      setError(err.message || 'Failed to load test paper');
     } finally {
       setLoading(false);
     }
   };
 
+  // Initialize test data
   useEffect(() => {
-    if (testId) {
-      fetchTestData(testId);
+    if (paperId) {
+      getTestPaperById(paperId);
     } else {
-      setError('No test ID provided');
+      setError('No paper ID provided');
       setLoading(false);
     }
-  }, [testId, isFromTestPaper]);
+  }, [paperId]);
 
   // Event handlers using utility functions
   const onInstructionsAccept = () => {
     handleInstructionsAccept(setShowInstructions, setInstructionsAccepted);
     setTestStarted(true);
-
+    
     // Initialize test timer when instructions are accepted
     const startTime = initializeTestTimer();
     setTestStartTime(startTime);
-
+    
   };
 
   const onInstructionsClose = () => {
@@ -135,26 +127,27 @@ const ChampionTest = ({route, navigation}) => {
   };
 
   const onNext = () =>
-    handleNextQuestion(currentQuestionIndex, testData, setCurrentQuestionIndex);
+    handleNextQuestion(currentQuestionIndex, paperData, setCurrentQuestionIndex);
+    
   const onPrevious = () =>
     handlePreviousQuestion(currentQuestionIndex, setCurrentQuestionIndex);
 
   // Handle question selection from menu
-  const handleQuestionSelect = questionIndex => {
+  const handleQuestionSelect = (questionIndex) => {
     setCurrentQuestionIndex(questionIndex);
   };
 
   // Handle skip functionality
   const handleSkip = () => {
-    if (currentQuestionIndex < testData.questions.length - 1) {
+    if (currentQuestionIndex < paperData.questions.length - 1) {
       setCurrentQuestionIndex(currentQuestionIndex + 1);
     }
   };
 
-  // Handle time up - only if test is not completed
+  // Handle time up
   const handleTimeUp = () => {
     if (isTestCompleted) {
-      return; // Don't show alert if test is already completed
+      return;
     }
 
     Alert.alert(
@@ -171,9 +164,10 @@ const ChampionTest = ({route, navigation}) => {
     );
   };
 
+  // Handle test submission
   const handleSubmitTest = () => {
     const answeredCount = Object.keys(selectedAnswers).length;
-    const totalQuestions = testData?.questions?.length || 0;
+    const totalQuestions = paperData?.questions?.length || 0;
 
     if (answeredCount < totalQuestions) {
       Alert.alert(
@@ -204,6 +198,7 @@ const ChampionTest = ({route, navigation}) => {
     }
   };
 
+  // Submit test function
   const submitTest = async () => {
     const userId = getUserId();
 
@@ -222,12 +217,12 @@ const ChampionTest = ({route, navigation}) => {
 
     try {
       await handleTestSubmission(
-        testId,
+        paperId, // Using paperId instead of testId
         selectedAnswers,
         setIsSubmitting,
         userId,
         testStartTime,
-        response => {
+        (response) => {
           Alert.alert(
             'Test Submitted Successfully!',
             'Your test has been submitted. You can now view your results.',
@@ -235,12 +230,11 @@ const ChampionTest = ({route, navigation}) => {
               {
                 text: 'View Result',
                 onPress: () => {
-                  // Navigate to ChampionResult for both test types
+                  // Navigate to result screen - adjust route name as needed
                   navigation.navigate('ChampionResult', {
                     userId: userId,
-                    testPaperId: testId,
-                    testTitle: testData.testTitle,
-                    source: source, // Pass source to help identify test type if needed
+                    testPaperId: paperId,
+                    testTitle: paperData.testTitle,
                   });
                 },
                 style: 'default',
@@ -248,19 +242,14 @@ const ChampionTest = ({route, navigation}) => {
               {
                 text: 'Back to Home',
                 onPress: () => {
-                  // Navigate to appropriate home screen based on source
-                  if (isFromTestPaper) {
-                    navigation.navigate('Home');
-                  } else {
-                    navigation.navigate('ChampionSeries');
-                  }
+                  navigation.navigate('Home'); // Adjust route name as needed
                 },
                 style: 'cancel',
               },
             ],
           );
         },
-        errorMessage => {
+        (errorMessage) => {
           // Error callback - reset completion state on error
           setIsTestCompleted(false);
           Alert.alert('Submission Failed', errorMessage, [
@@ -270,23 +259,19 @@ const ChampionTest = ({route, navigation}) => {
       );
     } catch (error) {
       console.error('❌ Test submission failed with error:', error);
-      // Reset completion state on error
       setIsTestCompleted(false);
     }
   };
 
+  // Retry function
   const onRetryFetch = () => {
-    fetchTestData(testId);
+    getTestPaperById(paperId);
   };
 
-  // Check if user is authenticated before rendering
+  // Check if user is authenticated
   if (!isAuthenticated && !authLoading) {
     return (
-      <View
-        style={[
-          styles.container,
-          {justifyContent: 'center', alignItems: 'center'},
-        ]}>
+      <View style={[styles.container, {justifyContent: 'center', alignItems: 'center'}]}>
         <Header />
         <Text style={{fontSize: 18, color: '#6B7280'}}>
           Please login to take the test
@@ -295,6 +280,7 @@ const ChampionTest = ({route, navigation}) => {
     );
   }
 
+  // Show instructions screen
   if (showInstructions) {
     return (
       <>
@@ -303,8 +289,8 @@ const ChampionTest = ({route, navigation}) => {
           visible={showInstructions}
           onAccept={onInstructionsAccept}
           onClose={onInstructionsClose}
-          testTitle={testData?.testTitle || testTitle}
-          testData={testData}
+          testTitle={paperData?.testTitle}
+          testData={paperData}
         />
       </>
     );
@@ -316,7 +302,7 @@ const ChampionTest = ({route, navigation}) => {
   }
 
   // Render Error Screen
-  if (error || !testData) {
+  if (error || !paperData) {
     return (
       <View style={styles.container}>
         {renderErrorScreen(error, onRetryFetch, navigation, styles)}
@@ -325,7 +311,7 @@ const ChampionTest = ({route, navigation}) => {
   }
 
   // Render No Questions Screen
-  if (!testData.questions || testData.questions.length === 0) {
+  if (!paperData.questions || paperData.questions.length === 0) {
     return (
       <View style={styles.container}>
         {renderNoQuestionsScreen(navigation, styles)}
@@ -333,46 +319,32 @@ const ChampionTest = ({route, navigation}) => {
     );
   }
 
-  const currentQuestion = testData.questions[currentQuestionIndex];
-  const answeredCount = Object.keys(selectedAnswers).length;
-  const totalQuestions = testData?.questions?.length || 0;
+  const currentQuestion = paperData.questions[currentQuestionIndex];
 
   // Main Test Screen
   return (
     <View style={styles.container}>
-      {/* Test Header with Timer, Submit Button, and Menu */}
+      {/* Test Header with Timer and Menu */}
       <View style={styles.testHeaderContainer}>
         <View style={styles.headerTopSection}>
+          <PaperTimer
+            duration={paperData.duration}
+            onTimeUp={handleTimeUp}
+            testStarted={testStarted}
+            isTestCompleted={isTestCompleted}
+          />
           <TestMenu
-            testData={testData}
+            testData={paperData}
             selectedAnswers={selectedAnswers}
             currentQuestionIndex={currentQuestionIndex}
             navigation={navigation}
             onQuestionSelect={handleQuestionSelect}
           />
-          <PaperTimer
-            duration={testData.duration}
-            onTimeUp={handleTimeUp}
-            testStarted={testStarted}
-            isTestCompleted={isTestCompleted}
-          />
-          
-          {/* Submit Button in Header */}
-          <TouchableOpacity
-            style={styles.headerSubmitButton}
-            onPress={handleSubmitTest}
-            disabled={isSubmitting}
-          >
-            <Text style={styles.headerSubmitButtonText}>
-              {isSubmitting ? 'Submitting...' : 'Submit'}
-            </Text>
-          </TouchableOpacity>
-          
-          
         </View>
       </View>
 
-      <View style={styles.QestionHeader}>
+      {/* Question Header */}
+      <View style={styles.questionHeader}>
         <View style={styles.testTitleSection}>
           <View style={styles.questionInfoContainer}>
             <View style={styles.questionNumberBadge}>
@@ -386,11 +358,6 @@ const ChampionTest = ({route, navigation}) => {
                   Section: {currentQuestion.section}
                 </Text>
               </View>
-              <View style={styles.metaItem}>
-                <Text style={styles.progressText}>
-                  Progress: {answeredCount}/{totalQuestions}
-                </Text>
-              </View>
             </View>
           </View>
           <View style={styles.marksContainer}>
@@ -399,6 +366,7 @@ const ChampionTest = ({route, navigation}) => {
         </View>
       </View>
 
+      {/* Question Content */}
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* Question Card */}
         <View style={styles.questionCard}>
@@ -436,35 +404,35 @@ const ChampionTest = ({route, navigation}) => {
 
         <TouchableOpacity
           style={[styles.navButton, styles.skipButton]}
-          onPress={handleSkip}
-          disabled={currentQuestionIndex >= testData.questions.length - 1}>
-          <Text style={[
-            styles.skipButtonText,
-            currentQuestionIndex >= testData.questions.length - 1 && styles.disabledButtonText
-          ]}>
-            Skip
-          </Text>
+          onPress={handleSkip}>
+          <Text style={styles.skipButtonText}>Skip</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity
-          style={[styles.navButton, styles.saveNextButton]}
-          onPress={onNext}
-          disabled={currentQuestionIndex >= testData.questions.length - 1}>
-          <Text style={[
-            styles.saveNextButtonText,
-            currentQuestionIndex >= testData.questions.length - 1 && styles.disabledButtonText
-          ]}>
-            {currentQuestionIndex < testData.questions.length - 1 ? 'Save & Next' : 'Last Question'}
-          </Text>
-        </TouchableOpacity>
+        {currentQuestionIndex < paperData.questions.length - 1 ? (
+          <TouchableOpacity
+            style={[styles.navButton, styles.saveNextButton]}
+            onPress={onNext}>
+            <Text style={styles.saveNextButtonText}>Save & Next</Text>
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity
+            style={[styles.navButton, styles.submitButton]}
+            onPress={handleSubmitTest}
+            disabled={isSubmitting}>
+            <Text style={styles.submitButtonText}>
+              {isSubmitting ? 'Submitting...' : 'Submit'}
+            </Text>
+          </TouchableOpacity>
+        )}
       </View>
 
+      {/* Submission Loading Overlay */}
       {renderSubmissionLoading(isSubmitting, styles)}
     </View>
   );
 };
 
-// Updated styles with header submit button
+// Styles (same as ChampionTest)
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -479,7 +447,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.2,
     shadowRadius: 4,
   },
-  QestionHeader: {
+  questionHeader: {
     backgroundColor: '#fff',
     paddingHorizontal: 20,
     paddingVertical: 16,
@@ -493,26 +461,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-  },
-  // New Header Submit Button Styles
-  headerSubmitButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#EF4444',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 8,
-    elevation: 2,
-    shadowColor: '#EF4444',
-    shadowOffset: {width: 0, height: 2},
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-  },
-  headerSubmitButtonText: {
-    color: '#FFFFFF',
-    fontSize: 12,
-    fontWeight: '600',
-    marginLeft: 4,
   },
   testTitleSection: {
     flexDirection: 'row',
@@ -545,11 +493,6 @@ const styles = StyleSheet.create({
   sectionText: {
     fontSize: 14,
     color: '#8B5CF6',
-    fontWeight: '500',
-  },
-  progressText: {
-    fontSize: 12,
-    color: '#6B7280',
     fontWeight: '500',
   },
   marksContainer: {
@@ -595,6 +538,8 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     paddingHorizontal: 20,
   },
+  
+  // Option button styles
   optionButton: {
     backgroundColor: '#FFFFFF',
     borderWidth: 2,
@@ -649,6 +594,8 @@ const styles = StyleSheet.create({
     color: '#1F2937',
     fontWeight: '500',
   },
+  
+  // Navigation styles
   navigationContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -724,17 +671,27 @@ const styles = StyleSheet.create({
   disabledButtonText: {
     color: '#9CA3AF',
   },
+  
+  // Loading and error styles
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: '#F8FAFC',
   },
+  loadingContent: {
+    alignItems: 'center',
+  },
   loadingText: {
     fontSize: 16,
-    color: '#0288D1',
+    color: '#6366F1',
     marginTop: 16,
     fontWeight: '500',
+  },
+  loadingSubtext: {
+    fontSize: 14,
+    color: '#6B7280',
+    marginTop: 8,
   },
   errorContainer: {
     flex: 1,
@@ -743,8 +700,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#F8FAFC',
     paddingHorizontal: 20,
   },
-  errorIcon: {
-    marginBottom: 16,
+  errorIconContainer: {
+    marginBottom: 20,
   },
   errorTitle: {
     fontSize: 20,
@@ -753,61 +710,46 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     textAlign: 'center',
   },
-  errorText: {
+  errorSubtitle: {
     fontSize: 16,
     color: '#6B7280',
     textAlign: 'center',
     marginBottom: 24,
     lineHeight: 24,
   },
-  retryButton: {
+  errorActions: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  primaryButton: {
     backgroundColor: '#6366F1',
-    paddingHorizontal: 24,
+    paddingHorizontal: 20,
     paddingVertical: 12,
     borderRadius: 8,
-    marginBottom: 12,
-    elevation: 2,
-    shadowColor: '#6366F1',
-    shadowOffset: {width: 0, height: 2},
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
-  retryButtonText: {
+  primaryButtonText: {
     color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '600',
   },
-  backButton: {
+  secondaryButton: {
     backgroundColor: '#FFFFFF',
     borderWidth: 1,
     borderColor: '#D1D5DB',
-    paddingHorizontal: 24,
+    paddingHorizontal: 20,
     paddingVertical: 12,
     borderRadius: 8,
   },
-  backButtonText: {
+  secondaryButtonText: {
     color: '#6B7280',
     fontSize: 16,
     fontWeight: '600',
   },
-  progressBarContainer: {
-    backgroundColor: '#FFFFFF',
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
-  },
-  progressBar: {
-    height: 6,
-    backgroundColor: '#E5E7EB',
-    borderRadius: 3,
-    overflow: 'hidden',
-  },
-  progressFill: {
-    height: '100%',
-    backgroundColor: '#6366F1',
-    borderRadius: 3,
-  },
+  
+  // Submission overlay styles
   submissionOverlay: {
     position: 'absolute',
     top: 0,
@@ -837,55 +779,11 @@ const styles = StyleSheet.create({
     marginTop: 16,
     fontWeight: '500',
   },
-  noQuestionsContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#F8FAFC',
-    paddingHorizontal: 20,
-  },
-  noQuestionsIcon: {
-    marginBottom: 16,
-  },
-  noQuestionsTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#1F2937',
-    marginBottom: 8,
-    textAlign: 'center',
-  },
-  noQuestionsText: {
-    fontSize: 16,
+  submissionSubtext: {
+    fontSize: 14,
     color: '#6B7280',
-    textAlign: 'center',
-    marginBottom: 24,
-    lineHeight: 24,
-  },
-  centerContent: {
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  textCenter: {
-    textAlign: 'center',
-  },
-  marginTop: {
-    marginTop: 16,
-  },
-  marginBottom: {
-    marginBottom: 16,
-  },
-  paddingHorizontal: {
-    paddingHorizontal: 20,
-  },
-  fullWidth: {
-    width: '100%',
-  },
-  hidden: {
-    display: 'none',
-  },
-  visible: {
-    display: 'flex',
+    marginTop: 8,
   },
 });
 
-export default ChampionTest;
+export default Test;

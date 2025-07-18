@@ -26,21 +26,22 @@ const ChampionResult = ({route, navigation}) => {
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  
+
   // Tab state
   const [activeTab, setActiveTab] = useState(0);
   const [analysisData, setAnalysisData] = useState({});
   const [analysisLoading, setAnalysisLoading] = useState(false);
 
   const tabs = [
-    { id: 0, title: 'Results', icon: 'assessment' },
-    { id: 1, title: 'All', icon: 'list', type: 'ALL' },
-    { id: 2, title: 'Correct', icon: 'check-circle', type: 'CORRECT' },
-    { id: 3, title: 'Incorrect', icon: 'cancel', type: 'INCORRECT' },
-    { id: 4, title: 'Unsolved', icon: 'help-outline', type: 'UNSOLVED' },
+    {id: 0, title: 'Results', icon: 'assessment'},
+    {id: 1, title: 'All', icon: 'list', type: 'ALL'},
+    {id: 2, title: 'Correct', icon: 'check-circle', type: 'CORRECT'},
+    {id: 3, title: 'Incorrect', icon: 'cancel', type: 'INCORRECT'},
+    {id: 4, title: 'Unsolved', icon: 'help-outline', type: 'UNSOLVED'},
   ];
 
   useEffect(() => {
+
     if (!userId || !testPaperId) {
       setError('Missing required parameters');
       setLoading(false);
@@ -60,6 +61,7 @@ const ChampionResult = ({route, navigation}) => {
     // Fetch analysis data when tab changes (except for Results tab)
     if (activeTab > 0) {
       const currentTab = tabs[activeTab];
+
       fetchAnalysisData(currentTab.type);
     }
   }, [activeTab, userId, testPaperId]);
@@ -70,27 +72,35 @@ const ChampionResult = ({route, navigation}) => {
       setError('');
 
       const response = await champresult({}, [userId, testPaperId]);
+
       setResult(response);
-      // console.log('result',response);
       setLoading(false);
     } catch (err) {
       console.error('Error fetching result:', err);
-      setError('Failed to fetch result. Please try again.');
+
+      if (err.message && err.message.includes('no attempts')) {
+        setError('No test attempts found. Please complete the test first.');
+      } else {
+        setError('Failed to fetch result. Please try again.');
+      }
       setLoading(false);
     }
   };
 
-  const fetchAnalysisData = async (type) => {
+  const fetchAnalysisData = async type => {
     try {
+     
       setAnalysisLoading(true);
       const response = await getTestAnalysis(userId, testPaperId, type);
-      
+
       // Handle response - it should be an array based on your API responses
-      const questionsArray = Array.isArray(response) ? response : (response.data || []);
-      
+      const questionsArray = Array.isArray(response)
+        ? response
+        : response.data || [];
+
       setAnalysisData(prev => ({
         ...prev,
-        [type]: questionsArray
+        [type]: questionsArray,
       }));
     } catch (err) {
       console.error('Error fetching analysis:', err);
@@ -110,29 +120,25 @@ const ChampionResult = ({route, navigation}) => {
 
   const renderTabBar = () => (
     <View style={styles.tabContainer}>
-      <ScrollView 
-        horizontal 
+      <ScrollView
+        horizontal
         showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.tabScrollContent}
-      >
-        {tabs.map((tab) => (
+        contentContainerStyle={styles.tabScrollContent}>
+        {tabs.map(tab => (
           <TouchableOpacity
             key={tab.id}
-            style={[
-              styles.tab,
-              activeTab === tab.id && styles.activeTab
-            ]}
-            onPress={() => setActiveTab(tab.id)}
-          >
-            <MaterialIcons 
-              name={tab.icon} 
-              size={18} 
-              color={activeTab === tab.id ? '#6366F1' : '#6B7280'} 
+            style={[styles.tab, activeTab === tab.id && styles.activeTab]}
+            onPress={() => setActiveTab(tab.id)}>
+            <MaterialIcons
+              name={tab.icon}
+              size={18}
+              color={activeTab === tab.id ? '#6366F1' : '#6B7280'}
             />
-            <Text style={[
-              styles.tabText,
-              activeTab === tab.id && styles.activeTabText
-            ]}>
+            <Text
+              style={[
+                styles.tabText,
+                activeTab === tab.id && styles.activeTabText,
+              ]}>
               {tab.title}
             </Text>
           </TouchableOpacity>
@@ -180,24 +186,28 @@ const ChampionResult = ({route, navigation}) => {
   };
 
   const renderQuestionItem = ({item, index}) => {
-    const getStatusColor = (status) => {
+    const getStatusColor = status => {
       if (status === 'CORRECT') return '#10B981'; // Green
       if (status === 'INCORRECT') return '#EF4444'; // Red
       return '#6B7280'; // Gray for UNSOLVED
     };
 
-    const getStatusIcon = (status) => {
+    const getStatusIcon = status => {
       if (status === 'CORRECT') return 'check-circle';
       if (status === 'INCORRECT') return 'cancel';
       return 'help-outline';
     };
 
-    const getStatusText = (status) => {
-      switch(status) {
-        case 'CORRECT': return 'Correct';
-        case 'INCORRECT': return 'Incorrect';
-        case 'UNSOLVED': return 'Unsolved';
-        default: return 'Unknown';
+    const getStatusText = status => {
+      switch (status) {
+        case 'CORRECT':
+          return 'Correct';
+        case 'INCORRECT':
+          return 'Incorrect';
+        case 'UNSOLVED':
+          return 'Unsolved';
+        default:
+          return 'Unknown';
       }
     };
 
@@ -207,69 +217,76 @@ const ChampionResult = ({route, navigation}) => {
           <View style={styles.questionNumber}>
             <Text style={styles.questionNumberText}>Q{index + 1}</Text>
           </View>
-          <View style={[
-            styles.statusBadge, 
-            { backgroundColor: `${getStatusColor(item.status)}20` }
-          ]}>
-            <MaterialIcons 
-              name={getStatusIcon(item.status)} 
-              size={16} 
-              color={getStatusColor(item.status)} 
+          <View
+            style={[
+              styles.statusBadge,
+              {backgroundColor: `${getStatusColor(item.status)}20`},
+            ]}>
+            <MaterialIcons
+              name={getStatusIcon(item.status)}
+              size={16}
+              color={getStatusColor(item.status)}
             />
-            <Text style={[styles.statusText, { color: getStatusColor(item.status) }]}>
+            <Text
+              style={[styles.statusText, {color: getStatusColor(item.status)}]}>
               {getStatusText(item.status)}
             </Text>
           </View>
         </View>
-        
+
         <Text style={styles.questionText}>{item.question}</Text>
-        
+
         {/* Display all options */}
         <View style={styles.optionsContainer}>
           {['A', 'B', 'C', 'D', 'E'].map(option => {
             const optionKey = `option${option}`;
             const optionText = item[optionKey];
-            
+
             if (!optionText || optionText.trim() === '') return null;
-            
+
             const isUserAnswer = item.userAnswer === option;
             const isCorrectAnswer = item.correctAnswer === option;
-            
+
             return (
-              <View 
-                key={option} 
+              <View
+                key={option}
                 style={[
                   styles.optionItem,
                   isUserAnswer && isCorrectAnswer && styles.correctAnswerOption,
                   isUserAnswer && !isCorrectAnswer && styles.wrongAnswerOption,
-                  !isUserAnswer && isCorrectAnswer && styles.correctAnswerOption,
-                ]}
-              >
-                <Text style={[
-                  styles.optionLabel,
-                  (isUserAnswer || isCorrectAnswer) && styles.highlightedOptionLabel
+                  !isUserAnswer &&
+                    isCorrectAnswer &&
+                    styles.correctAnswerOption,
                 ]}>
+                <Text
+                  style={[
+                    styles.optionLabel,
+                    (isUserAnswer || isCorrectAnswer) &&
+                      styles.highlightedOptionLabel,
+                  ]}>
                   {option})
                 </Text>
-                <Text style={[
-                  styles.optionText,
-                  (isUserAnswer || isCorrectAnswer) && styles.highlightedOptionText
-                ]}>
+                <Text
+                  style={[
+                    styles.optionText,
+                    (isUserAnswer || isCorrectAnswer) &&
+                      styles.highlightedOptionText,
+                  ]}>
                   {optionText}
                 </Text>
                 {isUserAnswer && (
-                  <MaterialIcons 
-                    name="person" 
-                    size={16} 
-                    color={isCorrectAnswer ? '#10B981' : '#EF4444'} 
+                  <MaterialIcons
+                    name="person"
+                    size={16}
+                    color={isCorrectAnswer ? '#10B981' : '#EF4444'}
                     style={styles.userIcon}
                   />
                 )}
                 {isCorrectAnswer && (
-                  <MaterialIcons 
-                    name="check-circle" 
-                    size={16} 
-                    color="#10B981" 
+                  <MaterialIcons
+                    name="check-circle"
+                    size={16}
+                    color="#10B981"
                     style={styles.correctIcon}
                   />
                 )}
@@ -277,25 +294,37 @@ const ChampionResult = ({route, navigation}) => {
             );
           })}
         </View>
-        
+
         <View style={styles.answersContainer}>
           <View style={styles.answerRow}>
             <Text style={styles.answerLabel}>Your Answer: </Text>
-            <Text style={[
-              styles.answerValue, 
-              { color: item.userAnswer ? (item.status === 'CORRECT' ? '#10B981' : '#EF4444') : '#6B7280' }
-            ]}>
-              {item.userAnswer ? `${item.userAnswer}) ${item[`option${item.userAnswer}`] || item.userAnswer}` : 'Not Answered'}
+            <Text
+              style={[
+                styles.answerValue,
+                {
+                  color: item.userAnswer
+                    ? item.status === 'CORRECT'
+                      ? '#10B981'
+                      : '#EF4444'
+                    : '#6B7280',
+                },
+              ]}>
+              {item.userAnswer
+                ? `${item.userAnswer}) ${
+                    item[`option${item.userAnswer}`] || item.userAnswer
+                  }`
+                : 'Not Answered'}
             </Text>
           </View>
-          
+
           <View style={styles.answerRow}>
             <Text style={styles.answerLabel}>Correct Answer: </Text>
-            <Text style={[styles.answerValue, { color: '#10B981' }]}>
-              {item.correctAnswer && item.correctAnswer !== 'undefined' ? 
-                `${item.correctAnswer}) ${item[`option${item.correctAnswer}`] || item.correctAnswer}` : 
-                'Not Available'
-              }
+            <Text style={[styles.answerValue, {color: '#10B981'}]}>
+              {item.correctAnswer && item.correctAnswer !== 'undefined'
+                ? `${item.correctAnswer}) ${
+                    item[`option${item.correctAnswer}`] || item.correctAnswer
+                  }`
+                : 'Not Available'}
             </Text>
           </View>
         </View>
@@ -306,18 +335,18 @@ const ChampionResult = ({route, navigation}) => {
             <Text style={styles.explanationText}>{item.answerExplanation}</Text>
           </View>
         )}
-        
       </View>
     );
   };
 
   const renderAnalysisContent = () => {
     const currentTab = tabs[activeTab];
-    
+
     // Get data from analysisData for the current tab
     let questionsData = analysisData[currentTab.type] || [];
 
     if (analysisLoading) {
+
       return (
         <View style={styles.centerContainer}>
           <ActivityIndicator size="large" color="#0288D1" />
@@ -332,7 +361,8 @@ const ChampionResult = ({route, navigation}) => {
           <MaterialIcons name="inbox" size={80} color="#6B7280" />
           <Text style={styles.emptyTitle}>No questions found</Text>
           <Text style={styles.emptyText}>
-            No {currentTab.title.toLowerCase()} questions available for this test.
+            No {currentTab.title.toLowerCase()} questions available for this
+            test.
           </Text>
         </View>
       );
@@ -345,7 +375,7 @@ const ChampionResult = ({route, navigation}) => {
             {currentTab.title} Questions ({questionsData.length})
           </Text>
         </View>
-        
+
         <FlatList
           data={questionsData}
           renderItem={renderQuestionItem}
@@ -370,20 +400,20 @@ const ChampionResult = ({route, navigation}) => {
       timeTaken = '',
       testTitle: testName = testTitle || 'Test',
       userRank = '',
-      questionResponses = []
+      questionResponses = [],
     } = result;
 
     const totalQuestions = solvedQuestions + unsolvedQuestions;
-    const obtainedMarks = correctQuestions; 
-    const percentage = totalQuestions > 0 ? (correctQuestions / totalQuestions) * 100 : 0;
+    const obtainedMarks = correctQuestions;
+    const percentage =
+      totalQuestions > 0 ? (correctQuestions / totalQuestions) * 100 : 0;
     const scoreColor = getScoreColor(percentage);
 
     return (
-      <ScrollView 
-        style={styles.content} 
+      <ScrollView
+        style={styles.content}
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}
-      >
+        contentContainerStyle={styles.scrollContent}>
         {/* Header Card */}
         <View style={styles.headerCard}>
           <View style={styles.testIconContainer}>
@@ -396,7 +426,7 @@ const ChampionResult = ({route, navigation}) => {
         {/* Compact Stats Container */}
         <View style={styles.statsContainer}>
           <Text style={styles.sectionTitle}>Test Results</Text>
-          
+
           {/* First Row: Total Questions and Correct Answers */}
           <View style={styles.statsRow}>
             {renderCompactResultCard(
@@ -432,18 +462,20 @@ const ChampionResult = ({route, navigation}) => {
           {/* Third Row: Rank and Time (if available) */}
           {(userRank || timeTaken) && (
             <View style={styles.statsRow}>
-              {userRank && renderCompactResultCard(
-                'Rank', 
-                userRank, 
-                'leaderboard', 
-                '#F59E0B'
-              )}
-              {timeTaken && renderCompactResultCard(
-                'Time Taken', 
-                timeTaken, 
-                'access-time', 
-                '#8B5CF6'
-              )}
+              {userRank &&
+                renderCompactResultCard(
+                  'Rank',
+                  userRank,
+                  'leaderboard',
+                  '#F59E0B',
+                )}
+              {timeTaken &&
+                renderCompactResultCard(
+                  'Time Taken',
+                  timeTaken,
+                  'access-time',
+                  '#8B5CF6',
+                )}
             </View>
           )}
         </View>
@@ -498,19 +530,19 @@ const styles = StyleSheet.create({
     paddingHorizontal: width * 0.05,
   },
   scrollContent: {
-    paddingBottom: height * 0.15, 
+    paddingBottom: height * 0.15,
   },
-  sectionTitle:{
-    alignSelf:'center',
-    padding:10,
-    fontWeight:'600',
+  sectionTitle: {
+    alignSelf: 'center',
+    padding: 10,
+    fontWeight: '600',
     fontSize: 16,
     color: '#1F2937',
   },
-  
+
   loadingText: {
     fontSize: 16,
-    fontWeight:'500',
+    fontWeight: '500',
     color: '#0288D1',
     marginTop: 12,
     textAlign: 'center',
@@ -553,7 +585,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '500',
   },
-  
+
   // Tab Styles
   tabContainer: {
     backgroundColor: '#FFFFFF',
@@ -754,7 +786,7 @@ const styles = StyleSheet.create({
     lineHeight: 24,
     marginBottom: 12,
   },
-  
+
   // Options Container Styles
   optionsContainer: {
     marginBottom: 12,
