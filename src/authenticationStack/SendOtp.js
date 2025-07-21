@@ -5,11 +5,11 @@ import {
   TextInput,
   TouchableOpacity,
   StyleSheet,
-  Alert,
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform
 } from 'react-native';
+import { showMessage } from 'react-native-flash-message';
 import { sendOTP } from '../util/apiCall';
 
 const SendOtp = ({ navigation }) => {
@@ -25,12 +25,20 @@ const SendOtp = ({ navigation }) => {
   const handleSendOTP = async () => {
     // Validate email
     if (!email.trim()) {
-      Alert.alert('Error', 'Please enter your email address');
+      showMessage({
+        message: 'Please enter your email address',
+        type: 'danger',
+        duration: 3000,
+      });
       return;
     }
 
     if (!validateEmail(email.trim())) {
-      Alert.alert('Error', 'Please enter a valid email address');
+      showMessage({
+        message: 'Please enter a valid email address',
+        type: 'danger',
+        duration: 3000,
+      });
       return;
     }
 
@@ -41,25 +49,30 @@ const SendOtp = ({ navigation }) => {
       
       // Check if OTP was sent successfully
       if (response && (response.includes('OTP sent') || response === `OTP sent to ${email.trim()}`)) {
-        Alert.alert(
-          'Success',
-          'OTP has been sent to your email address',
-          [
-            {
-              text: 'OK',
-              onPress: () => {
-                // Navigate to VerifyOtp page with email parameter
-                navigation.navigate('VerifyOtp', { email: email.trim() });
-              }
-            }
-          ]
-        );
+        showMessage({
+          message: 'OTP has been sent to your email address',
+          type: 'success',
+          duration: 3000,
+        });
+        
+        // Navigate to VerifyOtp page with email parameter after a short delay
+        setTimeout(() => {
+          navigation.navigate('VerifyOtp', { email: email.trim() });
+        }, 1000);
       } else {
-        Alert.alert('Error', response || 'Failed to send OTP');
+        showMessage({
+          message: response || 'Failed to send OTP',
+          type: 'danger',
+          duration: 4000,
+        });
       }
     } catch (error) {
       console.error('Send OTP Error:', error);
-      Alert.alert('Error', error.message || 'Failed to send OTP. Please try again.');
+      showMessage({
+        message: error.message || 'Failed to send OTP. Please try again.',
+        type: 'danger',
+        duration: 4000,
+      });
     } finally {
       setLoading(false);
     }

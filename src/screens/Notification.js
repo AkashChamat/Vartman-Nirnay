@@ -14,6 +14,8 @@ import {useNavigation, useFocusEffect} from '@react-navigation/native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import LinearGradient from 'react-native-linear-gradient';
 import {getTodayNotifications, getAllNotifications} from '../util/apiCall';
+import { showInfoMessage } from '../Components/SubmissionMessage';
+
 
 const Notification = () => {
   const navigation = useNavigation();
@@ -114,11 +116,8 @@ const Notification = () => {
       style={styles.notificationCard}
       onPress={() => {
         // Handle notification tap - you can navigate to detail screen or show alert
-        Alert.alert(
-          item.title || 'Notification',
-          item.description || 'No description available',
-          [{text: 'OK'}]
-        );
+       showInfoMessage(item.title || 'Notification', item.description || 'No description available');
+
       }}
       activeOpacity={0.7}>
       <View style={styles.notificationContent}>

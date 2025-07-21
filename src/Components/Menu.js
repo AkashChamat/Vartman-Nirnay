@@ -37,8 +37,8 @@ const Menu = () => {
     {label: 'Champion Series', value: 'ChampionSeries', icon: 'award'},
     {label: 'Job Alerts', value: 'JobSearch', icon: 'briefcase'},
     // {label: 'Packages', value: 'Packages', icon: 'box'},
-    // {label: 'Test Series', value: 'TestSeries', icon: 'edit'},
-    // {label: 'E-Book', value: 'Ebook', icon: 'book-open'},
+    {label: 'Test Series', value: 'TestSeries', icon: 'edit'},
+    {label: 'E-Book', value: 'Ebook', icon: 'book-open'},
     // {label: 'Courses', value: 'Courses', icon: 'layers'},
     {label: 'Contact Us', value: 'ContactUs', icon: 'message-square'},
     {

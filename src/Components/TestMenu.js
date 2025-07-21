@@ -6,7 +6,7 @@ import {
   Modal,
   StyleSheet,
   Dimensions,
-  Alert,
+  
   ScrollView,
 } from 'react-native';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';

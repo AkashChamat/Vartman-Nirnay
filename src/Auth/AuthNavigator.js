@@ -3,14 +3,15 @@ import {NavigationContainer} from '@react-navigation/native';
 import {createStackNavigator} from '@react-navigation/stack';
 import {View, Text, ActivityIndicator, StyleSheet} from 'react-native';
 import {useAuth} from '../Auth/AuthContext';
+import FlashMessage from "react-native-flash-message"; // Add this import
 
 // Import your screens
 import LoginScreen from '../authenticationStack/Login';
 import Home from '../screens/Home';
 import EPaper from '../screens/EPaper';
-import ChampionSeries from '../screens/ChampionSeries'; // Fixed path
-import Packages from '../screens/Packages'; // Fixed path
-import TestSeries from '../screens/TestSeries/testseries'; // Note: case sensitivity - should match your file name
+import ChampionSeries from '../screens/ChampionSeries';
+import Packages from '../screens/Packages';
+import TestSeries from '../screens/TestSeries/testseries';
 import Courses from '../screens/Courses';
 import WeeklyPrize from '../screens/WeeklyPrize';
 import Ebook from '../screens/Ebook';
@@ -61,57 +62,65 @@ const AuthNavigator = () => {
   }
 
   return (
-    <NavigationContainer>
-      <Stack.Navigator
-        screenOptions={{headerShown: false}}
-        initialRouteName={isAuthenticated ? 'Home' : 'Login'}>
-        {isAuthenticated ? (
-          // Authenticated stack
-          <>
-            <Stack.Screen name="Home" component={Home} />
-            <Stack.Screen name="EPaper" component={EPaper} />
-            <Stack.Screen name="ChampionSeries" component={ChampionSeries} />
-            <Stack.Screen name="Packages" component={Packages} />
-            <Stack.Screen name="TestSeries" component={TestSeries} />
-            <Stack.Screen name="Courses" component={Courses} />
-            <Stack.Screen name="WeeklyPrize" component={WeeklyPrize} />
-            <Stack.Screen name="Ebook" component={Ebook} />
-            <Stack.Screen name="Gallery" component={Gallery} />
-            <Stack.Screen name="ReferEarn" component={ReferEarn} />
-            <Stack.Screen name="FollowUs" component={FollowUs} />
-            <Stack.Screen name="JobSearch" component={JobSearch} />
-            <Stack.Screen name="Sponsors" component={Sponsors} />
-            <Stack.Screen name="Purchase" component={Purchase} />
-            <Stack.Screen name="BookStore" component={BookStore} />
-            <Stack.Screen name="PdfViewer" component={PdfViewer} />
-            <Stack.Screen name="ChampionTest" component={ChampionTest} />
-            <Stack.Screen name="ChampionResult" component={ChampionResult} />
-            <Stack.Screen name="Profile" component={Profile} />
-            <Stack.Screen name="ContactUs" component={ContactUs} />
-            <Stack.Screen name="Privacy" component={Privacy} />
-            <Stack.Screen name="TermsAndConditions" component={TermsAndConditions} />
-            <Stack.Screen name="Shipping" component={Shipping} />
-            <Stack.Screen name="Refund" component={Refund} />
-            <Stack.Screen name="Notification" component={Notification} />
-            <Stack.Screen name="AllResult" component={AllResult} />
-            <Stack.Screen name="PaymentScreen" component={PaymentScreen} />
-            <Stack.Screen name="PaymentSuccess" component={PaymentSuccess} />
-            <Stack.Screen name="TestPaper" component={TestPaper} />
-            <Stack.Screen name="SeriesPayment" component={SeriesPayment} />
-            <Stack.Screen name="Test" component={Test} />
-
-
-          </>
-        ) : (
-          <>
-            <Stack.Screen name="Login" component={LoginScreen} />
-            <Stack.Screen name="SendOtp" component={SendOtp} />
-            <Stack.Screen name="VerifyOtp" component={VerifyOtp} />
-            <Stack.Screen name="ResetPassword" component={ResetPassword} />
-          </>
-        )}
-      </Stack.Navigator>
-    </NavigationContainer>
+    <>
+      <NavigationContainer>
+        <Stack.Navigator
+          screenOptions={{headerShown: false}}
+          initialRouteName={isAuthenticated ? 'Home' : 'Login'}>
+          {isAuthenticated ? (
+            // Authenticated stack
+            <>
+              <Stack.Screen name="Home" component={Home} />
+              <Stack.Screen name="EPaper" component={EPaper} />
+              <Stack.Screen name="ChampionSeries" component={ChampionSeries} />
+              <Stack.Screen name="Packages" component={Packages} />
+              <Stack.Screen name="TestSeries" component={TestSeries} />
+              <Stack.Screen name="Courses" component={Courses} />
+              <Stack.Screen name="WeeklyPrize" component={WeeklyPrize} />
+              <Stack.Screen name="Ebook" component={Ebook} />
+              <Stack.Screen name="Gallery" component={Gallery} />
+              <Stack.Screen name="ReferEarn" component={ReferEarn} />
+              <Stack.Screen name="FollowUs" component={FollowUs} />
+              <Stack.Screen name="JobSearch" component={JobSearch} />
+              <Stack.Screen name="Sponsors" component={Sponsors} />
+              <Stack.Screen name="Purchase" component={Purchase} />
+              <Stack.Screen name="BookStore" component={BookStore} />
+              <Stack.Screen name="PdfViewer" component={PdfViewer} />
+              <Stack.Screen name="ChampionTest" component={ChampionTest} />
+              <Stack.Screen name="ChampionResult" component={ChampionResult} />
+              <Stack.Screen name="Profile" component={Profile} />
+              <Stack.Screen name="ContactUs" component={ContactUs} />
+              <Stack.Screen name="Privacy" component={Privacy} />
+              <Stack.Screen name="TermsAndConditions" component={TermsAndConditions} />
+              <Stack.Screen name="Shipping" component={Shipping} />
+              <Stack.Screen name="Refund" component={Refund} />
+              <Stack.Screen name="Notification" component={Notification} />
+              <Stack.Screen name="AllResult" component={AllResult} />
+              <Stack.Screen name="PaymentScreen" component={PaymentScreen} />
+              <Stack.Screen name="PaymentSuccess" component={PaymentSuccess} />
+              <Stack.Screen name="TestPaper" component={TestPaper} />
+              <Stack.Screen name="SeriesPayment" component={SeriesPayment} />
+              <Stack.Screen name="Test" component={Test} />
+            </>
+          ) : (
+            <>
+              <Stack.Screen name="Login" component={LoginScreen} />
+              <Stack.Screen name="SendOtp" component={SendOtp} />
+              <Stack.Screen name="VerifyOtp" component={VerifyOtp} />
+              <Stack.Screen name="ResetPassword" component={ResetPassword} />
+            </>
+          )}
+        </Stack.Navigator>
+      </NavigationContainer>
+      
+      {/* Add FlashMessage here - after NavigationContainer */}
+      <FlashMessage 
+        position="top" 
+        duration={4000}
+        floating={true}
+        style={{ paddingTop: 25 }}
+      />
+    </>
   );
 };
 

@@ -5,12 +5,13 @@ import {
   StyleSheet,
   ScrollView,
   ActivityIndicator,
-  Alert,
   Dimensions,
   TouchableOpacity,
   SafeAreaView,
   FlatList,
 } from 'react-native';
+import {showMessage} from 'react-native-flash-message';
+
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import Header from '../Components/Header';
 import Footer from '../Components/Footer';
@@ -41,7 +42,6 @@ const ChampionResult = ({route, navigation}) => {
   ];
 
   useEffect(() => {
-
     if (!userId || !testPaperId) {
       setError('Missing required parameters');
       setLoading(false);
@@ -89,7 +89,6 @@ const ChampionResult = ({route, navigation}) => {
 
   const fetchAnalysisData = async type => {
     try {
-     
       setAnalysisLoading(true);
       const response = await getTestAnalysis(userId, testPaperId, type);
 
@@ -104,7 +103,11 @@ const ChampionResult = ({route, navigation}) => {
       }));
     } catch (err) {
       console.error('Error fetching analysis:', err);
-      Alert.alert('Error', 'Failed to fetch analysis data');
+      showMessage({
+        message: 'Failed to fetch analysis data',
+        type: 'danger',
+        icon: 'auto',
+      });
     } finally {
       setAnalysisLoading(false);
     }
@@ -346,7 +349,6 @@ const ChampionResult = ({route, navigation}) => {
     let questionsData = analysisData[currentTab.type] || [];
 
     if (analysisLoading) {
-
       return (
         <View style={styles.centerContainer}>
           <ActivityIndicator size="large" color="#0288D1" />

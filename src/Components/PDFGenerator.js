@@ -1,7 +1,22 @@
 import RNHTMLtoPDF from 'react-native-html-to-pdf';
-import {Platform, PermissionsAndroid, Linking, Alert} from 'react-native';
+import {Platform, PermissionsAndroid, Linking} from 'react-native';
 import RNFS from 'react-native-fs';
 import {Image} from 'react-native';
+import {
+  showPermissionDeniedMessage,
+  showPermissionErrorMessage,
+  showPdfGeneratingMessage,
+  showFileNotFoundMessage,
+  showTestFailedMessage,
+  showDownloadingMessage,
+  showDownloadFailedMessage,
+  showPdfGenerationFailedMessage,
+  showPdfGeneratedSuccessMessage,
+  showPdfSavedToDownloadsMessage,
+  showDownloadCompleteMessage,
+  showFileOpenFallbackMessage,
+  hideMessage,
+} from '../Components/SubmissionMessage';
 
 /**
  * Request storage permission for Android devices
@@ -28,16 +43,13 @@ const requestStoragePermission = async () => {
       );
 
       if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
-        Alert.alert(
-          'Permission Denied',
-          'Storage permission is required to download PDF',
-        );
+        showPermissionDeniedMessage();
         return false;
       }
       return true;
     } catch (error) {
       console.error('❌ Permission Error:', error);
-      Alert.alert('Permission Error', 'Failed to request storage permission');
+      showPermissionErrorMessage();
       return false;
     }
   }
@@ -380,7 +392,6 @@ const generatePDFWithWatermark = async testPaper => {
       },
     };
 
-
     // Generate PDF
     const file = await RNHTMLtoPDF.convert(options);
 
@@ -428,11 +439,10 @@ const generatePDFWithWatermark = async testPaper => {
  */
 const openFile = async filePath => {
   try {
-
     const fileExists = await RNFS.exists(filePath);
     if (!fileExists) {
       console.error('❌ File not found:', filePath);
-      Alert.alert('Error', 'File not found');
+      showFileNotFoundMessage();
       return;
     }
 
@@ -449,19 +459,18 @@ const openFile = async filePath => {
     if (supported) {
       await Linking.openURL(fileUrl);
     } else {
-      Alert.alert(
-        'PDF Generated Successfully',
-        `PDF saved to Downloads folder:\n${filePath}\n\nPlease open your file manager to view the PDF.`,
-        [{text: 'OK', style: 'default'}],
+      showPdfGeneratedSuccessMessage(
+        filePath,
+        () => {
+          hideMessage();
+          openFile(filePath);
+        },
+        () => hideMessage(),
       );
     }
   } catch (error) {
     console.error('❌ Error opening file:', error);
-    Alert.alert(
-      'PDF Generated Successfully',
-      `File saved to Downloads folder:\n${filePath}\n\nPlease open your file manager to view the PDF.`,
-      [{text: 'OK', style: 'default'}],
-    );
+    showPdfSavedToDownloadsMessage(filePath, () => hideMessage());
   }
 };
 
@@ -472,7 +481,6 @@ const openFile = async filePath => {
  */
 export const generateAndDownloadTestPaper = async testPaper => {
   try {
-
     // Request storage permission
     const hasPermission = await requestStoragePermission();
     if (!hasPermission) {
@@ -480,30 +488,13 @@ export const generateAndDownloadTestPaper = async testPaper => {
     }
 
     // Show loading indicator
-    Alert.alert(
-      'Generating PDF...',
-      'Please wait while we prepare your test paper.',
-    );
+    showPdfGeneratingMessage();
 
     try {
       // Generate PDF with watermark
       const filePath = await generatePDFWithWatermark(testPaper);
 
-      Alert.alert(
-        'PDF Generated Successfully',
-        `PDF saved to Downloads folder:\n${filePath}`,
-        [
-          {
-            text: 'Open PDF',
-            onPress: () => openFile(filePath),
-          },
-          {
-            text: 'OK',
-            style: 'default',
-          },
-        ],
-      );
-
+      showFileOpenFallbackMessage(filePath, () => hideMessage());
     } catch (pdfError) {
       console.error('❌ PDF generation failed:', pdfError);
       throw pdfError;
@@ -530,12 +521,7 @@ export const generateAndDownloadTestPaper = async testPaper => {
         'Insufficient storage space. Please free up some space and try again.';
     }
 
-    Alert.alert(
-      'Generation Failed',
-      errorMessage +
-        '\n\nTechnical details: ' +
-        (error.message || 'Unknown error'),
-    );
+    showPdfGenerationFailedMessage(error.message);
   }
 };
 
@@ -573,7 +559,7 @@ export const testPDFGeneration = async () => {
     await generateAndDownloadTestPaper(testData);
   } catch (error) {
     console.error('❌ Test failed:', error);
-    Alert.alert('Test Failed', error.message);
+    showTestFailedMessage(error.message);
   }
 };
 
@@ -584,7 +570,6 @@ export const testPDFGeneration = async () => {
  */
 export const downloadPDFFromUrl = async (pdfUrl, fileName) => {
   try {
-
     const hasPermission = await requestStoragePermission();
     if (!hasPermission) {
       return;
@@ -594,7 +579,7 @@ export const downloadPDFFromUrl = async (pdfUrl, fileName) => {
     const downloadsPath = getDownloadsPath();
     const downloadDest = `${downloadsPath}/${cleanFileName}.pdf`;
 
-    Alert.alert('Downloading...', 'Please wait while we download your PDF.');
+    showDownloadingMessage();
 
     const options = {
       fromUrl: pdfUrl,
@@ -607,29 +592,20 @@ export const downloadPDFFromUrl = async (pdfUrl, fileName) => {
     const result = await RNFS.downloadFile(options).promise;
 
     if (result.statusCode === 200) {
-      Alert.alert(
-        'Download Complete',
-        `PDF saved to Downloads folder:\n${downloadDest}`,
-        [
-          {
-            text: 'Open PDF',
-            onPress: () => openFile(downloadDest),
-          },
-          {
-            text: 'OK',
-            style: 'default',
-          },
-        ],
+      showDownloadCompleteMessage(
+        downloadDest,
+        () => {
+          hideMessage();
+          openFile(downloadDest);
+        },
+        () => hideMessage(),
       );
     } else {
       throw new Error(`Download failed with status: ${result.statusCode}`);
     }
   } catch (error) {
     console.error('❌ Download Error:', error);
-    Alert.alert(
-      'Download Failed',
-      'Unable to download the PDF. Please try again.',
-    );
+    showDownloadFailedMessage();
   }
 };
 

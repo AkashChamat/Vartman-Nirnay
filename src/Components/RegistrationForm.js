@@ -5,13 +5,18 @@ import {
   TextInput,
   TouchableOpacity,
   StyleSheet,
-  Alert,
   ActivityIndicator,
   ScrollView,
   Dimensions,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import {register as registerAPI} from '../util/apiCall';
+import { 
+  showValidationErrorMessage, 
+  showRegistrationFailedMessage, 
+  showRegistrationSuccessMessage 
+} from '../Components/SubmissionMessage';
+
 
 const {width} = Dimensions.get('window');
 
@@ -71,128 +76,122 @@ const RegistrationForm = ({onSwitchToLogin, loading, setLoading}) => {
     }
   };
 
-  const validateForm = () => {
-    const {userName, email, contact, password, confirmPassword} = formData;
+const validateForm = () => {
+  const {userName, email, contact, password, confirmPassword} = formData;
 
-    if (!userName.trim()) {
-      Alert.alert('Error', 'Please enter your full name');
-      return false;
-    }
+  if (!userName.trim()) {
+    showValidationErrorMessage('Please enter your full name');
+    return false;
+  }
 
-    if (!email.trim()) {
-      Alert.alert('Error', 'Please enter your email');
-      return false;
-    }
+  if (!email.trim()) {
+    showValidationErrorMessage('Please enter your email');
+    return false;
+  }
 
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-      Alert.alert('Error', 'Please enter a valid email address');
-      return false;
-    }
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(email)) {
+    showValidationErrorMessage('Please enter a valid email address');
+    return false;
+  }
 
-    if (!contact.trim()) {
-      Alert.alert('Error', 'Please enter your contact number');
-      return false;
-    }
+  if (!contact.trim()) {
+    showValidationErrorMessage('Please enter your contact number');
+    return false;
+  }
 
-    if (contact.length !== 10) {
-      Alert.alert('Error', 'Contact number must be 10 digits');
-      return false;
-    }
+  if (contact.length !== 10) {
+    showValidationErrorMessage('Contact number must be 10 digits');
+    return false;
+  }
 
-    if (!password.trim()) {
-      Alert.alert('Error', 'Please enter a password');
-      return false;
-    }
+  if (!password.trim()) {
+    showValidationErrorMessage('Please enter a password');
+    return false;
+  }
 
-    if (password.length < 6) {
-      Alert.alert('Error', 'Password must be at least 6 characters long');
-      return false;
-    }
+  if (password.length < 6) {
+    showValidationErrorMessage('Password must be at least 6 characters long');
+    return false;
+  }
 
-    if (password !== confirmPassword) {
-      Alert.alert('Error', 'Passwords do not match');
-      return false;
-    }
+  if (password !== confirmPassword) {
+    showValidationErrorMessage('Passwords do not match');
+    return false;
+  }
 
-    if (showAddressSection && formData.addresses.length > 0) {
-      for (let i = 0; i < formData.addresses.length; i++) {
-        const addr = formData.addresses[i];
-        if (!addr.address.trim() || !addr.state.trim() || !addr.district.trim() || 
-            !addr.city.trim() || !addr.pincode.trim()) {
-          Alert.alert('Error', `Please fill all required fields in Address ${i + 1}`);
-          return false;
-        }
-        if (addr.pincode.length !== 6) {
-          Alert.alert('Error', `Pincode must be 6 digits in Address ${i + 1}`);
-          return false;
-        }
+  if (showAddressSection && formData.addresses.length > 0) {
+    for (let i = 0; i < formData.addresses.length; i++) {
+      const addr = formData.addresses[i];
+      if (!addr.address.trim() || !addr.state.trim() || !addr.district.trim() || 
+          !addr.city.trim() || !addr.pincode.trim()) {
+        showValidationErrorMessage(`Please fill all required fields in Address ${i + 1}`);
+        return false;
+      }
+      if (addr.pincode.length !== 6) {
+        showValidationErrorMessage(`Pincode must be 6 digits in Address ${i + 1}`);
+        return false;
       }
     }
+  }
 
-    return true;
-  };
+  return true;
+};
 
   const handleRegister = async () => {
-    if (loading) return;
+  if (loading) return;
 
-    if (!validateForm()) return;
+  if (!validateForm()) return;
 
-    setLoading(true);
+  setLoading(true);
 
-    try {
-      const payload = {
-        userName: formData.userName.trim(),
-        email: formData.email.trim().toLowerCase(),
-        contact: parseInt(formData.contact.trim()),
-        examName: formData.examName,
-        password: formData.password.trim(),
-        confirmPassword: formData.confirmPassword.trim(),
-        ...(showAddressSection && formData.addresses.length > 0
-          ? {addresses: formData.addresses}
-          : {addresses: []}),
+  try {
+    const payload = {
+      userName: formData.userName.trim(),
+      email: formData.email.trim().toLowerCase(),
+      contact: parseInt(formData.contact.trim()),
+      examName: formData.examName,
+      password: formData.password.trim(),
+      confirmPassword: formData.confirmPassword.trim(),
+      ...(showAddressSection && formData.addresses.length > 0
+        ? {addresses: formData.addresses}
+        : {addresses: []}),
+    };
+
+    const response = await registerAPI(payload);
+
+    if (response?.status === 200 || response?.status === 201 || response?.success) {
+      // Handle successful registration
+      const handleLoginRedirect = () => {
+        setFormData({
+          userName: '',
+          email: '',
+          contact: '',
+          examName: 'UPSC',
+          password: '',
+          confirmPassword: '',
+          addresses: [],
+        });
+        setShowAddressSection(false);
+        onSwitchToLogin();
       };
 
-      const response = await registerAPI(payload);
-
-      if (response?.status === 200 || response?.status === 201 || response?.success) {
-        Alert.alert(
-          'Success',
-          'Registration successful! Please login with your credentials.',
-          [
-            {
-              text: 'OK',
-              onPress: () => {
-                setFormData({
-                  userName: '',
-                  email: '',
-                  contact: '',
-                  examName: 'UPSC',
-                  password: '',
-                  confirmPassword: '',
-                  addresses: [],
-                });
-                setShowAddressSection(false);
-                onSwitchToLogin();
-              },
-            },
-          ]
-        );
-      } else {
-        Alert.alert('Error', 'Registration failed. Please try again.');
-      }
-    } catch (error) {
-      console.error('Registration error:', error);
-      const errorMessage = error.response?.data?.message || 
-                          error.message || 
-                          'Registration failed. Please try again.';
-      Alert.alert('Registration Failed', errorMessage);
-    } finally {
-      if (isMountedRef.current) {
-        setLoading(false);
-      }
+      showRegistrationSuccessMessage(handleLoginRedirect);
+    } else {
+      showRegistrationFailedMessage('Registration failed. Please try again.');
     }
-  };
+  } catch (error) {
+    console.error('Registration error:', error);
+    const errorMessage = error.response?.data?.message || 
+                        error.message || 
+                        'Registration failed. Please try again.';
+    showRegistrationFailedMessage(errorMessage);
+  } finally {
+    if (isMountedRef.current) {
+      setLoading(false);
+    }
+  }
+};
 
   const ExamDropdown = () => (
     <View style={styles.dropdownContainer}>

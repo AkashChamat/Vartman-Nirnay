@@ -5,7 +5,6 @@ import {
   StyleSheet,
   FlatList,
   ActivityIndicator,
-  Alert,
   TouchableOpacity,
   SafeAreaView,
 } from 'react-native';
@@ -13,6 +12,7 @@ import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import { getAllResults } from '../util/apiCall';
 import Header from '../Components/Header';
 import Footer from '../Components/Footer';
+import { showMessage } from 'react-native-flash-message';
 
 const AllResults = ({ route, navigation }) => {
   const { testId, testTitle, pdfUrl } = route.params;
@@ -65,21 +65,39 @@ const AllResults = ({ route, navigation }) => {
         data: err.response?.data,
       });
       
-      Alert.alert(
-        'Error',
-        errorMessage,
-        [
-          {
-            text: 'Retry',
-            onPress: fetchAllResults,
-          },
-          {
-            text: 'Go Back',
-            onPress: () => navigation.goBack(),
-            style: 'cancel',
-          },
-        ]
-      );
+      showMessage({
+      message: 'Error',
+      description: errorMessage,
+      type: 'danger',
+      floating: true,
+      autoHide: false,
+      renderCustomContent: () => (
+        <View style={styles.flashContainer}>
+          <Text style={styles.flashTitle}>Error</Text>
+          <Text style={styles.flashDescription}>{errorMessage}</Text>
+          <View style={styles.flashButtonsRow}>
+            <TouchableOpacity 
+              style={styles.flashButton} 
+              onPress={() => {
+                showMessage({ message: '', type: 'none' });
+                fetchAllResults();
+              }}
+            >
+              <Text style={styles.flashButtonText}>Retry</Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={[styles.flashButton, styles.flashButtonSecondary]} 
+              onPress={() => {
+                showMessage({ message: '', type: 'none' });
+                navigation.goBack();
+              }}
+            >
+              <Text style={styles.flashButtonTextSecondary}>Go Back</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      ),
+    });
     } finally {
       setLoading(false);
     }
@@ -587,6 +605,57 @@ const styles = StyleSheet.create({
     color: '#4A5568',
     marginHorizontal: 4,
     fontWeight: '600',
+  },
+   flashContainer: {
+    backgroundColor: '#FFFFFF',
+    padding: 20,
+    borderRadius: 12,
+    margin: 10,
+    elevation: 8,
+    shadowColor: '#000',
+    shadowOffset: {width: 0, height: 4},
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+  },
+  flashTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#1F2937',
+    marginBottom: 8,
+  },
+  flashDescription: {
+    fontSize: 14,
+    color: '#6B7280',
+    marginBottom: 16,
+    lineHeight: 20,
+  },
+  flashButton: {
+    backgroundColor: '#0288D1',
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  flashButtonSecondary: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+  },
+  flashButtonText: {
+    color: '#FFFFFF',
+    fontWeight: '600',
+    fontSize: 14,
+  },
+  flashButtonTextSecondary: {
+    color: '#6B7280',
+    fontWeight: '600',
+    fontSize: 14,
+  },
+  flashButtonsRow: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: 10,
   },
 });
 

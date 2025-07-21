@@ -49,7 +49,7 @@ const Header = () => {
 
   return (
     <>
-      <LinearGradient colors={['#ffffff', '#f5f5f5']} style={styles.header}>
+      <LinearGradient colors={['#ffffff', '#ffffff']} style={styles.header}>
         <TouchableOpacity style={styles.menuContainer}>
           <Menu />
         </TouchableOpacity>

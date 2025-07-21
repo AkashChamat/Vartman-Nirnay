@@ -22,6 +22,10 @@ import MonthYearPicker from '../Components/MonthYearPicker';
 import fs from 'react-native-fs';
 import Header from '../Components/Header';
 import Footer from '../Components/Footer';
+import {
+  showErrorMessage,
+  showInfoMessage,
+} from '../Components/SubmissionMessage';
 
 // Get device dimensions for responsive design
 const {width, height} = Dimensions.get('window');
@@ -31,25 +35,25 @@ const ITEMS_PER_PAGE = 10;
 const isTablet = width >= 768;
 
 // Helper functions for responsive sizes
-const wp = (percentage) => {
+const wp = percentage => {
   const value = width * (percentage / 100);
   return Math.round(value);
 };
 
-const hp = (percentage) => {
+const hp = percentage => {
   const value = height * (percentage / 100);
   return Math.round(value);
 };
 
 // Responsive font scaling
 const fontScale = width / (isTablet ? 768 : 375);
-const getFontSize = (size) => {
+const getFontSize = size => {
   const scaledSize = size * fontScale;
   return Math.round(Math.max(scaledSize, size * 0.8)); // Minimum font size
 };
 
 // Responsive spacing
-const getSpacing = (size) => {
+const getSpacing = size => {
   return isTablet ? size * 1.5 : size;
 };
 
@@ -66,7 +70,7 @@ const JobAlerts = () => {
   const [selectedJob, setSelectedJob] = useState(null);
   const [modalVisible, setModalVisible] = useState(false);
   const [downloading, setDownloading] = useState(false);
-  
+
   // New state for download progress
   const [downloadProgress, setDownloadProgress] = useState(0);
   const [downloadStatus, setDownloadStatus] = useState('');
@@ -191,22 +195,26 @@ const JobAlerts = () => {
   // Enhanced download function with progress tracking
   const handleDownloadPdf = async pdfUrl => {
     if (!pdfUrl) {
-      Alert.alert('Error', 'PDF not available for this job alert');
+      showErrorMessage('Error', 'PDF not available for this job alert');
       return;
     }
 
     // Prevent multiple downloads
     if (downloading) {
-      Alert.alert('Download in Progress', 'Please wait for the current download to complete.');
+      showInfoMessage(
+        'Download in Progress',
+        'Please wait for the current download to complete.',
+      );
       return;
     }
 
     const hasPermission = await requestStoragePermission();
     if (!hasPermission) {
-      Alert.alert(
+      showErrorMessage(
         'Permission Denied',
         'Storage permission is required to download PDF files',
       );
+
       return;
     }
 
@@ -215,7 +223,7 @@ const JobAlerts = () => {
     setShowDownloadProgress(true);
     setDownloadProgress(0);
     setDownloadStatus('Preparing download...');
-    
+
     // Animate progress bar appearance
     Animated.timing(progressAnimation, {
       toValue: 1,
@@ -242,7 +250,7 @@ const JobAlerts = () => {
         discretionary: true,
         progress: res => {
           const progressPercent = Math.round(
-            (res.bytesWritten / res.contentLength) * 100
+            (res.bytesWritten / res.contentLength) * 100,
           );
           setDownloadProgress(progressPercent);
           setDownloadStatus(`Downloading... ${progressPercent}%`);
@@ -253,12 +261,12 @@ const JobAlerts = () => {
 
       if (result.statusCode === 200) {
         setDownloadStatus('Download completed!');
-        
+
         // Show success animation
         setTimeout(() => {
           setDownloading(false);
           setShowDownloadProgress(false);
-          
+
           if (Platform.OS === 'ios') {
             fs.readFile(downloadPath, 'base64').then(base64Data => {
               const shareOptions = {
@@ -266,13 +274,13 @@ const JobAlerts = () => {
                 url: `data:application/pdf;base64,${base64Data}`,
                 message: 'Save your PDF file',
               };
-              Alert.alert(
+              showInfoMessage(
                 'Download Complete',
                 'PDF downloaded successfully. You can find it in your documents folder.',
               );
             });
           } else {
-            Alert.alert(
+            showInfoMessage(
               'Download Complete',
               `PDF saved to Downloads folder as ${fileName}`,
             );
@@ -285,7 +293,8 @@ const JobAlerts = () => {
       setDownloading(false);
       setShowDownloadProgress(false);
       setDownloadStatus('');
-      Alert.alert('Download Failed', 'Could not download the PDF file');
+      showErrorMessage('Download Failed', 'Could not download the PDF file');
+
       console.error('Download error:', error);
     }
   };
@@ -350,34 +359,30 @@ const JobAlerts = () => {
     if (!showDownloadProgress) return null;
 
     return (
-      <Animated.View 
+      <Animated.View
         style={[
           styles.downloadProgressContainer,
           {
             opacity: progressAnimation,
-            transform: [{
-              translateY: progressAnimation.interpolate({
-                inputRange: [0, 1],
-                outputRange: [20, 0],
-              }),
-            }],
-          }
-        ]}
-      >
+            transform: [
+              {
+                translateY: progressAnimation.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [20, 0],
+                }),
+              },
+            ],
+          },
+        ]}>
         <View style={styles.progressHeader}>
           <Text style={styles.downloadStatusText}>{downloadStatus}</Text>
           <Text style={styles.downloadPercentText}>{downloadProgress}%</Text>
         </View>
-        
+
         <View style={styles.progressBarContainer}>
-          <View 
-            style={[
-              styles.progressBar, 
-              { width: `${downloadProgress}%` }
-            ]} 
-          />
+          <View style={[styles.progressBar, {width: `${downloadProgress}%`}]} />
         </View>
-        
+
         <View style={styles.progressIndicatorRow}>
           <ActivityIndicator size="small" color="#5B95C4" />
           <Text style={styles.progressText}>
@@ -472,9 +477,9 @@ const JobAlerts = () => {
                   disabled={downloading}>
                   <View style={styles.downloadButtonContent}>
                     {downloading && (
-                      <ActivityIndicator 
-                        size="small" 
-                        color="#fff" 
+                      <ActivityIndicator
+                        size="small"
+                        color="#fff"
                         style={styles.buttonLoader}
                       />
                     )}
@@ -611,7 +616,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: getSpacing(20),
     marginTop: getSpacing(40),
   },
-  
+
   // Text styles
   loadingText: {
     marginTop: getSpacing(16),
@@ -634,7 +639,7 @@ const styles = StyleSheet.create({
     marginBottom: getSpacing(16),
     lineHeight: getFontSize(24),
   },
-  
+
   // Button styles
   retryButton: {
     backgroundColor: '#5B95C4',
@@ -655,7 +660,7 @@ const styles = StyleSheet.create({
     fontSize: getFontSize(16),
     fontWeight: '600',
   },
-  
+
   // Filters section
   filtersContainer: {
     backgroundColor: '#5B95C4',
@@ -688,7 +693,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     fontSize: getFontSize(14),
   },
-  
+
   // List styles
   listContainer: {
     paddingBottom: getSpacing(16),
@@ -698,7 +703,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: getSpacing(8),
   },
-  
+
   // Card styles
   cardContainer: {
     backgroundColor: '#fff',
@@ -760,7 +765,7 @@ const styles = StyleSheet.create({
     color: '#718096',
     fontWeight: '500',
   },
- 
+
   // Modal styles
   modalOverlay: {
     flex: 1,
@@ -803,7 +808,7 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     lineHeight: getFontSize(20),
   },
-  
+
   // Modal header row
   modalHeaderRow: {
     flexDirection: 'row',
@@ -844,7 +849,7 @@ const styles = StyleSheet.create({
     fontSize: getFontSize(12),
     fontWeight: '500',
   },
-  
+
   // Job details row
   jobDetailsRow: {
     flexDirection: 'row',
@@ -875,7 +880,7 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     fontSize: getFontSize(12),
   },
-  
+
   // Description container
   descriptionContainer: {
     marginBottom: getSpacing(16),

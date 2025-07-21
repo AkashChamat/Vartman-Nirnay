@@ -6,7 +6,6 @@ import {
   FlatList,
   TouchableOpacity,
   ActivityIndicator,
-  Alert,
   Image,
   Dimensions,
   Animated,
@@ -14,15 +13,17 @@ import {
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import Header from '../Components/Header';
-import TestTimer from '../Components/TestTimer'; 
+import TestTimer from '../Components/TestTimer';
 import {
   championpaper,
   getpaperbyid,
   getAttemptCount,
   getUserId,
 } from '../util/apiCall';
+import {showMessage} from 'react-native-flash-message';
+
 import Footer from '../Components/Footer';
-import { useAuth } from '../Auth/AuthContext';
+import {useAuth} from '../Auth/AuthContext';
 
 const {width} = Dimensions.get('window');
 
@@ -32,7 +33,7 @@ const ChampionSeries = ({navigation}) => {
   const [error, setError] = useState(null);
   const [attemptCounts, setAttemptCounts] = useState({});
   const [loadingAttempts, setLoadingAttempts] = useState(false);
-const { getUserId: getAuthUserId } = useAuth();
+  const {getUserId: getAuthUserId} = useAuth();
   const fetchAttemptCounts = async papers => {
     try {
       setLoadingAttempts(true);
@@ -295,13 +296,15 @@ const { getUserId: getAuthUserId } = useAuth();
     // Check test timing
     const timingCheck = checkTestTiming(testPaper);
     if (!timingCheck.canStart) {
-      Alert.alert(
-        timingCheck.reason === 'not_started'
-          ? 'Test Not Started'
-          : 'Test Completed',
-        timingCheck.message,
-        [{text: 'OK'}],
-      );
+      showMessage({
+        message:
+          timingCheck.reason === 'not_started'
+            ? 'Test Not Started'
+            : 'Test Completed',
+        description: timingCheck.message,
+        type: 'warning',
+        icon: 'auto',
+      });
       return;
     }
 
@@ -320,11 +323,12 @@ const { getUserId: getAuthUserId } = useAuth();
   const handleViewResult = testPaper => {
     // Check if results are available
     if (!testPaper.showTestResult) {
-      Alert.alert(
-        'Results Not Available',
-        'Results for this test are not available yet.',
-        [{text: 'OK'}],
-      );
+      showMessage({
+        message: 'Results Not Available',
+        description: 'Results for this test are not available yet.',
+        type: 'info',
+        icon: 'auto',
+      });
       return;
     }
 
@@ -342,7 +346,6 @@ const { getUserId: getAuthUserId } = useAuth();
   };
 
   const handleViewAllResult = testPaper => {
-
     // Navigate to AllResults screen with test details
     navigation.navigate('AllResult', {
       testId: testPaper.id,
@@ -350,44 +353,49 @@ const { getUserId: getAuthUserId } = useAuth();
       pdfUrl: testPaper.allResultPdf || null, // Optional PDF URL if available
     });
   };
- const handleViewMyResult = async testPaper => {
-  try {
-    const userId = getAuthUserId();
+  const handleViewMyResult = async testPaper => {
+    try {
+      const userId = getAuthUserId();
 
-    if (!userId) {
-      Alert.alert('Error', 'User not authenticated');
-      return;
+      if (!userId) {
+        showMessage({
+          message: 'User not authenticated',
+          type: 'danger',
+          icon: 'auto',
+        });
+        return;
+      }
+
+      // Check if user has attempted the test
+      const attemptCount = getAttemptCountForPaper(testPaper.id);
+
+      if (attemptCount === 0) {
+        showMessage({
+          message: 'No Attempts Found',
+          description: 'Please complete the test first to view your result.',
+          type: 'warning',
+          icon: 'auto',
+        });
+
+        return;
+      }
+
+      // Navigate to ChampionResult
+      navigation.navigate('ChampionResult', {
+        userId: userId,
+        testPaperId: testPaper.id,
+        testTitle: testPaper.testTitle,
+        source: 'ChampionSeries',
+      });
+    } catch (error) {
+      console.error('Error in handleViewMyResult:', error);
+      showMessage({
+        message: 'Failed to load result',
+        type: 'danger',
+        icon: 'auto',
+      });
     }
-
-    // Check if user has attempted the test
-    const attemptCount = getAttemptCountForPaper(testPaper.id);
-
-    if (attemptCount === 0) {
-      Alert.alert(
-        'No Attempts Found',
-        'Please complete the test first to view your result.',
-        [
-          {
-            text: 'OK',
-            style: 'default',
-          },
-        ],
-      );
-      return;
-    }
-
-    // Navigate to ChampionResult
-    navigation.navigate('ChampionResult', {
-      userId: userId,
-      testPaperId: testPaper.id,
-      testTitle: testPaper.testTitle,
-      source: 'ChampionSeries',
-    });
-  } catch (error) {
-    console.error('Error in handleViewMyResult:', error);
-    Alert.alert('Error', 'Failed to load result');
-  }
-};
+  };
 
   const renderTestCard = ({item}) => {
     const attemptCount = getAttemptCountForPaper(item.id);

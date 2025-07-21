@@ -5,7 +5,6 @@ import {
   StyleSheet,
   ScrollView,
   Dimensions,
-  Alert,
   TouchableOpacity,
 } from 'react-native';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
@@ -18,7 +17,17 @@ import {useAuth} from '../Auth/AuthContext';
 
 // Import API functions
 import {getAPI} from '../util/apiCall';
-import {TestPaperByIdUrl} from '../util/Url'; 
+import {TestPaperByIdUrl} from '../util/Url';
+
+import {
+  showSubmissionMessage,
+  showTimeUpMessage,
+  showIncompleteTestMessage,
+  showConfirmSubmissionMessage,
+  showErrorMessage,
+  showSuccessMessage,
+  hideMessage,
+} from '../Components/SubmissionMessage';
 
 import {
   handleTestSubmission,
@@ -36,16 +45,18 @@ import {
   renderNavigationButtons,
   renderSubmissionLoading,
   initializeTestTimer,
+  fetchTestQuestions, 
 } from '../Components/ChampionUtil';
 
 const {width} = Dimensions.get('window');
 
 const ChampionTest = ({route, navigation}) => {
   const {testId, testTitle, source} = route.params || {};
-  
+
   // Determine which API to use based on source or route name
-  const isFromTestPaper = source === 'TestPaper' || route.name === 'TestFromPaper';
-  
+  const isFromTestPaper =
+    source === 'TestPaper' || route.name === 'TestFromPaper';
+
   // Get user ID from AuthContext instead of AsyncStorage
   const {getUserId, isAuthenticated, loading: authLoading} = useAuth();
 
@@ -64,40 +75,45 @@ const ChampionTest = ({route, navigation}) => {
   const [isTestCompleted, setIsTestCompleted] = useState(false);
 
   // Unified function to fetch test data from either API
-  const fetchTestData = async (testId) => {
+  const fetchTestData = async testId => {
     try {
       setLoading(true);
       setError(null);
-      
+
       if (!testId) throw new Error('Test ID is required');
-      
+
       let response;
-      
+
       if (isFromTestPaper) {
         // Use TestPaper API
         response = await getAPI(TestPaperByIdUrl, {}, testId, true);
+
+        // Transform the data to ensure consistent format
+        const transformedData = {
+          ...response,
+          questions:
+            response.questions?.map(q => ({
+              ...q,
+              createQuestion: q.createQuestion || q.question,
+              marks: q.marks || 1,
+              section: q.section || 'General',
+            })) || [],
+          duration: response.duration || 60,
+          totalMarks: response.totalMarks || response.questions?.length || 0,
+          noOfQuestions: response.questions?.length || 0,
+          testTitle: response.testTitle || testTitle || 'Test',
+          terms:
+            response.terms ||
+            response.instructions ||
+            'Please read all questions carefully and answer to the best of your ability.',
+        };
+
+        setTestData(transformedData);
       } else {
-        // Use ChampionTest API (replace with your actual champion test API)
-        response = await fetchTestQuestions(testId); // Your existing champion test API call
+        // Use ChampionTest API - call the imported function
+        await fetchTestQuestions(testId, setTestData, setError, setLoading);
+        return; // fetchTestQuestions handles setLoading, so we return early
       }
-      
-      // Transform the data to ensure consistent format
-      const transformedData = {
-        ...response,
-        questions: response.questions?.map(q => ({
-          ...q,
-          createQuestion: q.createQuestion || q.question,
-          marks: q.marks || 1,
-          section: q.section || 'General',
-        })) || [],
-        duration: response.duration || 60,
-        totalMarks: response.totalMarks || response.questions?.length || 0,
-        noOfQuestions: response.questions?.length || 0,
-        testTitle: response.testTitle || testTitle || 'Test',
-        terms: response.terms || response.instructions || 'Please read all questions carefully and answer to the best of your ability.',
-      };
-      
-      setTestData(transformedData);
     } catch (err) {
       console.error('❌ Error fetching test data:', err.message);
       setError(err.message || 'Failed to load test data');
@@ -123,7 +139,6 @@ const ChampionTest = ({route, navigation}) => {
     // Initialize test timer when instructions are accepted
     const startTime = initializeTestTimer();
     setTestStartTime(startTime);
-
   };
 
   const onInstructionsClose = () => {
@@ -154,21 +169,13 @@ const ChampionTest = ({route, navigation}) => {
   // Handle time up - only if test is not completed
   const handleTimeUp = () => {
     if (isTestCompleted) {
-      return; // Don't show alert if test is already completed
+      return; 
     }
 
-    Alert.alert(
-      "Time's Up!",
-      'Your test time has ended. The test will be automatically submitted.',
-      [
-        {
-          text: 'OK',
-          onPress: () => submitTest(),
-          style: 'default',
-        },
-      ],
-      {cancelable: false},
-    );
+    showTimeUpMessage(() => {
+      hideMessage();
+      submitTest();
+    });
   };
 
   const handleSubmitTest = () => {
@@ -176,30 +183,26 @@ const ChampionTest = ({route, navigation}) => {
     const totalQuestions = testData?.questions?.length || 0;
 
     if (answeredCount < totalQuestions) {
-      Alert.alert(
-        'Incomplete Test',
-        `You have answered ${answeredCount} out of ${totalQuestions} questions. Are you sure you want to submit?`,
-        [
-          {text: 'Cancel', style: 'cancel'},
-          {
-            text: 'Submit Anyway',
-            onPress: () => submitTest(),
-            style: 'destructive',
-          },
-        ],
+      showIncompleteTestMessage(
+        answeredCount,
+        totalQuestions,
+        () => {
+          hideMessage();
+          submitTest();
+        },
+        () => {
+          hideMessage();
+        },
       );
     } else {
-      Alert.alert(
-        'Submit Test',
-        'Are you sure you want to submit your test? This action cannot be undone.',
-        [
-          {text: 'Cancel', style: 'cancel'},
-          {
-            text: 'Submit',
-            onPress: () => submitTest(),
-            style: 'default',
-          },
-        ],
+      showConfirmSubmissionMessage(
+        () => {
+          hideMessage();
+          submitTest();
+        },
+        () => {
+          hideMessage();
+        },
       );
     }
   };
@@ -208,16 +211,19 @@ const ChampionTest = ({route, navigation}) => {
     const userId = getUserId();
 
     if (!userId) {
-      Alert.alert('Error', 'User not authenticated. Please login again.');
+      showErrorMessage('Error', 'User not authenticated. Please login again.');
       return;
     }
 
     if (!testStartTime) {
-      Alert.alert('Error', 'Test timing data is missing. Please try again.');
+      showErrorMessage(
+        'Error',
+        'Test timing data is missing. Please try again.',
+      );
       return;
     }
 
-    // Mark test as completed to prevent timer alerts
+  
     setIsTestCompleted(true);
 
     try {
@@ -228,44 +234,30 @@ const ChampionTest = ({route, navigation}) => {
         userId,
         testStartTime,
         response => {
-          Alert.alert(
-            'Test Submitted Successfully!',
-            'Your test has been submitted. You can now view your results.',
-            [
-              {
-                text: 'View Result',
-                onPress: () => {
-                  // Navigate to ChampionResult for both test types
-                  navigation.navigate('ChampionResult', {
-                    userId: userId,
-                    testPaperId: testId,
-                    testTitle: testData.testTitle,
-                    source: source, // Pass source to help identify test type if needed
-                  });
-                },
-                style: 'default',
-              },
-              {
-                text: 'Back to Home',
-                onPress: () => {
-                  // Navigate to appropriate home screen based on source
-                  if (isFromTestPaper) {
-                    navigation.navigate('Home');
-                  } else {
-                    navigation.navigate('ChampionSeries');
-                  }
-                },
-                style: 'cancel',
-              },
-            ],
+          showSubmissionMessage(
+            () => {
+              hideMessage();
+              navigation.navigate('ChampionResult', {
+                userId: userId,
+                testPaperId: testId,
+                testTitle: testData.testTitle,
+                source: source, 
+              });
+            },
+            () => {
+              hideMessage();
+              if (isFromTestPaper) {
+                navigation.navigate('Home');
+              } else {
+                navigation.navigate('ChampionSeries');
+              }
+            },
           );
         },
         errorMessage => {
           // Error callback - reset completion state on error
           setIsTestCompleted(false);
-          Alert.alert('Submission Failed', errorMessage, [
-            {text: 'OK', style: 'default'},
-          ]);
+          showErrorMessage('Submission Failed', errorMessage);
         },
       );
     } catch (error) {
@@ -356,19 +348,16 @@ const ChampionTest = ({route, navigation}) => {
             testStarted={testStarted}
             isTestCompleted={isTestCompleted}
           />
-          
+
           {/* Submit Button in Header */}
           <TouchableOpacity
             style={styles.headerSubmitButton}
             onPress={handleSubmitTest}
-            disabled={isSubmitting}
-          >
+            disabled={isSubmitting}>
             <Text style={styles.headerSubmitButtonText}>
               {isSubmitting ? 'Submitting...' : 'Submit'}
             </Text>
           </TouchableOpacity>
-          
-          
         </View>
       </View>
 
@@ -438,10 +427,12 @@ const ChampionTest = ({route, navigation}) => {
           style={[styles.navButton, styles.skipButton]}
           onPress={handleSkip}
           disabled={currentQuestionIndex >= testData.questions.length - 1}>
-          <Text style={[
-            styles.skipButtonText,
-            currentQuestionIndex >= testData.questions.length - 1 && styles.disabledButtonText
-          ]}>
+          <Text
+            style={[
+              styles.skipButtonText,
+              currentQuestionIndex >= testData.questions.length - 1 &&
+                styles.disabledButtonText,
+            ]}>
             Skip
           </Text>
         </TouchableOpacity>
@@ -450,11 +441,15 @@ const ChampionTest = ({route, navigation}) => {
           style={[styles.navButton, styles.saveNextButton]}
           onPress={onNext}
           disabled={currentQuestionIndex >= testData.questions.length - 1}>
-          <Text style={[
-            styles.saveNextButtonText,
-            currentQuestionIndex >= testData.questions.length - 1 && styles.disabledButtonText
-          ]}>
-            {currentQuestionIndex < testData.questions.length - 1 ? 'Save & Next' : 'Last Question'}
+          <Text
+            style={[
+              styles.saveNextButtonText,
+              currentQuestionIndex >= testData.questions.length - 1 &&
+                styles.disabledButtonText,
+            ]}>
+            {currentQuestionIndex < testData.questions.length - 1
+              ? 'Save & Next'
+              : 'Last Question'}
           </Text>
         </TouchableOpacity>
       </View>

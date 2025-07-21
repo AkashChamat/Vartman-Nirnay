@@ -1,4 +1,4 @@
-import { StyleSheet, Text, View, Image, ActivityIndicator, Dimensions, TouchableOpacity, Alert, ScrollView } from 'react-native';
+import { StyleSheet, Text, View, Image, ActivityIndicator, Dimensions, TouchableOpacity, ScrollView } from 'react-native';
 import React, { useState, useEffect, useRef } from 'react';
 import Carousel from 'react-native-reanimated-carousel';
 import { sponsor, sponsorpdf, sponsortitle } from '../util/apiCall';
@@ -6,6 +6,12 @@ import { useNavigation } from '@react-navigation/native';
 import Header from '../Components/Header';
 import Footer from '../Components/Footer';
 import Icon from 'react-native-vector-icons/MaterialIcons';
+import { 
+  showPdfNotAvailableMessage, 
+  showNoPdfDataMessage, 
+  showPdfLoadFailedMessage 
+} from '../Components/SubmissionMessage';
+
 
 const windowWidth = Dimensions.get('window').width;
 const windowHeight = Dimensions.get('window').height;
@@ -63,33 +69,33 @@ const Sponsors = () => {
   };
 
   // PDF viewing logic similar to Gallery component
-  const handleViewSponsorPDF = async () => {
-    try {
-      setPdfLoading(true);
-      const response = await sponsorpdf();
+ const handleViewSponsorPDF = async () => {
+  try {
+    setPdfLoading(true);
+    const response = await sponsorpdf();
+    
+    if (response && Array.isArray(response) && response.length > 0) {
+      const pdfData = response[0];
       
-      if (response && Array.isArray(response) && response.length > 0) {
-        const pdfData = response[0];
-        
-        if (!pdfData.pdf) {
-          Alert.alert('Error', 'PDF not available');
-          return;
-        }
-
-        navigation.navigate('PdfViewer', {
-          pdfUrl: pdfData.pdf,
-          title: pdfData.description || 'Champion Series Prize Distribution',
-        });
-      } else {
-        Alert.alert('Error', 'No PDF data available');
+      if (!pdfData.pdf) {
+        showPdfNotAvailableMessage();
+        return;
       }
-    } catch (error) {
-      console.error('Error fetching PDF:', error);
-      Alert.alert('Error', 'Failed to load PDF. Please try again later.');
-    } finally {
-      setPdfLoading(false);
+
+      navigation.navigate('PdfViewer', {
+        pdfUrl: pdfData.pdf,
+        title: pdfData.description || 'Champion Series Prize Distribution',
+      });
+    } else {
+      showNoPdfDataMessage();
     }
-  };
+  } catch (error) {
+    console.error('Error fetching PDF:', error);
+    showPdfLoadFailedMessage();
+  } finally {
+    setPdfLoading(false);
+  }
+};
 
   // Improved onSnapToItem handler for better synchronization
   const handleSnapToItem = (index) => {

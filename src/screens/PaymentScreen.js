@@ -4,7 +4,6 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
-  Alert,
   ActivityIndicator,
   SafeAreaView,
   ScrollView,
@@ -14,6 +13,19 @@ import {
 import {useRoute, useFocusEffect} from '@react-navigation/native';
 import {WebView} from 'react-native-webview';
 import {useAuth} from '../Auth/AuthContext';
+import {
+  showErrorMessage,
+  showSuccessMessage,
+  showMissingPhoneMessage,
+  showPaymentInitErrorMessage,
+  showPaymentFailedMessage,
+  showPaymentCancelledMessage,
+  showPaymentStatusUnknownMessage,
+  showClosePaymentConfirmation,
+  showPaymentInProgressMessage,
+  hideMessage,
+} from '../Components/SubmissionMessage';
+
 import {
   createPaymentSession,
   verifyPayment,
@@ -84,14 +96,16 @@ const CashfreePaymentScreen = ({navigation}) => {
     React.useCallback(() => {
       const onBackPress = () => {
         if (showWebView) {
-          Alert.alert(
-            'Payment in Progress',
-            'Please complete or cancel the payment first.',
-            [
-              {text: 'Close Payment', onPress: () => setShowWebView(false)},
-              {text: 'Continue', style: 'cancel'},
-            ],
-          );
+          showPaymentInProgressMessage(
+  () => {
+    hideMessage();
+    setShowWebView(false);
+  },
+  () => {
+    hideMessage();
+    // Continue - just hide the message
+  }
+);
           return true;
         }
         return false;
@@ -105,14 +119,13 @@ const CashfreePaymentScreen = ({navigation}) => {
   const initializePayment = async () => {
     try {
       setLoading(true);
-      
+
       // Get user data
       const email = await getUserEmail();
 
       if (!email || !email.trim()) {
-        Alert.alert('Error', 'Email not found. Please login again.', [
-          {text: 'OK', onPress: () => navigation.goBack()},
-        ]);
+        showErrorMessage('Error', 'Email not found. Please login again.');
+        setTimeout(() => navigation.goBack(), 2000);
         return;
       }
 
@@ -128,16 +141,15 @@ const CashfreePaymentScreen = ({navigation}) => {
       const userId = response.id;
 
       if (!userPhone) {
-        Alert.alert(
-          'Missing Phone Number',
-          'Phone number is required for payment. Please update your profile.',
-          [
-            {
-              text: 'Update Profile',
-              onPress: () => navigation.navigate('Profile'),
-            },
-            {text: 'Cancel', onPress: () => navigation.goBack()},
-          ],
+        showMissingPhoneMessage(
+          () => {
+            hideMessage();
+            navigation.navigate('Profile');
+          },
+          () => {
+            hideMessage();
+            navigation.goBack();
+          },
         );
         return;
       }
@@ -158,9 +170,9 @@ const CashfreePaymentScreen = ({navigation}) => {
         amount,
         userId,
       );
-      
+
       if (!validation.isValid) {
-        Alert.alert('Validation Error', validation.errors.join('\n'));
+        AshowErrorMessage('Validation Error', validation.errors.join('\n'));
         return;
       }
 
@@ -179,17 +191,18 @@ const CashfreePaymentScreen = ({navigation}) => {
       setSessionData(sessionResponse);
       setShowWebView(true);
       setLoading(false);
-      
     } catch (error) {
       console.error('❌ Payment initialization error:', error);
       setLoading(false);
-      Alert.alert(
-        'Payment Error',
-        error.message || 'Failed to initialize payment',
-        [
-          {text: 'Try Again', onPress: () => initializePayment()},
-          {text: 'Cancel', onPress: () => navigation.goBack()},
-        ],
+      showPaymentInitErrorMessage(
+        () => {
+          hideMessage();
+          initializePayment();
+        },
+        () => {
+          hideMessage();
+          navigation.goBack();
+        },
       );
     }
   };
@@ -211,7 +224,6 @@ const CashfreePaymentScreen = ({navigation}) => {
         handlePaymentResult({status: 'FAILED', error: data.error});
       }
     } catch (error) {
-
       // Handle simple string messages with more validation
       const message = event.nativeEvent.data.toLowerCase();
       if (
@@ -242,11 +254,10 @@ const CashfreePaymentScreen = ({navigation}) => {
       setWebViewLoading(true);
 
       if (!result) {
-        Alert.alert(
-          'Payment Status Unknown',
-          "The payment process completed but we couldn't determine the result. Please check your payment history or contact support.",
-          [{text: 'OK', onPress: () => navigation.goBack()}],
-        );
+       showPaymentStatusUnknownMessage(() => {
+  hideMessage();
+  navigation.goBack();
+});
         return;
       }
 
@@ -257,7 +268,6 @@ const CashfreePaymentScreen = ({navigation}) => {
         result.orderStatus;
       const orderId =
         result.orderId || result.order_id || sessionData?.order_id;
-
 
       if (
         txStatus === 'SUCCESS' ||
@@ -271,20 +281,20 @@ const CashfreePaymentScreen = ({navigation}) => {
             await verifyPayment(orderId, sessionData.payment_session_id);
           }
 
-          Alert.alert(
+          showSuccessMessage(
             'Payment Successful! 🎉',
             `Your payment has been processed successfully.${
-              orderId ? `\n\nOrder ID: ${orderId}` : ''
+              orderId ? `\nOrder ID: ${orderId}` : ''
             }`,
-            [{text: 'Continue', onPress: () => navigation.goBack()}],
           );
+          setTimeout(() => navigation.goBack(), 3000);
         } catch (verificationError) {
           console.error('❌ Payment verification failed:', verificationError);
-          Alert.alert(
+          showErrorMessage(
             'Payment Verification Failed',
             'Payment was successful but verification failed. Please contact support with your transaction details.',
-            [{text: 'OK', onPress: () => navigation.goBack()}],
           );
+          setTimeout(() => navigation.goBack(), 4000);
         }
       } else if (
         txStatus === 'FAILED' ||
@@ -292,15 +302,18 @@ const CashfreePaymentScreen = ({navigation}) => {
         txStatus === 'FAILURE' ||
         txStatus === 'ERROR'
       ) {
-        Alert.alert(
-          'Payment Failed',
+        showPaymentFailedMessage(
+          () => {
+            hideMessage();
+            initializePayment();
+          },
+          () => {
+            hideMessage();
+            navigation.goBack();
+          },
           result.message ||
             result.error ||
             'Payment could not be processed. Please try again.',
-          [
-            {text: 'Try Again', onPress: () => initializePayment()},
-            {text: 'Cancel', onPress: () => navigation.goBack()},
-          ],
         );
       } else if (
         txStatus === 'CANCELLED' ||
@@ -308,23 +321,29 @@ const CashfreePaymentScreen = ({navigation}) => {
         txStatus === 'CANCELED' ||
         txStatus === 'ABORTED'
       ) {
-        Alert.alert('Payment Cancelled', 'You cancelled the payment process.', [
-          {text: 'Try Again', onPress: () => initializePayment()},
-          {text: 'Go Back', onPress: () => navigation.goBack()},
-        ]);
+        showPaymentCancelledMessage(
+          () => {
+            hideMessage();
+            initializePayment();
+          },
+          () => {
+            hideMessage();
+            navigation.goBack();
+          },
+        );
       } else {
         console.warn('⚠️ Unknown payment status:', txStatus);
-        Alert.alert(
+        showErrorMessage(
           'Payment Status Unknown',
           `Unable to determine payment result. Status: ${
             txStatus || 'Unknown'
-          }\n\nPlease check your payment history or contact support.`,
-          [{text: 'OK', onPress: () => navigation.goBack()}],
+          }\nPlease check your payment history or contact support.`,
         );
+        setTimeout(() => navigation.goBack(), 4000);
       }
     } catch (error) {
       console.error('❌ Error processing payment result:', error);
-      Alert.alert(
+      showErrorMessage(
         'Error',
         'Failed to process payment result. Please contact support.',
       );
@@ -332,22 +351,18 @@ const CashfreePaymentScreen = ({navigation}) => {
   };
 
   const closeWebView = () => {
-    Alert.alert(
-      'Close Payment',
-      'Are you sure you want to close the payment? Your payment will be cancelled.',
-      [
-        {text: 'Continue Payment', style: 'cancel'},
-        {
-          text: 'Close',
-          onPress: () => {
-            setShowWebView(false);
-            setWebViewLoading(true);
-            navigation.goBack();
-          },
-          style: 'destructive',
-        },
-      ],
-    );
+    showClosePaymentConfirmation(
+  () => {
+    hideMessage();
+    // Continue payment - just hide the message
+  },
+  () => {
+    hideMessage();
+    setShowWebView(false);
+    setWebViewLoading(true);
+    navigation.goBack();
+  }
+);
   };
 
   const goBack = () => {
@@ -768,7 +783,9 @@ const CashfreePaymentScreen = ({navigation}) => {
           {webViewLoading && (
             <View style={styles.webViewLoadingContainer}>
               <ActivityIndicator size="large" color="#007bff" />
-              <Text style={styles.webViewLoadingText}>Loading Payment Gateway...</Text>
+              <Text style={styles.webViewLoadingText}>
+                Loading Payment Gateway...
+              </Text>
             </View>
           )}
 
@@ -780,7 +797,7 @@ const CashfreePaymentScreen = ({navigation}) => {
             onError={error => {
               console.error('❌ WebView error:', error);
               setWebViewLoading(false);
-              Alert.alert('Error', 'Failed to load payment page');
+              showErrorMessage('Error', 'Failed to load payment page');
             }}
             style={styles.webview}
             javaScriptEnabled={true}
@@ -929,7 +946,7 @@ const styles = StyleSheet.create({
     color: '#495057',
     marginTop: 12,
   },
-  webview: {flex: 1}
-})
+  webview: {flex: 1},
+});
 
 export default CashfreePaymentScreen;

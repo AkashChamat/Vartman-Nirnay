@@ -18,6 +18,7 @@ import {
   createTestSeriesPaymentSession,
   getUserByEmail,
 } from '../../util/apiCall';
+import FlashMessage, {showMessage} from 'react-native-flash-message';
 
 // Payment validation and helper functions
 const validatePaymentData = (seriesId, email, phone, amount, userId) => {
@@ -62,8 +63,8 @@ const formatCurrency = amount => {
 
 const TestSeriesPaymentScreen = ({navigation}) => {
   const route = useRoute();
-   const {seriesId} = route.params || {};
-   const {amount} = route.params || {};
+  const {seriesId} = route.params || {};
+  const {amount} = route.params || {};
 
   const {getUserEmail} = useAuth();
   const [loading, setLoading] = useState(true);
@@ -84,14 +85,12 @@ const TestSeriesPaymentScreen = ({navigation}) => {
     React.useCallback(() => {
       const onBackPress = () => {
         if (showWebView) {
-          Alert.alert(
-            'Payment in Progress',
-            'Please complete or cancel the payment first.',
-            [
-              {text: 'Close Payment', onPress: () => setShowWebView(false)},
-              {text: 'Continue', style: 'cancel'},
-            ],
-          );
+          showMessage({
+            message: 'Payment in Progress',
+            description: 'Please complete or cancel the payment first.',
+            type: 'warning',
+            duration: 3000,
+          });
           return true;
         }
         return false;
@@ -102,11 +101,10 @@ const TestSeriesPaymentScreen = ({navigation}) => {
     }, [showWebView]),
   );
 
-    const fetchSeriesData = async () => {
+  const fetchSeriesData = async () => {
     try {
-
       // If we have seriesId, we need to fetch the series details from API
-      if (routeSeriesId) {        
+      if (routeSeriesId) {
         return {
           seriesId: routeSeriesId,
           seriesName: seriesName || 'Test Series', // You'll need to fetch this
@@ -115,7 +113,9 @@ const TestSeriesPaymentScreen = ({navigation}) => {
       }
 
       // If no seriesId at all, throw error
-      throw new Error('Series ID is required but not provided in navigation params');
+      throw new Error(
+        'Series ID is required but not provided in navigation params',
+      );
     } catch (error) {
       console.error('❌ Error fetching series data:', error);
       throw error;
@@ -125,14 +125,17 @@ const TestSeriesPaymentScreen = ({navigation}) => {
   const initializePayment = async () => {
     try {
       setLoading(true);
-      
+
       // Get user data
       const email = await getUserEmail();
 
       if (!email || !email.trim()) {
-        Alert.alert('Error', 'Email not found. Please login again.', [
-          {text: 'OK', onPress: () => navigation.goBack()},
-        ]);
+        showMessage({
+          message: 'Error',
+          description: 'Email not found. Please login again.',
+          type: 'danger',
+          onPress: () => navigation.goBack(),
+        });
         return;
       }
 
@@ -147,17 +150,14 @@ const TestSeriesPaymentScreen = ({navigation}) => {
       const userId = response.id;
 
       if (!userPhone) {
-        Alert.alert(
-          'Missing Phone Number',
-          'Phone number is required for payment. Please update your profile.',
-          [
-            {
-              text: 'Update Profile',
-              onPress: () => navigation.navigate('Profile'),
-            },
-            {text: 'Cancel', onPress: () => navigation.goBack()},
-          ],
-        );
+        showMessage({
+          message: 'Missing Phone Number',
+          description:
+            'Phone number is required for payment. Please update your profile.',
+          type: 'warning',
+          duration: 4000,
+          onPress: () => navigation.navigate('Profile'),
+        });
         return;
       }
 
@@ -177,9 +177,14 @@ const TestSeriesPaymentScreen = ({navigation}) => {
         amount,
         userId,
       );
-      
+
       if (!validation.isValid) {
-        Alert.alert('Validation Error', validation.errors.join('\n'));
+        showMessage({
+          message: 'Validation Error',
+          description: validation.errors.join('\n'),
+          type: 'danger',
+          duration: 4000,
+        });
         return;
       }
 
@@ -198,18 +203,16 @@ const TestSeriesPaymentScreen = ({navigation}) => {
       setSessionData(sessionResponse);
       setShowWebView(true);
       setLoading(false);
-      
     } catch (error) {
       console.error('❌ Test Series Payment initialization error:', error);
       setLoading(false);
-      Alert.alert(
-        'Payment Error',
-        error.message || 'Failed to initialize payment',
-        [
-          {text: 'Try Again', onPress: () => initializePayment()},
-          {text: 'Cancel', onPress: () => navigation.goBack()},
-        ],
-      );
+      showMessage({
+        message: 'Payment Error',
+        description: error.message || 'Failed to initialize payment',
+        type: 'danger',
+        duration: 4000,
+        onPress: () => initializePayment(),
+      });
     }
   };
 
@@ -230,7 +233,6 @@ const TestSeriesPaymentScreen = ({navigation}) => {
         handlePaymentResult({status: 'FAILED', error: data.error});
       }
     } catch (error) {
-
       // Handle simple string messages with more validation
       const message = event.nativeEvent.data.toLowerCase();
       if (
@@ -261,11 +263,13 @@ const TestSeriesPaymentScreen = ({navigation}) => {
       setWebViewLoading(true);
 
       if (!result) {
-        Alert.alert(
-          'Payment Status Unknown',
-          "The payment process completed but we couldn't determine the result. Please check your payment history or contact support.",
-          [{text: 'OK', onPress: () => navigation.goBack()}],
-        );
+        showMessage({
+          message: 'Payment Successful! 🎉',
+          description: `Your test series payment has been processed successfully.`,
+          type: 'success',
+          duration: 4000,
+          onPress: () => navigation.goBack(),
+        });
         return;
       }
 
@@ -296,62 +300,66 @@ const TestSeriesPaymentScreen = ({navigation}) => {
         txStatus === 'FAILURE' ||
         txStatus === 'ERROR'
       ) {
-        Alert.alert(
-          'Payment Failed',
-          result.message ||
+        showMessage({
+          message: 'Payment Failed',
+          description:
+            result.message ||
             result.error ||
             'Payment could not be processed. Please try again.',
-          [
-            {text: 'Try Again', onPress: () => initializePayment()},
-            {text: 'Cancel', onPress: () => navigation.goBack()},
-          ],
-        );
+          type: 'danger',
+          duration: 4000,
+          onPress: () => initializePayment(),
+        });
       } else if (
         txStatus === 'CANCELLED' ||
         txStatus === 'cancelled' ||
         txStatus === 'CANCELED' ||
         txStatus === 'ABORTED'
       ) {
-        Alert.alert('Payment Cancelled', 'You cancelled the payment process.', [
-          {text: 'Try Again', onPress: () => initializePayment()},
-          {text: 'Go Back', onPress: () => navigation.goBack()},
-        ]);
+        showMessage({
+          message: 'Payment Cancelled',
+          description: 'You cancelled the payment process.',
+          type: 'info',
+          duration: 3000,
+          onPress: () => initializePayment(),
+        });
       } else {
         console.warn('⚠️ Unknown payment status:', txStatus);
-        Alert.alert(
-          'Payment Status Unknown',
-          `Unable to determine payment result. Status: ${
+        showMessage({
+          message: 'Payment Status Unknown',
+          description: `Unable to determine payment result. Status: ${
             txStatus || 'Unknown'
           }\n\nPlease check your payment history or contact support.`,
-          [{text: 'OK', onPress: () => navigation.goBack()}],
-        );
+          type: 'warning',
+          duration: 5000,
+          onPress: () => navigation.goBack(),
+        });
       }
     } catch (error) {
       console.error('❌ Error processing payment result:', error);
-      Alert.alert(
-        'Error',
-        'Failed to process payment result. Please contact support.',
-      );
+      showMessage({
+        message: 'Error',
+        description:
+          'Failed to process payment result. Please contact support.',
+        type: 'danger',
+        duration: 4000,
+      });
     }
   };
 
   const closeWebView = () => {
-    Alert.alert(
-      'Close Payment',
-      'Are you sure you want to close the payment? Your payment will be cancelled.',
-      [
-        {text: 'Continue Payment', style: 'cancel'},
-        {
-          text: 'Close',
-          onPress: () => {
-            setShowWebView(false);
-            setWebViewLoading(true);
-            navigation.goBack();
-          },
-          style: 'destructive',
-        },
-      ],
-    );
+    showMessage({
+      message: 'Close Payment',
+      description:
+        'Are you sure you want to close the payment? Your payment will be cancelled.',
+      type: 'warning',
+      duration: 4000,
+      onPress: () => {
+        setShowWebView(false);
+        setWebViewLoading(true);
+        navigation.goBack();
+      },
+    });
   };
 
   const goBack = () => {
@@ -718,7 +726,9 @@ const TestSeriesPaymentScreen = ({navigation}) => {
       <SafeAreaView style={styles.container}>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#4f46e5" />
-          <Text style={styles.loadingText}>Initializing Test Series Payment...</Text>
+          <Text style={styles.loadingText}>
+            Initializing Test Series Payment...
+          </Text>
           <Text style={styles.loadingSubtext}>
             Setting up secure payment gateway
           </Text>
@@ -740,7 +750,7 @@ const TestSeriesPaymentScreen = ({navigation}) => {
         {/* Payment Summary */}
         <View style={styles.summaryContainer}>
           <Text style={styles.summaryTitle}>Payment Summary</Text>
-          
+
           <View style={styles.summaryItem}>
             <Text style={styles.summaryLabel}>Amount:</Text>
             <Text style={styles.summaryValue}>{formatCurrency(amount)}</Text>
@@ -769,7 +779,9 @@ const TestSeriesPaymentScreen = ({navigation}) => {
           {webViewLoading && (
             <View style={styles.webViewLoadingContainer}>
               <ActivityIndicator size="large" color="#4f46e5" />
-              <Text style={styles.webViewLoadingText}>Loading Payment Gateway...</Text>
+              <Text style={styles.webViewLoadingText}>
+                Loading Payment Gateway...
+              </Text>
             </View>
           )}
 
@@ -781,7 +793,12 @@ const TestSeriesPaymentScreen = ({navigation}) => {
             onError={error => {
               console.error('❌ WebView error:', error);
               setWebViewLoading(false);
-              Alert.alert('Error', 'Failed to load payment page');
+              showMessage({
+                message: 'Error',
+                description: 'Failed to load payment page',
+                type: 'danger',
+                duration: 3000,
+              });
             }}
             style={styles.webview}
             javaScriptEnabled={true}

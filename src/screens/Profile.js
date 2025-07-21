@@ -5,7 +5,7 @@ import {
   StyleSheet,
   ScrollView,
   ActivityIndicator,
-  Alert,
+
   RefreshControl,
   TouchableOpacity,
 } from 'react-native';
@@ -13,6 +13,7 @@ import { useAuth } from '../Auth/AuthContext';
 import { getUserByEmail } from '../util/apiCall';
 import Header from '../Components/Header';
 import Footer from '../Components/Footer';
+import { showErrorMessage } from '../Components/SubmissionMessage';
 
 const ProfilePage = () => {
   const { getUserEmail, isAuthenticated } = useAuth();
@@ -60,9 +61,7 @@ const ProfilePage = () => {
       const errorMessage = err.message || 'Failed to load user data';
       setError(errorMessage);
 
-      Alert.alert('Error', errorMessage, [
-        { text: 'OK' },
-      ]);
+      showErrorMessage('Error', errorMessage);
     } finally {
       setLoading(false);
       setRefreshing(false);

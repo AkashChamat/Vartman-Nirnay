@@ -12,7 +12,7 @@ import {
   Animated,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useAuth } from '../../Auth/AuthContext';
+import {useAuth} from '../../Auth/AuthContext';
 import {useRoute, useNavigation} from '@react-navigation/native';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import Icon from 'react-native-vector-icons/MaterialIcons';
@@ -23,9 +23,10 @@ import {
   getUserId,
   getAttemptCount,
 } from '../../util/apiCall';
+import { showMessage } from 'react-native-flash-message';
 
 // CHANGE THIS PATH TO MATCH YOUR ACTUAL FILE LOCATION
-import { generateAndDownloadTestPaper } from '../../Components/PDFGenerator';
+import {generateAndDownloadTestPaper} from '../../Components/PDFGenerator';
 
 const {width} = Dimensions.get('window');
 
@@ -33,7 +34,7 @@ const TestPaper = () => {
   const route = useRoute();
   const navigation = useNavigation();
   const {seriesId} = route.params;
-  const { getUserId: getAuthUserId } = useAuth();
+  const {getUserId: getAuthUserId} = useAuth();
   const [testPapers, setTestPapers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [attemptCounts, setAttemptCounts] = useState({});
@@ -183,11 +184,19 @@ const TestPaper = () => {
   const handleStartTest = paper => {
     const attemptCount = getAttemptCountForPaper(paper.id);
     if (!paper.multipleAttemptsAllowed && attemptCount >= 1) {
-      Alert.alert('Attempts Over', 'You have already attempted this test.');
+      showMessage({
+        message: 'Attempts Over',
+        description: 'You have already attempted this test.',
+        type: 'warning',
+      });
       return;
     }
     if (paper.maxAttemptsAllowed && attemptCount >= paper.maxAttemptsAllowed) {
-      Alert.alert('Limit Exceeded', 'Maximum attempts reached for this test.');
+      showMessage({
+        message: 'Limit Exceeded',
+        description: 'Maximum attempts reached for this test.',
+        type: 'danger',
+      });
       return;
     }
 
@@ -202,7 +211,6 @@ const TestPaper = () => {
   };
 
   const handleViewAllResult = testPaper => {
-
     navigation.navigate('AllResult', {
       testId: testPaper.id,
       testTitle: testPaper.testTitle,
@@ -212,21 +220,20 @@ const TestPaper = () => {
 
   const handleViewMyResult = async testPaper => {
     try {
-      
       let userId = null;
-            try {
+      try {
         userId = getAuthUserId();
         if (userId) {
         }
       } catch (authError) {
         console.error('❌ AuthContext getUserId failed:', authError);
       }
-      
+
       // Method 2: Try apiCall method
       if (!userId) {
         userId = await getUserId();
       }
-      
+
       // Method 3: Try AsyncStorage userData
       if (!userId) {
         try {
@@ -239,7 +246,7 @@ const TestPaper = () => {
           console.error('❌ AsyncStorage userData error:', storageError);
         }
       }
-      
+
       // Method 4: Try AsyncStorage userId key
       if (!userId) {
         try {
@@ -251,10 +258,14 @@ const TestPaper = () => {
           console.error('❌ AsyncStorage userId error:', storageError);
         }
       }
-      
+
       if (!userId) {
         console.error('❌ Could not get user ID from any method');
-        Alert.alert('Error', 'User not authenticated. Please login again.');
+        showMessage({
+          message: 'Authentication Error',
+          description: 'Please login again.',
+          type: 'danger',
+        });
         return;
       }
 
@@ -262,11 +273,12 @@ const TestPaper = () => {
       const attemptCount = getAttemptCountForPaper(testPaper.id);
 
       if (attemptCount === 0) {
-        Alert.alert(
-          'No Attempts Found',
-          'Please complete the test first to view your result.',
-          [{ text: 'OK', style: 'default' }],
-        );
+        showMessage({
+          message: 'No Attempts Found',
+          description: 'Please complete the test first to view your result.',
+          type: 'warning',
+        });
+
         return;
       }
 
@@ -282,7 +294,7 @@ const TestPaper = () => {
     }
   };
 
-  const handleDownloadTestPaper = async (testPaper) => {
+  const handleDownloadTestPaper = async testPaper => {
     try {
       if (!testPaper) {
         Alert.alert('Error', 'Test paper data is not available');
@@ -294,29 +306,43 @@ const TestPaper = () => {
         return;
       }
 
-      Alert.alert('Please Wait', 'Generating PDF... This may take a moment.');
+      showMessage({
+        message: 'Please Wait',
+        description: 'Generating PDF... This may take a moment.',
+        type: 'info',
+      });
 
       // Call the PDF generator utility with proper error handling
       await generateAndDownloadTestPaper(testPaper);
-            
     } catch (error) {
       console.error('❌ Download Error:', error);
-      
+
       // Enhanced error messages
       let errorMessage = 'Unable to download the test paper. Please try again.';
-      
+
       if (error.message?.includes('Permission')) {
-        errorMessage = 'Storage permission is required to download the PDF. Please grant permission and try again.';
-      } else if (error.message?.includes('network') || error.message?.includes('Network')) {
-        errorMessage = 'Network error occurred. Please check your connection and try again.';
-      } else if (error.message?.includes('space') || error.message?.includes('storage')) {
-        errorMessage = 'Insufficient storage space. Please free up some space and try again.';
+        errorMessage =
+          'Storage permission is required to download the PDF. Please grant permission and try again.';
+      } else if (
+        error.message?.includes('network') ||
+        error.message?.includes('Network')
+      ) {
+        errorMessage =
+          'Network error occurred. Please check your connection and try again.';
+      } else if (
+        error.message?.includes('space') ||
+        error.message?.includes('storage')
+      ) {
+        errorMessage =
+          'Insufficient storage space. Please free up some space and try again.';
       }
-      
-      Alert.alert(
-        'Download Failed', 
-        errorMessage + '\n\nError details: ' + (error.message || 'Unknown error')
-      );
+
+      showMessage({
+        message: 'Download Failed',
+        description: errorMessage + '\n\n' + (error.message || 'Unknown error'),
+        type: 'danger',
+        duration: 5000,
+      });
     }
   };
 
@@ -469,7 +495,7 @@ const TestPaper = () => {
           />
         )}
       </View>
-      <Footer/>
+      <Footer />
     </View>
   );
 };

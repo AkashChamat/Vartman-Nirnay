@@ -4,7 +4,6 @@ import {
   Text,
   StyleSheet,
   ActivityIndicator,
-  Alert,
   ScrollView,
   TouchableOpacity,
   Platform,
@@ -20,13 +19,23 @@ import Footer from '../Components/Footer';
 import {useAuth} from '../Auth/AuthContext';
 import {getUserByEmail, getAPI} from '../util/apiCall';
 import {ebookordersUrl, testseriesordersUrl} from '../util/Url';
-import {useNavigation} from '@react-navigation/native'; // Add this import for navigation
+import {useNavigation} from '@react-navigation/native';
+import {
+  showErrorMessage,
+  showSuccessMessage,
+  showPdfLoadErrorMessage,
+  showDataLoadErrorMessage,
+  showDownloadFailedMessage,
+  showPdfNotAvailableMessage,
+  showDownloadSuccessMessage,
+  hideMessage,
+} from '../Components/SubmissionMessage';
 
 const {width, height} = Dimensions.get('window');
 
 const Purchase = () => {
   const {getUserEmail} = useAuth();
-  const navigation = useNavigation(); // Add navigation hook
+  const navigation = useNavigation();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [orders, setOrders] = useState([]);
@@ -38,18 +47,43 @@ const Purchase = () => {
   const [open, setOpen] = useState(false);
   const [selectedMaterialType, setSelectedMaterialType] = useState('all');
   const [dropdownItems, setDropdownItems] = useState([
-    {label: 'All', value: 'all'},
-    {label: 'Ebook', value: 'ebook'},
+    {label: 'All Materials', value: 'all'},
+    {label: 'E-Books', value: 'ebook'},
     {label: 'Test Series', value: 'testseries'},
   ]);
+
+  // Calculate statistics
+  const calculateStats = () => {
+    const totalItems = orders.length;
+    const ebookCount = orders.filter(order => order.type === 'ebook').length;
+    const testSeriesCount = orders.filter(
+      order => order.type === 'testseries',
+    ).length;
+
+    // Calculate total amount spent
+    const totalSpent = orders.reduce((total, order) => {
+      return total + (order.amount || 0);
+    }, 0);
+
+    return {
+      totalItems,
+      ebookCount,
+      testSeriesCount,
+      totalSpent,
+    };
+  };
+
+  const stats = calculateStats();
 
   const fetchUserData = async () => {
     try {
       setLoading(true);
       const email = getUserEmail();
+
       if (!email) throw new Error('Email not found. Please login again.');
 
       const userResponse = await getUserByEmail(email);
+
       const user = userResponse?.data || userResponse;
       const userId = user.id;
 
@@ -68,11 +102,13 @@ const Purchase = () => {
         type: 'testseries',
       }));
 
-      setOrders([...formattedEbooks, ...formattedTestSeries]);
+      const finalOrders = [...formattedEbooks, ...formattedTestSeries];
+
+      setOrders(finalOrders);
     } catch (err) {
-      console.error('Error:', err.message);
+      console.error('❌ Error fetching user data:', err);
       setError(err.message || 'Failed to load data');
-      Alert.alert('Error', err.message || 'Failed to load data');
+      showErrorMessage('Error', err.message || 'Failed to load data');
     } finally {
       setLoading(false);
     }
@@ -85,7 +121,7 @@ const Purchase = () => {
   const handleDownloadPDF = async item => {
     const url = item?.vmMaterial?.pdfFile;
     if (!url) {
-      Alert.alert('Error', 'PDF not available for this material');
+      showPdfNotAvailableMessage();
       return;
     }
 
@@ -130,7 +166,7 @@ const Purchase = () => {
       }));
 
       if (result.statusCode === 200) {
-        Alert.alert('Success', 'PDF downloaded successfully');
+        showDownloadSuccessMessage();
         if (Platform.OS === 'android') {
           await RNFS.scanFile(downloadDest);
         }
@@ -142,23 +178,20 @@ const Purchase = () => {
         ...prev,
         [item.orderId]: {isDownloading: false, progress: 0},
       }));
-      Alert.alert('Download Failed', error.message);
+      showErrorMessage('Download Failed', error.message);
     }
   };
 
-  // Enhanced PDF viewing with multiple fallback options
   const handleViewPDF = item => {
     const url = item?.vmMaterial?.pdfFile;
     if (!url) {
-      Alert.alert('Error', 'PDF not available for this material');
+      showPdfNotAvailableMessage();
       return;
     }
 
-    // Use Google Docs viewer (most reliable for React Native)
     const viewerUrl = `https://docs.google.com/viewer?url=${encodeURIComponent(
       url,
     )}&embedded=true`;
-
 
     setViewingPdf({
       url: viewerUrl,
@@ -187,9 +220,9 @@ const Purchase = () => {
   const getTypeColor = type => {
     switch (type) {
       case 'ebook':
-        return '#3B82F6';
+        return '#2563EB';
       case 'testseries':
-        return '#10B981';
+        return '#059669';
       default:
         return '#6B7280';
     }
@@ -207,7 +240,6 @@ const Purchase = () => {
   };
 
   const renderActionButtons = item => {
-    // For test series, show "View Papers" button
     if (item.type === 'testseries') {
       return (
         <View style={styles.actionButtonsContainer}>
@@ -215,27 +247,24 @@ const Purchase = () => {
             style={styles.viewPapersButton}
             onPress={() => handleViewTestPapers(item)}>
             <Icon name="assignment" size={16} color="#FFFFFF" />
-            <Text style={styles.viewPapersButtonText}>View Papers</Text>
+            <Text style={styles.actionButtonText}>View Papers</Text>
           </TouchableOpacity>
         </View>
       );
     }
 
-    // For ebooks, show the original View/Download buttons
     const canDownload = item?.vmMaterial?.saveToDevice;
     const isDownloading = downloadProgress[item.orderId]?.isDownloading;
 
     return (
       <View style={styles.actionButtonsContainer}>
-        {/* View Button - Always visible for ebooks */}
         <TouchableOpacity
           style={styles.viewButton}
           onPress={() => handleViewPDF(item)}>
           <Icon name="visibility" size={16} color="#FFFFFF" />
-          <Text style={styles.viewButtonText}>View</Text>
+          <Text style={styles.actionButtonText}>View</Text>
         </TouchableOpacity>
 
-        {/* Download Button - Only visible when saveToDevice is true */}
         {canDownload && (
           <TouchableOpacity
             style={[
@@ -249,7 +278,7 @@ const Purchase = () => {
             ) : (
               <Icon name="file-download" size={16} color="#FFFFFF" />
             )}
-            <Text style={styles.downloadButtonText}>
+            <Text style={styles.actionButtonText}>
               {isDownloading ? 'Downloading...' : 'Download'}
             </Text>
           </TouchableOpacity>
@@ -258,50 +287,84 @@ const Purchase = () => {
     );
   };
 
+  const renderStatCard = (title, value, icon, color) => (
+    <View style={styles.statCard}>
+      <View style={[styles.statIconContainer, {backgroundColor: color}]}>
+        <Icon name={icon} size={14} color="#FFFFFF" />
+      </View>
+      <Text style={styles.statValue}>{value}</Text>
+      <Text style={styles.statLabel}>{title}</Text>
+    </View>
+  );
+
+  const renderStatsSection = () => (
+    <View style={styles.statsContainer}>
+      <View style={styles.statsHeader}>
+        <Text style={styles.statsTitle}>My Purchases</Text>
+      </View>
+      <View style={styles.statsGrid}>
+        {renderStatCard(
+          'Total Items',
+          stats.totalItems,
+          'inventory-2',
+          '#8B5CF6',
+        )}
+        {renderStatCard('E-Books', stats.ebookCount, 'menu-book', '#2563EB')}
+        {renderStatCard(
+          'Test Series',
+          stats.testSeriesCount,
+          'quiz',
+          '#059669',
+        )}
+        {renderStatCard(
+          'Total Spent',
+          `₹${stats.totalSpent.toLocaleString()}`,
+          'account-balance-wallet',
+          '#DC2626',
+        )}
+      </View>
+    </View>
+  );
+
   const renderCard = (item, index) => (
     <View key={index} style={styles.card}>
-      <View style={styles.cardContent}>
-        <View style={styles.mainContent}>
-          <View style={styles.titleRow}>
-            <View style={styles.typeContainer}>
-              <Icon
-                name={getTypeIcon(item.type)}
-                size={16}
-                color={getTypeColor(item.type)}
-              />
-              <Text style={styles.chapterTitle} numberOfLines={2}>
-                {item?.vmMaterial?.chapterName ||
-                  item?.testSeries?.examTitle ||
-                  'Untitled'}
-              </Text>
-            </View>
+      <View style={styles.cardHeader}>
+        <View style={styles.cardTypeIndicator}>
+          <View
+            style={[
+              styles.typeIcon,
+              {backgroundColor: getTypeColor(item.type)},
+            ]}>
+            <Icon name={getTypeIcon(item.type)} size={16} color="#FFFFFF" />
           </View>
-
-          <View style={styles.metaRow}>
-            <View style={styles.dateContainer}>
-              <Icon name="event" size={12} color="#6B7280" />
-              <Text style={styles.dateText}>
-                {new Date(item.createdAt).toLocaleDateString('en-US', {
-                  day: 'numeric',
-                  month: 'short',
-                  year: 'numeric',
-                })}
-              </Text>
-            </View>
-
-            {renderActionButtons(item)}
+          <View style={styles.cardTitleContainer}>
+            <Text style={styles.cardTitle} numberOfLines={2}>
+              {item?.vmMaterial?.chapterName ||
+                item?.testSeries?.examTitle ||
+                'Untitled'}
+            </Text>
+            <Text style={styles.cardType}>
+              {item.type === 'ebook' ? 'E-Book' : 'Test Series'}
+            </Text>
           </View>
         </View>
       </View>
 
+      <View style={styles.cardBody}>{renderActionButtons(item)}</View>
+
       {downloadProgress[item.orderId]?.isDownloading && (
-        <View style={styles.progressBarContainer}>
-          <View
-            style={[
-              styles.progressBar,
-              {width: `${downloadProgress[item.orderId]?.progress || 0}%`},
-            ]}
-          />
+        <View style={styles.progressContainer}>
+          <View style={styles.progressBarContainer}>
+            <View
+              style={[
+                styles.progressBar,
+                {width: `${downloadProgress[item.orderId]?.progress || 0}%`},
+              ]}
+            />
+          </View>
+          <Text style={styles.progressText}>
+            {Math.round(downloadProgress[item.orderId]?.progress || 0)}%
+          </Text>
         </View>
       )}
     </View>
@@ -310,81 +373,83 @@ const Purchase = () => {
   return (
     <View style={styles.container}>
       <Header />
-      <View style={styles.content}>
-        {loading ? (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#3B82F6" />
-            <Text style={styles.loadingText}>Loading your purchases...</Text>
-          </View>
-        ) : error ? (
-          <View style={styles.errorContainer}>
-            <Icon name="error-outline" size={48} color="#EF4444" />
-            <Text style={styles.errorText}>{error}</Text>
-            <TouchableOpacity
-              style={styles.retryButton}
-              onPress={fetchUserData}>
-              <Text style={styles.retryButtonText}>Try Again</Text>
-            </TouchableOpacity>
-          </View>
-        ) : (
-          <>
-            <View style={styles.headerSection}>
-              <View style={styles.titleRow}>
-                <Text style={styles.title}>My Material</Text>
-              </View>
-
-              <View style={styles.compactFilterContainer}>
-                <DropDownPicker
-                  open={open}
-                  value={selectedMaterialType}
-                  items={dropdownItems}
-                  setOpen={setOpen}
-                  setValue={setSelectedMaterialType}
-                  setItems={setDropdownItems}
-                  placeholder="Filter by type"
-                  placeholderStyle={styles.dropdownPlaceholder}
-                  style={styles.compactDropdown}
-                  textStyle={styles.dropdownText}
-                  dropDownContainerStyle={styles.dropdownList}
-                  zIndex={3000}
-                  zIndexInverse={1000}
-                  searchable={false}
-                  theme="LIGHT"
-                  multiple={false}
-                  showArrowIcon={true}
-                  showTickIcon={false}
-                />
-              </View>
+      <ScrollView
+        style={styles.scrollContainer}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scrollContent}>
+        <View style={styles.content}>
+          {loading ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color="#0288D1" />
+              <Text style={styles.loadingText}>Loading your purchases...</Text>
             </View>
+          ) : error ? (
+            <View style={styles.errorContainer}>
+              <Icon name="error-outline" size={48} color="#DC2626" />
+              <Text style={styles.errorText}>{error}</Text>
+              <TouchableOpacity
+                style={styles.retryButton}
+                onPress={fetchUserData}>
+                <Icon name="refresh" size={18} color="#FFFFFF" />
+                <Text style={styles.retryButtonText}>Try Again</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <>
+              {/* Statistics Section */}
+              {renderStatsSection()}
 
-            <ScrollView
-              style={styles.cardsContainer}
-              showsVerticalScrollIndicator={false}
-              contentContainerStyle={styles.scrollContent}>
-              {filteredOrders.length === 0 ? (
-                <View style={styles.emptyContainer}>
-                  <Icon name="inbox" size={48} color="#D1D5DB" />
-                  <Text style={styles.emptyText}>No purchases found</Text>
-                  <Text style={styles.emptySubText}>
-                    {selectedMaterialType === 'all'
-                      ? "You haven't made any purchases yet"
-                      : `No ${selectedMaterialType} purchases found`}
-                  </Text>
+              <View style={styles.filterSection}>
+                <View style={styles.filterDropdownContainer}>
+                  <DropDownPicker
+                    open={open}
+                    value={selectedMaterialType}
+                    items={dropdownItems}
+                    setOpen={setOpen}
+                    setValue={setSelectedMaterialType}
+                    setItems={setDropdownItems}
+                    placeholder="Filter by type"
+                    placeholderStyle={styles.dropdownPlaceholder}
+                    style={styles.filterDropdown}
+                    textStyle={styles.dropdownText}
+                    dropDownContainerStyle={styles.dropdownList}
+                    zIndex={3000}
+                    zIndexInverse={1000}
+                    searchable={false}
+                    theme="LIGHT"
+                    multiple={false}
+                    showArrowIcon={true}
+                    showTickIcon={true}
+                    tickIconStyle={{tintColor: '#2563EB'}}
+                  />
                 </View>
-              ) : (
-                filteredOrders.map((item, index) => renderCard(item, index))
-              )}
-            </ScrollView>
-          </>
-        )}
-      </View>
+              </View>
+
+              <View style={styles.cardsContainer}>
+                {filteredOrders.length === 0 ? (
+                  <View style={styles.emptyContainer}>
+                    <Icon name="library-books" size={60} color="#E5E7EB" />
+                    <Text style={styles.emptyText}>No purchases found</Text>
+                    <Text style={styles.emptySubText}>
+                      {selectedMaterialType === 'all'
+                        ? "You haven't made any purchases yet"
+                        : `No ${selectedMaterialType} purchases found`}
+                    </Text>
+                  </View>
+                ) : (
+                  filteredOrders.map((item, index) => renderCard(item, index))
+                )}
+              </View>
+            </>
+          )}
+        </View>
+      </ScrollView>
       <Footer />
 
       <Modal
         visible={!!viewingPdf}
         animationType="slide"
-        onRequestClose={closePdfViewer}
-        >
+        onRequestClose={closePdfViewer}>
         <View style={styles.pdfModalContainer}>
           <View style={styles.pdfHeader}>
             <TouchableOpacity
@@ -399,7 +464,7 @@ const Purchase = () => {
 
           {pdfLoading && (
             <View style={styles.pdfLoadingContainer}>
-              <ActivityIndicator size="large" color="#3B82F6" />
+              <ActivityIndicator size="large" color="#0288D1" />
               <Text style={styles.pdfLoadingText}>Loading PDF...</Text>
             </View>
           )}
@@ -417,16 +482,15 @@ const Purchase = () => {
               onError={error => {
                 console.error('WebView error:', error);
                 setPdfLoading(false);
-                Alert.alert(
-                  'PDF Load Error',
-                  'Failed to load PDF. Please check your internet connection and try again.',
-                  [{text: 'OK', onPress: closePdfViewer}],
-                );
+                showPdfLoadErrorMessage(() => {
+                  hideMessage();
+                  closePdfViewer();
+                });
               }}
               startInLoadingState={true}
               renderLoading={() => (
                 <View style={styles.webViewLoading}>
-                  <ActivityIndicator size="large" color="#3B82F6" />
+                  <ActivityIndicator size="large" color="#0288D1" />
                   <Text style={styles.pdfLoadingText}>Loading PDF...</Text>
                 </View>
               )}
@@ -458,231 +522,301 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#F8FAFC',
   },
-  content: {
+  scrollContainer: {
     flex: 1,
+  },
+  scrollContent: {
+    paddingBottom: 100,
+  },
+  content: {
     paddingHorizontal: 16,
     paddingTop: 12,
-    zIndex: 1000,
   },
+
+  // Compact Statistics Styles
+  statsContainer: {
+    marginBottom: 10,
+  },
+  statsHeader: {
+    marginBottom: 12,
+    alignItems: 'center',
+  },
+  statsTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#111827',
+  },
+  statsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    gap: 8,
+  },
+  statCard: {
+    width: (width - 48) / 2,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 8,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 3,
+    borderWidth: 1,
+    borderColor: '#F3F4F6',
+  },
+  statIconContainer: {
+    width: 30,
+    height: 30,
+    borderRadius: 18,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  statValue: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#111827',
+    marginBottom: 2,
+  },
+  statLabel: {
+    fontSize: 11,
+    color: '#6B7280',
+    fontWeight: '500',
+    textAlign: 'center',
+  },
+
+  // Loading and Error Styles
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    paddingVertical: 60,
   },
   loadingText: {
     marginTop: 12,
-    fontSize: 16,
-    color: '#3B82F6',
+    fontSize: 14,
+    color: '#0288D1',
+    fontWeight: '500',
   },
   errorContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
+    paddingVertical: 60,
+    paddingHorizontal: 20,
   },
   errorText: {
-    color: '#EF4444',
+    color: '#DC2626',
     fontSize: 16,
     textAlign: 'center',
     marginVertical: 16,
-    lineHeight: 24,
+    lineHeight: 22,
+    fontWeight: '500',
   },
   retryButton: {
-    backgroundColor: '#3B82F6',
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 8,
-    marginTop: 8,
+    backgroundColor: '#2563EB',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
   },
   retryButtonText: {
     color: '#FFFFFF',
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '600',
   },
-  headerSection: {
-    marginBottom: 12,
+
+  // Compact Filter Section
+  filterSection: {
+    marginBottom: 16,
   },
-  titleRow: {
+  filterHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: 10,
   },
-  title: {
-    fontSize: 24,
+  filterTitle: {
+    fontSize: 18,
     fontWeight: 'bold',
-    color: '#333',
+    color: '#111827',
   },
-  compactFilterContainer: {
+  filterSubtitle: {
+    fontSize: 12,
+    color: '#6B7280',
+    fontWeight: '500',
+  },
+  filterDropdownContainer: {
     zIndex: 3000,
   },
-  compactDropdown: {
-    borderColor: '#D1D5DB',
-    borderRadius: 8,
+  filterDropdown: {
+    borderColor: '#E5E7EB',
+    borderRadius: 10,
     paddingHorizontal: 12,
     paddingVertical: 8,
     backgroundColor: '#FFFFFF',
-    minHeight: 40,
+    minHeight: 44,
     shadowColor: '#000',
     shadowOffset: {width: 0, height: 1},
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
     elevation: 2,
   },
   dropdownPlaceholder: {
     color: '#9CA3AF',
     fontSize: 14,
+    fontWeight: '500',
   },
   dropdownText: {
     fontSize: 14,
-    color: '#1F2937',
+    color: '#111827',
+    fontWeight: '500',
   },
   dropdownList: {
-    borderColor: '#D1D5DB',
-    borderRadius: 8,
+    borderColor: '#E5E7EB',
+    borderRadius: 10,
     backgroundColor: '#FFFFFF',
     shadowColor: '#000',
     shadowOffset: {width: 0, height: 2},
     shadowOpacity: 0.1,
-    shadowRadius: 6,
-    elevation: 3,
+    shadowRadius: 8,
+    elevation: 4,
   },
+
+  // Compact Card Styles
   cardsContainer: {
     flex: 1,
-  },
-  scrollContent: {
-    paddingBottom: 20,
   },
   card: {
     backgroundColor: '#FFFFFF',
     borderRadius: 12,
-    marginBottom: 8,
+    marginBottom: 12,
     shadowColor: '#000',
     shadowOffset: {width: 0, height: 1},
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.05,
     shadowRadius: 4,
     elevation: 2,
-    borderLeftWidth: 3,
-    borderLeftColor: '#3B82F6',
+    overflow: 'hidden',
   },
-  cardContent: {
-    padding: 12,
-  },
-  mainContent: {
-    flex: 1,
-  },
-  titleRow: {
+  cardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginBottom: 8,
+    padding: 16,
+    paddingBottom: 12,
   },
-  typeContainer: {
+  cardTypeIndicator: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     flex: 1,
-    marginRight: 8,
   },
-  chapterTitle: {
+  typeIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 10,
+  },
+  cardTitleContainer: {
+    flex: 1,
+  },
+  cardTitle: {
     fontSize: 15,
     fontWeight: '600',
-    color: '#1F2937',
-    marginLeft: 8,
-    flex: 1,
+    color: '#111827',
+    marginBottom: 2,
     lineHeight: 20,
   },
-  metaRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  dateContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  dateText: {
+  cardType: {
     fontSize: 12,
     color: '#6B7280',
-    marginLeft: 4,
+    fontWeight: '500',
+  },
+
+  cardBody: {
+    paddingHorizontal: 16,
+    paddingBottom: 16,
   },
   actionButtonsContainer: {
     flexDirection: 'row',
     gap: 8,
   },
   viewButton: {
-    backgroundColor: '#10B981',
+    backgroundColor: '#059669',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 6,
-    paddingHorizontal: 12,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
     borderRadius: 8,
-    shadowColor: '#10B981',
-    shadowOffset: {width: 0, height: 1},
-    shadowOpacity: 0.2,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  viewButtonText: {
-    color: '#FFFFFF',
-    fontSize: 12,
-    fontWeight: '600',
-    marginLeft: 4,
+    flex: 1,
   },
   downloadButton: {
-    backgroundColor: '#3B82F6',
+    backgroundColor: '#2563EB',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 6,
-    paddingHorizontal: 12,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
     borderRadius: 8,
-    shadowColor: '#3B82F6',
-    shadowOffset: {width: 0, height: 1},
-    shadowOpacity: 0.2,
-    shadowRadius: 2,
-    elevation: 2,
+    flex: 1,
   },
   downloadingButton: {
     backgroundColor: '#9CA3AF',
   },
-  downloadButtonText: {
-    color: '#FFFFFF',
-    fontSize: 12,
-    fontWeight: '600',
-    marginLeft: 4,
-  },
-  // New style for View Papers button
   viewPapersButton: {
     backgroundColor: '#8B5CF6',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 6,
-    paddingHorizontal: 12,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
     borderRadius: 8,
-    shadowColor: '#8B5CF6',
-    shadowOffset: {width: 0, height: 1},
-    shadowOpacity: 0.2,
-    shadowRadius: 2,
-    elevation: 2,
+    flex: 1,
   },
-  viewPapersButtonText: {
+  actionButtonText: {
     color: '#FFFFFF',
     fontSize: 12,
     fontWeight: '600',
-    marginLeft: 4,
+    marginLeft: 6,
+  },
+  progressContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    backgroundColor: '#F8FAFC',
+    borderTopWidth: 1,
+    borderTopColor: '#F3F4F6',
   },
   progressBarContainer: {
-    height: 3,
+    height: 4,
     backgroundColor: '#E5E7EB',
-    borderBottomLeftRadius: 12,
-    borderBottomRightRadius: 12,
+    borderRadius: 2,
+    flex: 1,
+    marginRight: 10,
     overflow: 'hidden',
   },
   progressBar: {
     height: '100%',
-    backgroundColor: '#3B82F6',
+    backgroundColor: '#2563EB',
+    borderRadius: 2,
   },
+  progressText: {
+    fontSize: 11,
+    color: '#6B7280',
+    fontWeight: '600',
+  },
+
+  // Compact Empty State
   emptyContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -690,17 +824,19 @@ const styles = StyleSheet.create({
     paddingVertical: 40,
   },
   emptyText: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '600',
     color: '#6B7280',
-    marginTop: 12,
+    marginTop: 16,
+    marginBottom: 6,
   },
   emptySubText: {
-    fontSize: 14,
+    fontSize: 13,
     color: '#9CA3AF',
-    marginTop: 6,
     textAlign: 'center',
+    lineHeight: 18,
   },
+
   // PDF Modal Styles
   pdfModalContainer: {
     flex: 1,
@@ -709,31 +845,22 @@ const styles = StyleSheet.create({
   pdfHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#3B82F6',
+    backgroundColor: '#2563EB',
     paddingHorizontal: 16,
     paddingVertical: 12,
-      shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 3.84,
-    elevation: 5,
+    paddingTop: Platform.OS === 'ios' ? 50 : 16,
   },
   closeButton: {
-    marginRight: 16,
-    padding: 4,
+    padding: 6,
+    borderRadius: 6,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    marginRight: 12,
   },
   pdfHeaderTitle: {
-    color: '#FFFFFF',
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '600',
+    color: '#FFFFFF',
     flex: 1,
-  },
-  webView: {
-    flex: 1,
-    backgroundColor: '#FFFFFF',
   },
   pdfLoadingContainer: {
     position: 'absolute',
@@ -743,13 +870,18 @@ const styles = StyleSheet.create({
     bottom: 0,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
     zIndex: 1000,
   },
   pdfLoadingText: {
     marginTop: 12,
-    fontSize: 16,
-    color: '#6B7280',
+    fontSize: 14,
+    color: '#2563EB',
+    fontWeight: '500',
+  },
+  webView: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
   },
   webViewLoading: {
     position: 'absolute',

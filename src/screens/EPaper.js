@@ -1,22 +1,3 @@
-import React, {useState, useEffect} from 'react'; import { StyleSheet, Text, View, Image, TouchableOpacity, Dimensions, SafeAreaView, StatusBar, ScrollView, ActivityIndicator, Linking, Alert, Platform, Animated, } from 'react-native'; import {useNavigatio
-
-pasted
-
-import { decode, encode } from 'base-64';  global.atob = global.atob || decode; global.btoa = global.btoa || encode;  import React from 'react'; import { StatusBar } from 'react-native'; import { AuthProvider } from './src/Auth/AuthContext'; import AuthNavigator from './src/Auth/AuthNavigator';  const App = () => {   return (     <>       <StatusBar barStyle="light-content" backgroundColor="
-#5B9EED" />       <AuthProvider>         <AuthNavigator />       </AuthProvider>     </>   ); };  export default App;    i have implemented statusBar logic in app.js so remove it from epaper file
-
-Edit
-I'll help you remove the StatusBar logic from the EPapers component since it's already implemented in App.js. Here's the updated code:
-
-
-EPapers Component - StatusBar Removed
-Code 
-
-
-
-
-
-
 import React, {useState, useEffect} from 'react';
 import {
   StyleSheet,
@@ -29,7 +10,7 @@ import {
   ScrollView,
   ActivityIndicator,
   Linking,
-  Alert,
+ 
   Platform,
   Animated,
 } from 'react-native';
@@ -41,6 +22,10 @@ import MonthYearPicker from '../Components/MonthYearPicker';
 import Header from '../Components/Header';
 import Footer from '../Components/Footer';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
+import {
+  showErrorMessage,
+  showSuccessMessage,
+} from '../Components/SubmissionMessage';
 
 const {width} = Dimensions.get('window');
 
@@ -75,7 +60,7 @@ const EPapers = () => {
             paperName: paper.paperName,
             month: paper.month,
             year: paper.year.toString(),
-            image: paper.image, 
+            image: paper.image,
           };
         });
 
@@ -130,7 +115,7 @@ const EPapers = () => {
   };
 
   const BlinkingLatestBadge = ({paperName}) => {
-    const blinkOpacity = useBlinkingAnimation(700); 
+    const blinkOpacity = useBlinkingAnimation(700);
     return (
       <Animated.View style={[styles.latestBadge, {opacity: blinkOpacity}]}>
         <Text style={styles.latestBadgeText}>NEW</Text>
@@ -174,11 +159,7 @@ const EPapers = () => {
       setPapers(filteredPapers);
       setCurrentPage(1); // Reset to first page when filtering
     } else {
-      Alert.alert(
-        'No Papers Found',
-        'No papers available for the selected month and year.',
-        [{text: 'OK'}],
-      );
+    showErrorMessage('No Papers Found', 'No papers available for the selected month and year.');
     }
   };
 
@@ -190,7 +171,8 @@ const EPapers = () => {
 
   const handleViewPDF = paper => {
     if (!paper.pdfUrl) {
-      Alert.alert('Error', 'PDF not available for this paper');
+   showErrorMessage('Error', 'PDF not available for this paper');
+
       return;
     }
 
@@ -202,7 +184,7 @@ const EPapers = () => {
 
   const handleDownloadPDF = async paper => {
     if (!paper.pdfUrl) {
-      Alert.alert('Error', 'PDF not available for this paper');
+showErrorMessage('Error', 'PDF not available for this paper');
       return;
     }
 
@@ -264,11 +246,7 @@ const EPapers = () => {
             console.error('Error scanning file:', err);
           }
         }
-        Alert.alert(
-          'Download Complete',
-          `${paper.paperName} has been downloaded successfully!`,
-          [{text: 'OK'}],
-        );
+        showErrorMessage('Error', 'PDF not available for this paper');
       } else {
         throw new Error(
           `Download failed with status code: ${result.statusCode}`,
@@ -283,17 +261,14 @@ const EPapers = () => {
         },
       }));
 
-      Alert.alert(
-        'Download Failed',
-        `Could not download the file: ${error.message}. Please try again later.`,
-      );
+     showErrorMessage('Error', 'Could not open WhatsApp. Please make sure WhatsApp is installed on your device.');
     }
   };
 
   // Function to handle WhatsApp sharing
   const handleWhatsAppShare = async paper => {
     if (!paper.pdfUrl) {
-      Alert.alert('Error', 'PDF not available for this paper');
+      showErrorMessage('Error', 'PDF not available for this paper');
       return;
     }
 
@@ -314,17 +289,14 @@ const EPapers = () => {
         await Linking.openURL(webWhatsAppUrl);
       }
     } catch (error) {
-      Alert.alert(
-        'Error',
-        'Could not open WhatsApp. Please make sure WhatsApp is installed on your device.',
-        [{text: 'OK'}],
-      );
+     showErrorMessage('Error', 'Could not open WhatsApp. Please make sure WhatsApp is installed on your device.');
+
     }
   };
 
   const handleTelegramShare = async paper => {
     if (!paper.pdfUrl) {
-      Alert.alert('Error', 'PDF not available for this paper');
+showErrorMessage('Error', 'PDF not available for this paper');
       return;
     }
 
@@ -346,11 +318,8 @@ const EPapers = () => {
         await Linking.openURL(telegramUrl);
       }
     } catch (error) {
-      Alert.alert(
-        'Error',
-        'Could not open Telegram. Please make sure Telegram is installed on your device.',
-        [{text: 'OK'}],
-      );
+     showErrorMessage('Error', 'Could not open Telegram. Please make sure Telegram is installed on your device.');
+
     }
   };
 
@@ -666,7 +635,6 @@ const EPapers = () => {
   );
 };
 
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -813,7 +781,7 @@ const styles = StyleSheet.create({
     fontSize: width * 0.035,
     fontWeight: 'bold',
     marginBottom: width * 0.01,
-    textAlign:'center',
+    textAlign: 'center',
   },
   latestPaperDate: {
     color: '#718096',
@@ -859,13 +827,13 @@ const styles = StyleSheet.create({
     fontSize: width * 0.025,
     fontWeight: '600',
     marginBottom: width * 0.01,
-    textAlign:'center'
+    textAlign: 'center',
   },
   paperDate: {
     color: '#718096',
     fontSize: width * 0.025,
     marginBottom: width * 0.02,
-    textAlign:'center'
+    textAlign: 'center',
   },
   // Updated thumbnail styles
   thumbnailContainer: {

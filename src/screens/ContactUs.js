@@ -1,16 +1,29 @@
-import { StyleSheet, Text, View, TextInput, TouchableOpacity, ScrollView, Alert, SafeAreaView } from 'react-native';
-import React, { useState } from 'react';
-import { Picker } from '@react-native-picker/picker';
-import { contactus, logAPI } from '../util/apiCall'; 
+import {
+  StyleSheet,
+  Text,
+  View,
+  TextInput,
+  TouchableOpacity,
+  ScrollView,
+  
+  SafeAreaView,
+} from 'react-native';
+import React, {useState} from 'react';
+import {Picker} from '@react-native-picker/picker';
+import {contactus, logAPI} from '../util/apiCall';
 import Header from '../Components/Header';
 import Footer from '../Components/Footer';
+import {
+  showErrorMessage,
+  showSuccessMessage,
+} from '../Components/SubmissionMessage';
 
 const ContactUs = () => {
   const [formData, setFormData] = useState({
     name: '',
     phone: '',
     category: 'UPSC',
-    message: ''
+    message: '',
   });
 
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -18,34 +31,34 @@ const ContactUs = () => {
   const handleInputChange = (field, value) => {
     setFormData(prevState => ({
       ...prevState,
-      [field]: value
+      [field]: value,
     }));
   };
 
   const validateForm = () => {
     const errors = [];
-    
+
     if (!formData.name.trim()) {
       errors.push('Name is required');
     }
-    
+
     if (!formData.phone.trim()) {
       errors.push('Phone number is required');
     } else if (!/^\d{10}$/.test(formData.phone.trim())) {
       errors.push('Phone number must be exactly 10 digits');
     }
-    
+
     if (!formData.message.trim()) {
       errors.push('Message is required');
     }
-    
+
     return errors;
   };
 
   const handleSubmit = async () => {
     const validationErrors = validateForm();
     if (validationErrors.length > 0) {
-      Alert.alert('Validation Error', validationErrors.join('\n'));
+      showErrorMessage('Validation Error', validationErrors.join('\n'));
       return;
     }
 
@@ -53,7 +66,7 @@ const ContactUs = () => {
       name: formData.name.trim(),
       phoneNumber: formData.phone.trim(),
       adsExamCategory: formData.category,
-      message: formData.message.trim()
+      message: formData.message.trim(),
     };
 
     setIsSubmitting(true);
@@ -63,37 +76,30 @@ const ContactUs = () => {
       const response = await contactus(payload);
       const endTime = Date.now();
 
-      Alert.alert(
-        'Success', 
-        'Your message has been sent successfully!',
-        [
-          {
-            text: 'OK',
-            onPress: () => {
-              setFormData({
-                name: '',
-                phone: '',
-                category: 'UPSC',
-                message: ''
-              });
-            }
-          }
-        ]
-      );
-
+      showSuccessMessage('Success', 'Your message has been sent successfully!');
+      // Reset form after showing success message
+      setTimeout(() => {
+        setFormData({
+          name: '',
+          phone: '',
+          category: 'UPSC',
+          message: '',
+        });
+      }, 1500); 
+  
     } catch (error) {
       if (error.response) {
         if (error.response.status === 400) {
-          Alert.alert('Invalid Data', 'Please check your input and try again.');
+          showErrorMessage('Invalid Data', 'Please check your input and try again.');
         } else if (error.response.status === 500) {
-          Alert.alert('Server Error', 'Something went wrong on our end. Please try again later.');
+         showErrorMessage('Server Error', 'Something went wrong on our end. Please try again later.');
         } else {
-          Alert.alert('Error', error.response.data?.message || 'Failed to send message. Please try again.');
+          showErrorMessage('Error', error.response.data?.message || 'Failed to send message. Please try again.');
         }
       } else if (error.request) {
-        Alert.alert('Network Error', 'Unable to connect to server. Please check your internet connection and try again.');
+       showErrorMessage('Network Error', 'Unable to connect to server. Please check your internet connection and try again.');
       } else {
-        Alert.alert('Error', 'Something went wrong. Please try again.');
+       showErrorMessage('Error', 'Something went wrong. Please try again.');
       }
     } finally {
       setIsSubmitting(false);
@@ -104,13 +110,12 @@ const ContactUs = () => {
     <SafeAreaView style={styles.safeArea}>
       {/* Header */}
       <Header />
-      
+
       {/* Scrollable Content */}
-      <ScrollView 
-        style={styles.scrollContainer} 
+      <ScrollView
+        style={styles.scrollContainer}
         contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
+        showsVerticalScrollIndicator={false}>
         {/* Page Header */}
         <View style={styles.header}>
           <Text style={styles.title}>Contact Us</Text>
@@ -122,14 +127,14 @@ const ContactUs = () => {
         {/* Contact Information */}
         <View style={styles.contactSection}>
           <Text style={styles.sectionTitle}>Get in Touch</Text>
-          
+
           {/* Email and Phone in a row */}
           <View style={styles.contactRow}>
             <View style={styles.contactItem}>
               <Text style={styles.contactLabel}>Email</Text>
               <Text style={styles.contactValue}>vartmannirnay@gmail.com</Text>
             </View>
-            
+
             <View style={styles.contactItem}>
               <Text style={styles.contactLabel}>Phone</Text>
               <Text style={styles.contactValue}>+91 9028596157</Text>
@@ -146,12 +151,14 @@ const ContactUs = () => {
                 Aurangabad, Maharashtra
               </Text>
             </View>
-            
+
             <View style={styles.infoColumn}>
               <Text style={styles.contactLabel}>Hours</Text>
               <Text style={styles.contactValue}>Mon-Fri: 9 AM - 6 PM</Text>
               <Text style={styles.contactValue}>Sat: 10 AM - 2 PM</Text>
-              <Text style={styles.contactValueSmall}>Response within 2 days</Text>
+              <Text style={styles.contactValueSmall}>
+                Response within 2 days
+              </Text>
             </View>
           </View>
         </View>
@@ -166,7 +173,7 @@ const ContactUs = () => {
               style={styles.input}
               placeholder="Enter your full name"
               value={formData.name}
-              onChangeText={(text) => handleInputChange('name', text)}
+              onChangeText={text => handleInputChange('name', text)}
               editable={!isSubmitting}
               placeholderTextColor="#999"
             />
@@ -178,7 +185,7 @@ const ContactUs = () => {
               style={styles.input}
               placeholder="10-digit phone number"
               value={formData.phone}
-              onChangeText={(text) => handleInputChange('phone', text)}
+              onChangeText={text => handleInputChange('phone', text)}
               keyboardType="phone-pad"
               maxLength={10}
               editable={!isSubmitting}
@@ -192,9 +199,10 @@ const ContactUs = () => {
               <Picker
                 selectedValue={formData.category}
                 style={styles.picker}
-                onValueChange={(itemValue) => handleInputChange('category', itemValue)}
-                enabled={!isSubmitting}
-              >
+                onValueChange={itemValue =>
+                  handleInputChange('category', itemValue)
+                }
+                enabled={!isSubmitting}>
                 <Picker.Item label="UPSC" value="UPSC" />
                 <Picker.Item label="MPSC" value="MPSC" />
                 <Picker.Item label="Saralseva" value="Saralseva" />
@@ -212,7 +220,7 @@ const ContactUs = () => {
               style={[styles.input, styles.messageInput]}
               placeholder="Type your message here..."
               value={formData.message}
-              onChangeText={(text) => handleInputChange('message', text)}
+              onChangeText={text => handleInputChange('message', text)}
               multiline={true}
               numberOfLines={4}
               textAlignVertical="top"
@@ -221,18 +229,20 @@ const ContactUs = () => {
             />
           </View>
 
-          <TouchableOpacity 
-            style={[styles.submitButton, isSubmitting && styles.submitButtonDisabled]} 
+          <TouchableOpacity
+            style={[
+              styles.submitButton,
+              isSubmitting && styles.submitButtonDisabled,
+            ]}
             onPress={handleSubmit}
-            disabled={isSubmitting}
-          >
+            disabled={isSubmitting}>
             <Text style={styles.submitButtonText}>
               {isSubmitting ? 'Sending...' : 'Send Message'}
             </Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
-      
+
       {/* Footer */}
       <Footer />
     </SafeAreaView>
@@ -264,7 +274,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#1a1a1a',
     marginBottom: 4,
-    textAlign: 'center'
+    textAlign: 'center',
   },
   subtitle: {
     fontSize: 14,
@@ -278,11 +288,10 @@ const styles = StyleSheet.create({
     padding: 10,
     borderRadius: 12,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: {width: 0, height: 2},
     shadowOpacity: 0.05,
     shadowRadius: 8,
     elevation: 2,
-    
   },
   sectionTitle: {
     fontSize: 18,
@@ -319,9 +328,9 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   contactValue: {
-    fontSize: 11.5, 
+    fontSize: 11.5,
     color: '#1a1a1a',
-    lineHeight: 16, 
+    lineHeight: 16,
   },
   contactValueSmall: {
     fontSize: 12,
@@ -336,11 +345,11 @@ const styles = StyleSheet.create({
     padding: 10,
     borderRadius: 12,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: {width: 0, height: 2},
     shadowOpacity: 0.05,
     shadowRadius: 8,
     elevation: 2,
-    marginBottom:50
+    marginBottom: 50,
   },
   formTitle: {
     fontSize: 20,
@@ -389,7 +398,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: 8,
     shadowColor: '#007bff',
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: {width: 0, height: 2},
     shadowOpacity: 0.2,
     shadowRadius: 4,
     elevation: 3,

@@ -19,6 +19,8 @@ import DropDownPicker from 'react-native-dropdown-picker';
 import Header from '../Components/Header';
 import Footer from '../Components/Footer';
 import {getAllMaterials, materialtype} from '../util/apiCall';
+import { showErrorMessage } from '../Components/SubmissionMessage';
+
 
 const {width, height} = Dimensions.get('window');
 
@@ -81,7 +83,7 @@ const Ebook = () => {
     } catch (error) {
       console.error('Error fetching data:', error);
       setError(error.message || 'Failed to fetch data');
-      Alert.alert('Error', error.message || 'Failed to fetch data');
+showErrorMessage('Error', error.message || 'Failed to fetch data');
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -126,7 +128,7 @@ const Ebook = () => {
 
   const handleViewPdf = (pdfUrl, title) => {
     if (!pdfUrl) {
-      Alert.alert('Error', 'PDF file not available');
+showErrorMessage('Error', 'PDF file not available');
       return;
     }
 
@@ -135,7 +137,8 @@ const Ebook = () => {
       setSelectedPdf({url: pdfUrl, title});
       setShowPdfModal(true);
     } catch (error) {
-      Alert.alert('Error', 'Invalid PDF URL format');
+      showErrorMessage('Error', 'Invalid PDF URL format');
+
     }
   };
 
@@ -421,7 +424,7 @@ const Ebook = () => {
                   <Text style={styles.loadingText}>Loading PDF...</Text>
                 </View>
               )}
-              onError={() => Alert.alert('Error', 'Failed to load PDF')}
+onError={() => showErrorMessage('Error', 'Failed to load PDF')}
             />
           )}
         </View>

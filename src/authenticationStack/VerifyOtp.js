@@ -5,11 +5,11 @@ import {
   TextInput,
   TouchableOpacity,
   StyleSheet,
-  Alert,
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform
 } from 'react-native';
+import { showMessage } from 'react-native-flash-message';
 import { verifyOTP, sendOTP } from '../util/apiCall'; 
 
 const VerifyOtp = ({ navigation, route }) => {
@@ -38,21 +38,36 @@ const VerifyOtp = ({ navigation, route }) => {
   // Redirect back if no email provided
   useEffect(() => {
     if (!email) {
-      Alert.alert('Error', 'Email not provided', [
-        { text: 'OK', onPress: () => navigation.navigate('SendOtp') }
-      ]);
+      showMessage({
+        message: 'Email not provided',
+        type: 'danger',
+        duration: 3000,
+      });
+      
+      // Navigate back after showing the message
+      setTimeout(() => {
+        navigation.navigate('SendOtp');
+      }, 1000);
     }
   }, [email, navigation]);
 
   const handleVerifyOTP = async () => {
     // Validate OTP
     if (!otp.trim()) {
-      Alert.alert('Error', 'Please enter the OTP');
+      showMessage({
+        message: 'Please enter the OTP',
+        type: 'danger',
+        duration: 3000,
+      });
       return;
     }
 
     if (otp.trim().length !== 6 && otp.trim().length !== 4) {
-      Alert.alert('Error', 'Please enter a valid OTP');
+      showMessage({
+        message: 'Please enter a valid OTP',
+        type: 'danger',
+        duration: 3000,
+      });
       return;
     }
 
@@ -63,25 +78,30 @@ const VerifyOtp = ({ navigation, route }) => {
       
       // Check if OTP was verified successfully
       if (response && response.includes('verified successfully')) {
-        Alert.alert(
-          'Success',
-          'OTP verified successfully',
-          [
-            {
-              text: 'OK',
-              onPress: () => {
-                // Navigate to ResetPassword page with email parameter
-                navigation.navigate('ResetPassword', { email: email });
-              }
-            }
-          ]
-        );
+        showMessage({
+          message: 'OTP verified successfully',
+          type: 'success',
+          duration: 3000,
+        });
+        
+        // Navigate to ResetPassword page with email parameter after a short delay
+        setTimeout(() => {
+          navigation.navigate('ResetPassword', { email: email });
+        }, 1000);
       } else {
-        Alert.alert('Error', response || 'Invalid OTP or OTP expired');
+        showMessage({
+          message: response || 'Invalid OTP or OTP expired',
+          type: 'danger',
+          duration: 4000,
+        });
       }
     } catch (error) {
       console.error('Verify OTP Error:', error);
-      Alert.alert('Error', error.message || 'Failed to verify OTP. Please try again.');
+      showMessage({
+        message: error.message || 'Failed to verify OTP. Please try again.',
+        type: 'danger',
+        duration: 4000,
+      });
     } finally {
       setLoading(false);
     }
@@ -96,16 +116,29 @@ const VerifyOtp = ({ navigation, route }) => {
       const response = await sendOTP(email);
       
       if (response && (response.includes('OTP sent') || response === `OTP sent to ${email}`)) {
-        Alert.alert('Success', 'OTP has been resent to your email');
+        showMessage({
+          message: 'OTP has been resent to your email',
+          type: 'success',
+          duration: 3000,
+        });
+        
         setTimer(60);
         setCanResend(false);
         setOtp(''); // Clear previous OTP
       } else {
-        Alert.alert('Error', response || 'Failed to resend OTP');
+        showMessage({
+          message: response || 'Failed to resend OTP',
+          type: 'danger',
+          duration: 4000,
+        });
       }
     } catch (error) {
       console.error('Resend OTP Error:', error);
-      Alert.alert('Error', error.message || 'Failed to resend OTP. Please try again.');
+      showMessage({
+        message: error.message || 'Failed to resend OTP. Please try again.',
+        type: 'danger',
+        duration: 4000,
+      });
     } finally {
       setResendLoading(false);
     }

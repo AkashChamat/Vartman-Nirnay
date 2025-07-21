@@ -7,7 +7,7 @@ import {
   Dimensions,
   TouchableOpacity,
   ScrollView,
-  Alert,
+  
 } from 'react-native';
 import React, {useState, useEffect, useRef} from 'react';
 import Carousel from 'react-native-reanimated-carousel';
@@ -16,6 +16,8 @@ import {useNavigation} from '@react-navigation/native';
 import Header from '../Components/Header';
 import Footer from '../Components/Footer';
 import Icon from 'react-native-vector-icons/MaterialIcons';
+import { showErrorMessage } from '../Components/SubmissionMessage';
+
 
 const windowWidth = Dimensions.get('window').width;
 const windowHeight = Dimensions.get('window').height;
@@ -28,7 +30,7 @@ const Gallery = () => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [autoPlay, setAutoPlay] = useState(true);
   const [pdfLoading, setPdfLoading] = useState(false);
-  const [title, setTitle] = useState('Champion Series Winner\'s Gallery'); // Default title
+  const [title, setTitle] = useState("Champion Series Winner's Gallery"); // Default title
   const [titleLoading, setTitleLoading] = useState(true);
   const carouselRef = useRef(null);
 
@@ -82,7 +84,8 @@ const Gallery = () => {
         const pdfData = response[0];
 
         if (!pdfData.pdf) {
-          Alert.alert('Error', 'PDF not available');
+          showErrorMessage('Error', 'PDF not available');
+
           return;
         }
 
@@ -91,11 +94,11 @@ const Gallery = () => {
           title: pdfData.description || 'Winner PDF Gallery',
         });
       } else {
-        Alert.alert('Error', 'No PDF data available');
+        showErrorMessage('Error', 'PDF not available');
       }
     } catch (error) {
       console.error('Error fetching PDF:', error);
-      Alert.alert('Error', 'Failed to load PDF. Please try again later.');
+      showErrorMessage('Error', 'Failed to load PDF. Please try again later.');
     } finally {
       setPdfLoading(false);
     }
@@ -205,10 +208,12 @@ const Gallery = () => {
         <Header />
         <View style={styles.errorContainer}>
           <Text style={styles.errorText}>{error}</Text>
-          <TouchableOpacity style={styles.retryButton} onPress={() => {
-            fetchWinners();
-            fetchTitle();
-          }}>
+          <TouchableOpacity
+            style={styles.retryButton}
+            onPress={() => {
+              fetchWinners();
+              fetchTitle();
+            }}>
             <Text style={styles.retryButtonText}>Retry</Text>
           </TouchableOpacity>
         </View>
@@ -235,14 +240,13 @@ const Gallery = () => {
   return (
     <View style={styles.container}>
       <Header />
-      <ScrollView 
+      <ScrollView
         style={styles.scrollContainer}
         contentContainerStyle={styles.scrollContentContainer}
         showsVerticalScrollIndicator={false}
         bounces={true}
         scrollEventThrottle={16}
-        keyboardShouldPersistTaps="handled"
-      >
+        keyboardShouldPersistTaps="handled">
         <View style={styles.headerContainer}>
           <Text style={styles.headerText}>{title}</Text>
         </View>
@@ -358,7 +362,7 @@ const styles = StyleSheet.create({
   },
   imageContainer: {
     width: '100%',
-    height: windowHeight * 0.25, 
+    height: windowHeight * 0.25,
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: '#fff',
@@ -369,7 +373,7 @@ const styles = StyleSheet.create({
   },
   detailsContainer: {
     flex: 1,
-    padding: 12, 
+    padding: 12,
     backgroundColor: 'white',
   },
   winnerName: {
@@ -381,14 +385,14 @@ const styles = StyleSheet.create({
   },
   testimonialContainer: {
     flex: 1,
-    marginTop: 6, 
+    marginTop: 6,
   },
   testimonialScrollView: {
     flex: 1,
     backgroundColor: '#fafafa',
     borderRadius: 8,
-    padding: 8, 
-    maxHeight: 100, 
+    padding: 8,
+    maxHeight: 100,
   },
   testimonialText: {
     fontSize: 14,
@@ -401,7 +405,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    paddingVertical: 12, 
+    paddingVertical: 12,
   },
   dot: {
     borderRadius: 50,

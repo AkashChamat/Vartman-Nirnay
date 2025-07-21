@@ -5,11 +5,11 @@ import {
   TextInput,
   TouchableOpacity,
   StyleSheet,
-  Alert,
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform
 } from 'react-native';
+import { showMessage } from 'react-native-flash-message';
 import { resetPassword } from '../util/apiCall'; // Adjust path according to your file structure
 
 const ResetPassword = ({ navigation, route }) => {
@@ -25,9 +25,18 @@ const ResetPassword = ({ navigation, route }) => {
   // Redirect back if no email provided
   useEffect(() => {
     if (!email) {
-      Alert.alert('Error', 'Session expired. Please start again.', [
-        { text: 'OK', onPress: () => navigation.navigate('SendOtp') }
-      ]);
+      showMessage({
+        message: "Session Expired",
+        description: "Please start the password reset process again.",
+        type: "danger",
+        duration: 4000,
+        onPress: () => navigation.navigate('SendOtp')
+      });
+      
+      // Navigate back after showing message
+      setTimeout(() => {
+        navigation.navigate('SendOtp');
+      }, 2000);
     }
   }, [email, navigation]);
 
@@ -42,25 +51,45 @@ const ResetPassword = ({ navigation, route }) => {
   const handleResetPassword = async () => {
     // Validate passwords
     if (!password.trim()) {
-      Alert.alert('Error', 'Please enter a new password');
+      showMessage({
+        message: "Password Required",
+        description: "Please enter a new password",
+        type: "warning",
+        duration: 3000,
+      });
       return;
     }
 
     if (!confirmPassword.trim()) {
-      Alert.alert('Error', 'Please confirm your password');
+      showMessage({
+        message: "Confirm Password Required",
+        description: "Please confirm your password",
+        type: "warning",
+        duration: 3000,
+      });
       return;
     }
 
     // Validate password strength
     const passwordError = validatePassword(password);
     if (passwordError) {
-      Alert.alert('Error', passwordError);
+      showMessage({
+        message: "Password Invalid",
+        description: passwordError,
+        type: "warning",
+        duration: 3000,
+      });
       return;
     }
 
     // Check if passwords match
     if (password !== confirmPassword) {
-      Alert.alert('Error', 'Passwords do not match');
+      showMessage({
+        message: "Passwords Don't Match",
+        description: "Please make sure both passwords are identical",
+        type: "warning",
+        duration: 3000,
+      });
       return;
     }
 
@@ -71,28 +100,42 @@ const ResetPassword = ({ navigation, route }) => {
       
       // Check if password was reset successfully
       if (response && response.includes('reset successfully')) {
-        Alert.alert(
-          'Success',
-          'Your password has been reset successfully',
-          [
-            {
-              text: 'OK',
-              onPress: () => {
-                // Navigate back to login screen
-                navigation.reset({
-                  index: 0,
-                  routes: [{ name: 'Login' }], // Adjust route name according to your navigation
-                });
-              }
-            }
-          ]
-        );
+        showMessage({
+          message: "Password Reset Successful! 🎉",
+          description: "Your password has been reset successfully. You can now login with your new password.",
+          type: "success",
+          duration: 4000,
+          onPress: () => {
+            navigation.reset({
+              index: 0,
+              routes: [{ name: 'Login' }],
+            });
+          }
+        });
+
+        // Navigate to login after a short delay
+        setTimeout(() => {
+          navigation.reset({
+            index: 0,
+            routes: [{ name: 'Login' }],
+          });
+        }, 2000);
       } else {
-        Alert.alert('Error', response || 'Failed to reset password');
+        showMessage({
+          message: "Reset Failed",
+          description: response || "Failed to reset password. Please try again.",
+          type: "danger",
+          duration: 4000,
+        });
       }
     } catch (error) {
       console.error('Reset Password Error:', error);
-      Alert.alert('Error', error.message || 'Failed to reset password. Please try again.');
+      showMessage({
+        message: "Network Error",
+        description: error.message || "Failed to reset password. Please check your connection and try again.",
+        type: "danger",
+        duration: 4000,
+      });
     } finally {
       setLoading(false);
     }
