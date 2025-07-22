@@ -209,109 +209,128 @@ const LoginScreen = ({navigation}) => {
   };
 
   const handleLogin = async () => {
-    if (loading || authLoading) return;
+  if (loading || authLoading) return;
 
-    if (!email || !password) {
-      showMessage({
-        message: 'Validation Error',
-        description: 'Please enter both email and password',
-        type: 'warning',
-        icon: 'auto',
-        duration: 3000,
-      });
-      return;
-    }
-    setLoading(true);
+  // Basic input validation
+  if (!email || !password) {
 
-    try {
-      const payload = {
-        email: email.trim().toLowerCase(),
-        password: password.trim(),
-      };
+    showMessage({
+      message: 'Validation Error',
+      description: 'Please enter both email and password',
+      type: 'warning',
+      icon: 'auto',
+      duration: 3000,
+    });
+    return;
+  }
 
-      const response = await loginAPI(payload);
+  setLoading(true);
+  const payload = {
+    email: email.trim().toLowerCase(),
+    password: password.trim(),
+  };
 
-      if (response && response.token) {
-        try {
-          const decoded = jwtDecode(response.token);
-          const currentTime = Date.now() / 1000;
 
-          if (decoded.exp && decoded.exp <= currentTime) {
-            showMessage({
-              message: 'Token Expired',
-              description: 'Received expired token. Please try again.',
-              type: 'danger',
-              icon: 'auto',
-              duration: 4000,
-            });
-            return;
-          }
+  try {
+    const response = await loginAPI(payload);
 
-          await authLogin(response.token, response);
-          setEmail('');
-          setPassword('');
-          
-          // Success message
+    if (response && response.token) {
+
+      try {
+        const decoded = jwtDecode(response.token);
+
+        const currentTime = Date.now() / 1000;
+        if (decoded.exp && decoded.exp <= currentTime) {
+          console.warn('[LOGIN] Token expired:', decoded.exp, currentTime);
           showMessage({
-            message: 'Welcome Back!',
-            description: 'You have successfully logged in',
-            type: 'success',
-            icon: 'auto',
-            duration: 2000,
-          });
-        } catch (decodeError) {
-          showMessage({
-            message: 'Authentication Error',
-            description: 'Invalid token received. Please try again.',
+            message: 'Token Expired',
+            description: 'Received expired token. Please try again.',
             type: 'danger',
             icon: 'auto',
             duration: 4000,
           });
+          return;
         }
-      } else {
-        showMessage({
-          message: 'Login Failed',
-          description: 'Unexpected response from server',
-          type: 'danger',
-          icon: 'auto',
-          duration: 4000,
-        });
-      }
-    } catch (error) {
-      if (error.response) {
-        const msg = error.response.data?.message || 'Invalid credentials';
-        showMessage({
-          message: 'Login Failed',
-          description: msg,
-          type: 'danger',
-          icon: 'auto',
-          duration: 4000,
-        });
-      } else if (error.request) {
-        showMessage({
-          message: 'Network Error',
-          description: 'No response from server. Please check your internet connection.',
-          type: 'danger',
-          icon: 'auto',
-          duration: 4000,
-        });
-      } else {
-        showMessage({
-          message: 'Error',
-          description: error.message,
-          type: 'danger',
-          icon: 'auto',
-          duration: 4000,
-        });
-      }
 
-      logError('Login:handleLogin', error);
-    } finally {
-      if (isMountedRef.current) {
-        setLoading(false);
+        await authLogin(response.token, response);
+
+        // Clear login fields
+        setEmail('');
+        setPassword('');
+
+        showMessage({
+          message: 'Welcome Back!',
+          description: 'You have successfully logged in',
+          type: 'success',
+          icon: 'auto',
+          duration: 2000,
+        });
+      } catch (decodeError) {
+        console.error('[LOGIN] Token decode failed:', decodeError);
+
+        showMessage({
+          message: 'Authentication Error',
+          description: 'Invalid token received. Please try again.',
+          type: 'danger',
+          icon: 'auto',
+          duration: 4000,
+        });
       }
+    } else {
+      console.warn('[LOGIN] No token found in response:', response);
+
+      showMessage({
+        message: 'Login Failed',
+        description: 'Unexpected response from server',
+        type: 'danger',
+        icon: 'auto',
+        duration: 4000,
+      });
     }
-  };
+  } catch (error) {
+    console.error('[LOGIN] Login API call failed:', error);
+
+    if (error.response) {
+      const msg = error.response.data?.message || 'Invalid credentials';
+      console.warn('[LOGIN] Server responded with error:', msg);
+
+      showMessage({
+        message: 'Login Failed',
+        description: msg,
+        type: 'danger',
+        icon: 'auto',
+        duration: 4000,
+      });
+    } else if (error.request) {
+      console.error('[LOGIN] No response received:', error.request);
+
+      showMessage({
+        message: 'Network Error',
+        description: 'No response from server. Please check your internet connection.',
+        type: 'danger',
+        icon: 'auto',
+        duration: 4000,
+      });
+    } else {
+      console.error('[LOGIN] Other error occurred:', error.message);
+
+      showMessage({
+        message: 'Error',
+        description: error.message,
+        type: 'danger',
+        icon: 'auto',
+        duration: 4000,
+      });
+    }
+
+    logError('Login:handleLogin', error); // Custom error logger
+  } finally {
+    if (isMountedRef.current) {
+      setLoading(false);
+    }
+  }
+};
+
 
   const handleRegister = async () => {
     if (regLoading) {
