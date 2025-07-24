@@ -4,7 +4,7 @@ buildscript {
         minSdkVersion = 23
         compileSdkVersion = 35
         targetSdkVersion = 35
-        ndkVersion = "26.1.10909125"  // Updated to latest stable NDK
+        ndkVersion = "26.1.10909125" 
         kotlinVersion = "1.9.22"      // Updated Kotlin version
         
         hermesEnabled = true

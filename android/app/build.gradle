@@ -7,7 +7,9 @@ def enableHermes = true
 // SOLUTION: Make hermesEnabled accessible to other modules like react-native-reanimated
 project.ext.react = [
     enableHermes: enableHermes,
-    hermesEnabled: enableHermes  // Add this line to fix the error
+    hermesEnabled: enableHermes,
+    entryFile: "index.js",
+    bundleInRelease: true
 ]
 
 /**
@@ -23,10 +25,6 @@ react {
  */
 def enableProguardInReleaseBuilds = true
 
-/**
- * The preferred build flavor of JavaScriptCore (JSC)
- */
-def jscFlavor = 'org.webkit:android-jsc:+'
 
 android {
     namespace "com.vartmannew"
@@ -38,12 +36,19 @@ android {
         applicationId "com.vartmannew"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 4  // Increment version code for new release
-        versionName "1.0.3"  // Increment version name
+        versionCode 7  
+        versionName "1.0.7"  
 
         ndk {
-            abiFilters "armeabi-v7a", "arm64-v8a", "x86", "x86_64"
+            // FIXED: Added x86_64 for 16KB page size support
+            abiFilters "armeabi-v7a", "arm64-v8a", "x86_64"
         }
+
+        // ADDED: Enable 16KB page size support
+        manifestPlaceholders = [
+            'appAuthenticationPolicy': 'fingerprintAndPasscode'
+        ]
+        
     }
 
     signingConfigs {
@@ -54,12 +59,14 @@ android {
             keyPassword 'android'
         }
         release {
-       
-                storeFile file("upload-keystore.jks")
-                storePassword System.getenv("KEY_STORE_PASSWORD")      
-                keyAlias System.getenv("ALIAS")                        
-                keyPassword System.getenv("KEY_PASSWORD")             
-            
+            // storeFile file("upload-keystore.jks")
+            // storePassword System.getenv("KEY_STORE_PASSWORD")
+            // keyAlias System.getenv("ALIAS")
+            // keyPassword System.getenv("KEY_PASSWORD")
+            storeFile file(MYAPP_UPLOAD_STORE_FILE)
+            storePassword MYAPP_UPLOAD_STORE_PASSWORD
+            keyAlias MYAPP_UPLOAD_KEY_ALIAS
+            keyPassword MYAPP_UPLOAD_KEY_PASSWORD
         }
     }
 
@@ -74,6 +81,7 @@ android {
             proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"
         }
     }
+    
     kotlinOptions {
         jvmTarget = "17"
     }
@@ -84,11 +92,54 @@ android {
         targetCompatibility JavaVersion.VERSION_17
     }
 
+    packaging {
+        jniLibs {
+            useLegacyPackaging = true
+            pickFirsts += ['**/*.so']
+        }
+   
+
+     // ADDED: Handle duplicate files for 16KB support
+        resources {
+            excludes += [
+                'META-INF/DEPENDENCIES',
+                'META-INF/LICENSE',
+                'META-INF/LICENSE.txt',
+                'META-INF/NOTICE',
+                'META-INF/NOTICE.txt'
+            ]
+        }
+    }
+
+     // ADDED: Configure bundle for 16KB page size support
+    bundle {
+        language {
+            enableSplit = false
+        }
+        density {
+            enableSplit = false
+        }
+        abi {
+            enableSplit = true
+        }
+    }
+
+}
+
+// Skip metro bundling if already bundled manually
+afterEvaluate {
+    if (gradle.startParameter.taskNames.any { it.contains("assembleRelease") }) {
+        tasks.findByName("createBundleReleaseJsAndAssets")?.enabled = false
+    }
 }
 
 dependencies {
     implementation("com.facebook.react:react-android")
     implementation("com.facebook.react:flipper-integration")
+
+    // ADDED: Core AndroidX dependencies for edge-to-edge support
+    implementation "androidx.core:core-ktx:1.12.0"
+    implementation "androidx.activity:activity-ktx:1.8.2"
 
     if (enableHermes.toBoolean()) {
         implementation("com.facebook.react:hermes-android")
@@ -97,7 +148,6 @@ dependencies {
     }
 }
 
-apply from: file("../../node_modules/@react-native-community/cli-platform-android/native_modules.gradle"); 
+apply from: file("../../node_modules/@react-native-community/cli-platform-android/native_modules.gradle");
 applyNativeModulesAppBuildGradle(project)
-
 apply from: "../../node_modules/react-native-vector-icons/fonts.gradle"

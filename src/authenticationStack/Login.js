@@ -5,6 +5,7 @@ import {
   TextInput,
   TouchableOpacity,
   StyleSheet,
+  Alert,
   ActivityIndicator,
   Image,
   Animated,
@@ -15,7 +16,6 @@ import {
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import {Picker} from '@react-native-picker/picker';
-import {showMessage} from 'react-native-flash-message';
 import {login as loginAPI, register as registerAPI} from '../util/apiCall';
 import {useAuth} from '../Auth/AuthContext';
 import {logError} from '../util/ErrorHandler';
@@ -54,6 +54,7 @@ const LoginScreen = ({navigation}) => {
   });
 
   const [showRegPassword, setShowRegPassword] = useState(false);
+  // const [showAddressSection, setShowAddressSection] = useState(false);
   const [regLoading, setRegLoading] = useState(false);
 
   // Animation state
@@ -139,13 +140,7 @@ const LoginScreen = ({navigation}) => {
     if (navigation) {
       navigation.navigate('SendOtp');
     } else {
-      showMessage({
-        message: 'Error',
-        description: 'Navigation not available',
-        type: 'danger',
-        icon: 'auto',
-        duration: 3000,
-      });
+      Alert.alert('Error', 'Navigation not available');
     }
   };
 
@@ -208,122 +203,50 @@ const LoginScreen = ({navigation}) => {
     ],
   };
 
-  const handleLogin = async () => {
+ const handleLogin = async () => {
   if (loading || authLoading) return;
 
-  // Basic input validation
   if (!email || !password) {
-
-    showMessage({
-      message: 'Validation Error',
-      description: 'Please enter both email and password',
-      type: 'warning',
-      icon: 'auto',
-      duration: 3000,
-    });
+    Alert.alert('Error', 'Please enter both email and password');
     return;
   }
-
   setLoading(true);
-  const payload = {
-    email: email.trim().toLowerCase(),
-    password: password.trim(),
-  };
-
 
   try {
+    const payload = {
+      email: email.trim().toLowerCase(),
+      password: password.trim(),
+    };
+
     const response = await loginAPI(payload);
 
     if (response && response.token) {
-
       try {
-        const decoded = jwtDecode(response.token);
-
-        const currentTime = Date.now() / 1000;
-        if (decoded.exp && decoded.exp <= currentTime) {
-          console.warn('[LOGIN] Token expired:', decoded.exp, currentTime);
-          showMessage({
-            message: 'Token Expired',
-            description: 'Received expired token. Please try again.',
-            type: 'danger',
-            icon: 'auto',
-            duration: 4000,
-          });
-          return;
-        }
-
+        // Use our safer JWT handling
         await authLogin(response.token, response);
-
-        // Clear login fields
         setEmail('');
         setPassword('');
-
-        showMessage({
-          message: 'Welcome Back!',
-          description: 'You have successfully logged in',
-          type: 'success',
-          icon: 'auto',
-          duration: 2000,
-        });
+        console.log('Login successful');
       } catch (decodeError) {
-        console.error('[LOGIN] Token decode failed:', decodeError);
-
-        showMessage({
-          message: 'Authentication Error',
-          description: 'Invalid token received. Please try again.',
-          type: 'danger',
-          icon: 'auto',
-          duration: 4000,
-        });
+        console.error('Token validation failed:', decodeError);
+        Alert.alert('Error', 'Invalid token received. Please try again.');
       }
     } else {
-      console.warn('[LOGIN] No token found in response:', response);
-
-      showMessage({
-        message: 'Login Failed',
-        description: 'Unexpected response from server',
-        type: 'danger',
-        icon: 'auto',
-        duration: 4000,
-      });
+      Alert.alert('Login Failed', 'Unexpected response from server');
     }
   } catch (error) {
-    console.error('[LOGIN] Login API call failed:', error);
-
+    console.error('Login API error:', error);
+    
     if (error.response) {
       const msg = error.response.data?.message || 'Invalid credentials';
-      console.warn('[LOGIN] Server responded with error:', msg);
-
-      showMessage({
-        message: 'Login Failed',
-        description: msg,
-        type: 'danger',
-        icon: 'auto',
-        duration: 4000,
-      });
+      Alert.alert('Login Failed', msg);
     } else if (error.request) {
-      console.error('[LOGIN] No response received:', error.request);
-
-      showMessage({
-        message: 'Network Error',
-        description: 'No response from server. Please check your internet connection.',
-        type: 'danger',
-        icon: 'auto',
-        duration: 4000,
-      });
+      Alert.alert('Network Error', 'No response from server');
     } else {
-      console.error('[LOGIN] Other error occurred:', error.message);
-
-      showMessage({
-        message: 'Error',
-        description: error.message,
-        type: 'danger',
-        icon: 'auto',
-        duration: 4000,
-      });
+      Alert.alert('Error', error.message);
     }
 
-    logError('Login:handleLogin', error); // Custom error logger
+    logError('Login:handleLogin', error);
   } finally {
     if (isMountedRef.current) {
       setLoading(false);
@@ -332,163 +255,152 @@ const LoginScreen = ({navigation}) => {
 };
 
 
-  const handleRegister = async () => {
-    if (regLoading) {
-      return;
-    }
+// Replace your handleRegister function payload creation with this:
 
-    const errors = [];
-    if (!regFormData.userName.trim()) {
-      errors.push('Full name is required');
-    }
+const handleRegister = async () => {
+  if (regLoading) {
+    return;
+  }
 
-    if (!regFormData.email.trim()) {
-      errors.push('Email is required');
-    } else if (!/\S+@\S+\.\S+/.test(regFormData.email.trim())) {
-      errors.push('Please enter a valid email address');
-    }
+  const errors = [];
+  if (!regFormData.userName.trim()) {
+    errors.push('Full name is required');
+  }
 
-    if (!regFormData.contact.trim()) {
-      errors.push('Contact number is required');
-    } else if (!/^\d{10}$/.test(regFormData.contact.trim())) {
-      errors.push('Contact number must be exactly 10 digits');
-    }
+  if (!regFormData.email.trim()) {
+    errors.push('Email is required');
+  } else if (!/\S+@\S+\.\S+/.test(regFormData.email.trim())) {
+    errors.push('Please enter a valid email address');
+  }
 
-    // District validation
-    const currentDistrict = regFormData.addresses[0].district;
-    if (!currentDistrict || currentDistrict.trim() === '') {
-      errors.push('Please select a district');
-    }
+  if (!regFormData.contact.trim()) {
+    errors.push('Contact number is required');
+  } else if (!/^\d{10}$/.test(regFormData.contact.trim())) {
+    errors.push('Contact number must be exactly 10 digits');
+  }
 
-    if (!regFormData.password) {
-      errors.push('Password is required');
-    } else if (regFormData.password.length < 6) {
-      errors.push('Password must be at least 6 characters long');
-    }
+  // District validation
+  const currentDistrict = regFormData.addresses[0].district;
+  if (!currentDistrict || currentDistrict.trim() === '') {
+    errors.push('Please select a district');
+  }
 
-    if (!regFormData.confirmPassword) {
-      errors.push('Please confirm your password');
-    } else if (regFormData.password !== regFormData.confirmPassword) {
-      errors.push('Passwords do not match');
-    }
+  if (!regFormData.password) {
+    errors.push('Password is required');
+  } else if (regFormData.password.length < 6) {
+    errors.push('Password must be at least 6 characters long');
+  }
 
-    if (errors.length > 0) {
-      showMessage({
-        message: 'Validation Error',
-        description: errors.join('\n'),
-        type: 'warning',
-        icon: 'auto',
-        duration: 5000,
-      });
-      return;
-    }
+  if (!regFormData.confirmPassword) {
+    errors.push('Please confirm your password');
+  } else if (regFormData.password !== regFormData.confirmPassword) {
+    errors.push('Passwords do not match');
+  }
 
-    setRegLoading(true);
+  if (errors.length > 0) {
+    Alert.alert('Validation Error', errors.join('\n'));
+    return;
+  }
 
-    try {
-      const payload = {
-        userName: regFormData.userName.trim(),
-        email: regFormData.email.trim().toLowerCase(),
-        contact: regFormData.contact.trim(),
-        examName: regFormData.examName,
-        district: regFormData.addresses[0].district.trim(),
-        password: regFormData.password,
-        confirmPassword: regFormData.confirmPassword,
-      };
+  setRegLoading(true);
 
-      const response = await registerAPI(payload);
+  try {
+    // FIXED: Create payload in the exact format your backend expects
+    const payload = {
+      userName: regFormData.userName.trim(),
+      email: regFormData.email.trim().toLowerCase(),
+      contact: regFormData.contact.trim(), // Keep as string as per your example
+      examName: regFormData.examName,
+      district: regFormData.addresses[0].district.trim(), // District at root level
+      password: regFormData.password,
+      confirmPassword: regFormData.confirmPassword,
+    };
 
-      if (response) {
-        let successMessage = 'Account created successfully!';
+    const response = await registerAPI(payload);
 
-        if (response.message) {
-          successMessage = response.message;
-        }
+    if (response) {
+      console.log('[registerAPI] Success Response:', response.data);
+      let successMessage = 'Account created successfully!';
 
-        showMessage({
-          message: 'Registration Successful! 🎉',
-          description: successMessage,
-          type: 'success',
-          icon: 'auto',
-          duration: 3000,
-        });
+      if (response.message) {
+        successMessage = response.message;
+      }
 
-        // Reset form data
-        setRegFormData({
-          userName: '',
-          email: '',
-          password: '',
-          confirmPassword: '',
-          contact: '',
-          examName: 'UPSC',
-          addresses: [
-            {
-              address: '',
-              state: '',
-              district: '',
-              city: '',
-              area: '',
-              pincode: '',
-              landmark: '',
-            },
-          ],
-        });
+      Alert.alert('Registration Successful', successMessage, [
+        {
+          text: 'OK',
+          onPress: () => {
+            // Reset form data
+            setRegFormData({
+              userName: '',
+              email: '',
+              password: '',
+              confirmPassword: '',
+              contact: '',
+              examName: 'UPSC',
+              addresses: [
+                {
+                  address: '',
+                  state: '',
+                  district: '',
+                  city: '',
+                  area: '',
+                  pincode: '',
+                  landmark: '',
+                },
+              ],
+            });
 
-        setTimeout(() => {
-          flipCard();
-        }, 500);
+            setTimeout(() => {
+              flipCard();
+            }, 500);
+          },
+        },
+      ]);
 
-        if (response.token) {
-          try {
-            const decoded = jwtDecode(response.token);
-            const currentTime = Date.now() / 1000;
+      if (response.token) {
+        try {
+          const decoded = jwtDecode(response.token);
+          const currentTime = Date.now() / 1000;
 
-            if (decoded.exp && decoded.exp > currentTime) {
-              await authLogin(response.token, response);
-              return;
-            }
-          } catch (decodeError) {
-            // Silent fail for token decode error
+          if (decoded.exp && decoded.exp > currentTime) {
+            await authLogin(response.token, response);
+            return;
           }
+        } catch (decodeError) {
         }
-      }
-    } catch (error) {
-      console.error('❌ [REGISTER] Registration failed:', error);
-      console.error('❌ Error details:', error.response?.data);
-
-      let errorMessage = 'Registration failed. Please try again.';
-
-      if (error.response) {
-        if (error.response.data && error.response.data.message) {
-          errorMessage = error.response.data.message;
-        } else if (error.response.status === 400) {
-          errorMessage = 'Invalid registration data. Please check your inputs.';
-        } else if (error.response.status === 409) {
-          errorMessage = 'Email already exists. Please use a different email.';
-        } else if (error.response.status === 500) {
-          errorMessage = 'Server error. Please try again later.';
-        }
-      } else if (error.request) {
-        errorMessage = 'Network error. Please check your internet connection.';
-      } else if (error.message) {
-        errorMessage = error.message;
-      }
-
-      showMessage({
-        message: 'Registration Failed',
-        description: errorMessage,
-        type: 'danger',
-        icon: 'auto',
-        duration: 5000,
-      });
-      
-      logError('Registration:handleRegister', error);
-    } finally {
-      if (isMountedRef.current) {
-        setRegLoading(false);
       }
     }
-  };
+  } catch (error) {
+    console.error('❌ [REGISTER] Registration failed:', error);
+    console.error('❌ Error details:', error.response?.data);
+
+    let errorMessage = 'Registration failed. Please try again.';
+
+    if (error.response) {
+      if (error.response.data && error.response.data.message) {
+        errorMessage = error.response.data.message;
+      } else if (error.response.status === 400) {
+        errorMessage = 'Invalid registration data. Please check your inputs.';
+      } else if (error.response.status === 409) {
+        errorMessage = 'Email already exists. Please use a different email.';
+      } else if (error.response.status === 500) {
+        errorMessage = 'Server error. Please try again later.';
+      }
+    } else if (error.request) {
+      errorMessage = 'Network error. Please check your internet connection.';
+    } else if (error.message) {
+      errorMessage = error.message;
+    }
+
+    Alert.alert('Registration Failed', errorMessage);
+    logError('Registration:handleRegister', error);
+  } finally {
+    if (isMountedRef.current) {
+      setRegLoading(false);
+    }
+  }
+};
 
   const onLoginFormLayout = event => {
     const {height} = event.nativeEvent.layout;
@@ -721,6 +633,7 @@ const LoginScreen = ({navigation}) => {
                     style={styles.pickerIcon}
                   />
                   <View style={styles.pickerWrapper}>
+                    {/* <Text style={styles.pickerLabel}>Select Exam</Text> */}
                     <Picker
                       selectedValue={regFormData.examName}
                       onValueChange={value =>

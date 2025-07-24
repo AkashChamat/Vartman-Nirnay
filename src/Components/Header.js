@@ -89,6 +89,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
+    
     paddingVertical: 12,
     elevation: 2,
   },

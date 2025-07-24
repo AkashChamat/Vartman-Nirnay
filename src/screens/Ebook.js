@@ -9,10 +9,8 @@ import {
   Alert,
   ActivityIndicator,
   RefreshControl,
-  Modal,
   Dimensions,
 } from 'react-native';
-import {WebView} from 'react-native-webview';
 import {useNavigation} from '@react-navigation/native';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import DropDownPicker from 'react-native-dropdown-picker';
@@ -20,7 +18,6 @@ import Header from '../Components/Header';
 import Footer from '../Components/Footer';
 import {getAllMaterials, materialtype} from '../util/apiCall';
 import { showErrorMessage } from '../Components/SubmissionMessage';
-
 
 const {width, height} = Dimensions.get('window');
 
@@ -50,8 +47,6 @@ const Ebook = () => {
   const [selectedMaterialType, setSelectedMaterialType] = useState('all');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [selectedPdf, setSelectedPdf] = useState(null);
-  const [showPdfModal, setShowPdfModal] = useState(false);
   const [error, setError] = useState(null);
 
   // Dropdown state
@@ -83,7 +78,7 @@ const Ebook = () => {
     } catch (error) {
       console.error('Error fetching data:', error);
       setError(error.message || 'Failed to fetch data');
-showErrorMessage('Error', error.message || 'Failed to fetch data');
+      showErrorMessage('Error', error.message || 'Failed to fetch data');
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -126,29 +121,32 @@ showErrorMessage('Error', error.message || 'Failed to fetch data');
     fetchInitialData();
   };
 
+  // Updated handleViewPdf to navigate instead of using modal
   const handleViewPdf = (pdfUrl, title) => {
     if (!pdfUrl) {
-showErrorMessage('Error', 'PDF file not available');
+      showErrorMessage('Error', 'PDF file not available');
       return;
     }
 
     try {
       new URL(pdfUrl);
-      setSelectedPdf({url: pdfUrl, title});
-      setShowPdfModal(true);
+      // Navigate to PdfViewer instead of showing modal
+      navigation.navigate('PdfViewer', {
+        pdfUrl: pdfUrl,
+        title: title,
+      });
     } catch (error) {
       showErrorMessage('Error', 'Invalid PDF URL format');
-
     }
   };
 
- const handleBuy = (item) => {
-  navigation.navigate('PaymentScreen', {
-    materialId: item.id,
-    materialName: item.chapterName,
-    amount: item.price,
-  });
-};
+  const handleBuy = (item) => {
+    navigation.navigate('PaymentScreen', {
+      materialId: item.id,
+      materialName: item.chapterName,
+      amount: item.price,
+    });
+  };
 
   const hasDemo = demoPdf => {
     return (
@@ -338,19 +336,25 @@ showErrorMessage('Error', 'PDF file not available');
   );
 
   const renderError = () => (
-    <View style={styles.emptyState}>
-      <View style={styles.emptyIcon}>
-        <MaterialIcons
-          name="error-outline"
-          size={64}
-          color={COLORS.secondary}
-        />
+    <View style={styles.container}>
+      <Header />
+      <View style={styles.content}>
+        <View style={styles.emptyState}>
+          <View style={styles.emptyIcon}>
+            <MaterialIcons
+              name="error-outline"
+              size={64}
+              color={COLORS.secondary}
+            />
+          </View>
+          <Text style={styles.emptyTitle}>Something went wrong</Text>
+          <Text style={styles.emptySubtitle}>{error}</Text>
+          <TouchableOpacity style={styles.retryButton} onPress={fetchInitialData}>
+            <Text style={styles.retryText}>Try Again</Text>
+          </TouchableOpacity>
+        </View>
       </View>
-      <Text style={styles.emptyTitle}>Something went wrong</Text>
-      <Text style={styles.emptySubtitle}>{error}</Text>
-      <TouchableOpacity style={styles.retryButton} onPress={fetchInitialData}>
-        <Text style={styles.retryText}>Try Again</Text>
-      </TouchableOpacity>
+      <Footer />
     </View>
   );
 
@@ -369,13 +373,12 @@ showErrorMessage('Error', 'PDF file not available');
 
   return (
     <View style={styles.container}>
-      <Header />
-
-      <View style={styles.content}>
-        {error ? (
-          renderError()
-        ) : (
-          <>
+      {error ? (
+        renderError()
+      ) : (
+        <>
+          <Header />
+          <View style={styles.content}>
             {renderFilterDropdown()}
             <FlatList
               data={filteredMaterials}
@@ -393,44 +396,10 @@ showErrorMessage('Error', 'PDF file not available');
               }
               ListEmptyComponent={renderEmptyState}
             />
-          </>
-        )}
-      </View>
-
-      <Modal
-        visible={showPdfModal}
-        animationType="slide"
-        onRequestClose={() => setShowPdfModal(false)}>
-        <View style={styles.pdfModal}>
-          <View style={styles.pdfHeader}>
-            <TouchableOpacity
-              style={styles.closeButton}
-              onPress={() => setShowPdfModal(false)}>
-              <MaterialIcons name="close" size={24} color="#fff" />
-            </TouchableOpacity>
-            <Text style={styles.pdfTitle} numberOfLines={1}>
-              {selectedPdf?.title || 'PDF Viewer'}
-            </Text>
           </View>
-
-          {selectedPdf && (
-            <WebView
-              source={{uri: selectedPdf.url}}
-              style={styles.webView}
-              startInLoadingState={true}
-              renderLoading={() => (
-                <View style={styles.webViewLoading}>
-                  <ActivityIndicator size="large" color={'#0288D1'} />
-                  <Text style={styles.loadingText}>Loading PDF...</Text>
-                </View>
-              )}
-onError={() => showErrorMessage('Error', 'Failed to load PDF')}
-            />
-          )}
-        </View>
-      </Modal>
-
-      <Footer />
+          <Footer />
+        </>
+      )}
     </View>
   );
 };
@@ -570,8 +539,7 @@ const styles = StyleSheet.create({
     width: '100%',
     height: 200,
     backgroundColor: '#F8FAFC',
-    overflow: 'hidden',
-    
+    overflow: 'hidden',    
   },
   cardImage: {
     height: '97%',
@@ -587,7 +555,6 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: COLORS.cardBorder,
   },
-
  
   typeBadge: {
     position: 'absolute',
@@ -741,44 +708,6 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 14,
     fontWeight: '600',
-  },
-
-  // PDF Modal
-  pdfModal: {
-    flex: 1,
-    backgroundColor: '#000',
-  },
-  pdfHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: COLORS.text.primary,
-    paddingTop: height * 0.05,
-    paddingHorizontal: 16,
-    paddingBottom: 16,
-  },
-  closeButton: {
-    padding: 8,
-  },
-  pdfTitle: {
-    flex: 1,
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#fff',
-    marginLeft: 12,
-  },
-  webView: {
-    flex: 1,
-  },
-  webViewLoading: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: COLORS.surface,
-    gap: 16,
   },
 });
 
