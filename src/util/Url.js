@@ -6,6 +6,7 @@ export const sendotpUrl = `${baseUrl}/sendotp`;
 export const verifyotpUrl = `${baseUrl}/verifyOTP`;
 export const resetpasswordUrl = `${baseUrl}/resetUserPassword`;
 
+
 export const sliderImagesUrl = `${baseUrl}/AllVSlideImages`;
 export const epaperUrl = `${baseUrl}/AllVartmanNirnayPapers`;
 export const jobalertUrl = `${baseUrl}/AllAdvertisements`;
@@ -44,4 +45,5 @@ export const testseriesordersUrl = `${baseUrl}/testseries/user`;
 export const testseriesPaymentUrl = `${baseUrl}/createTestSeriesPayment`;
 export const bookpaymentUrl = `${baseUrl}/createBookPayment`;
 export const paidbooksUrl = `${baseUrl}//bookorders/user`;
+export const getallbooksUrl = `${baseUrl}/getAllBooks`;
 
