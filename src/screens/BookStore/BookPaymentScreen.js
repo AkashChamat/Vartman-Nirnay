@@ -4,52 +4,63 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
-  Alert,
   ActivityIndicator,
   SafeAreaView,
-  ScrollView,
   BackHandler,
   Modal,
- 
   Platform,
 } from 'react-native';
 import {useRoute, useFocusEffect} from '@react-navigation/native';
 import {WebView} from 'react-native-webview';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
-import {useAuth} from '../../Auth/AuthContext';
 import {
-  createTestSeriesPaymentSession,
-  verifyPayment,
-  getUserByEmail,
-} from '../../util/apiCall';
-import FlashMessage, {showMessage, hideMessage} from 'react-native-flash-message';
+  showErrorMessage,
+  showSuccessMessage,
+  showPaymentInitErrorMessage,
+  showPaymentFailedMessage,
+  showPaymentCancelledMessage,
+  showPaymentStatusUnknownMessage,
+  showClosePaymentConfirmation,
+  showPaymentInProgressMessage,
+  hideMessage,
+} from '../../Components/SubmissionMessage';
 
-// Payment validation and helper functions
-const validatePaymentData = (seriesId, email, phone, amount, userId) => {
+import {createBookPaymentSession} from '../../util/apiCall';
+
+const validateBookPaymentData = (bookId, email, phone, userId, addressId) => {
   const errors = [];
 
-  if (!seriesId) {
-    errors.push('Series ID is required');
+  if (!bookId) {
+    errors.push('Book ID is required');
   }
 
-  if (!email || !email.trim()) {
+  // ✅ FIXED: Better email validation with null/undefined checks
+  if (!email) {
     errors.push('Email is required');
+  } else if (typeof email !== 'string') {
+    errors.push('Email must be a valid string');
+  } else if (!email.trim()) {
+    errors.push('Email cannot be empty');
   } else if (!/\S+@\S+\.\S+/.test(email.trim())) {
     errors.push('Valid email is required');
   }
 
+  // ✅ IMPROVED: Better phone validation
   if (!phone) {
     errors.push('Phone number is required');
-  } else if (!/^\d{10}$/.test(phone.toString().replace(/\s+/g, ''))) {
-    errors.push('Valid 10-digit phone number is required');
-  }
-
-  if (amount && (isNaN(amount) || amount <= 0)) {
-    errors.push('Valid amount is required');
+  } else {
+    const phoneStr = phone.toString().replace(/\s+/g, '');
+    if (!/^\d{10}$/.test(phoneStr)) {
+      errors.push('Valid 10-digit phone number is required');
+    }
   }
 
   if (!userId) {
     errors.push('User ID is required');
+  }
+
+  if (!addressId) {
+    errors.push('Address selection is required');
   }
 
   return {
@@ -65,40 +76,33 @@ const formatCurrency = amount => {
   })}`;
 };
 
-const TestSeriesPaymentScreen = ({navigation}) => {
+const BookPaymentScreen = ({navigation}) => {
   const route = useRoute();
-  const {seriesId, seriesName, amount} = route.params || {};
-  const insets = useSafeAreaInsets(); // Android 15 safe area handling
+  const {book, addressId, userData} = route.params;
+  const insets = useSafeAreaInsets();
 
-  const {getUserEmail} = useAuth();
   const [loading, setLoading] = useState(true);
-  const [userData, setUserData] = useState({
-    email: '',
-    phone: '',
-    userId: null,
-  });
   const [showWebView, setShowWebView] = useState(false);
   const [sessionData, setSessionData] = useState(null);
   const [webViewLoading, setWebViewLoading] = useState(true);
 
   useEffect(() => {
-    initializePayment();
+    initializeBookPayment();
   }, []);
 
   useFocusEffect(
     React.useCallback(() => {
       const onBackPress = () => {
         if (showWebView) {
-          showMessage({
-            message: 'Payment in Progress',
-            description: 'Please complete or cancel the payment first.',
-            type: 'warning',
-            duration: 3000,
-            onPress: () => {
+          showPaymentInProgressMessage(
+            () => {
               hideMessage();
               setShowWebView(false);
             },
-          });
+            () => {
+              hideMessage();
+            },
+          );
           return true;
         }
         return false;
@@ -109,86 +113,40 @@ const TestSeriesPaymentScreen = ({navigation}) => {
     }, [showWebView]),
   );
 
-  const initializePayment = async () => {
+  const initializeBookPayment = async () => {
     try {
       setLoading(true);
 
-      // Get user data
-      const email = await getUserEmail();
-
-      if (!email || !email.trim()) {
-        showMessage({
-          message: 'Error',
-          description: 'Email not found. Please login again.',
-          type: 'danger',
-          duration: 3000,
-          onPress: () => {
-            hideMessage();
-            navigation.goBack();
-          },
-        });
-        return;
+      // Validate required data
+      if (!book || !addressId || !userData) {
+        throw new Error('Missing required payment data');
       }
 
-      const response = await getUserByEmail(email);
-      if (!response) {
-        throw new Error('User data not found.');
-      }
-
-      const userEmail = response.email || email;
-      const userPhone =
-        response.contact || response.phoneNumber || response.phone || '';
-      const userId = response.id;
-
-      if (!userPhone) {
-        showMessage({
-          message: 'Missing Phone Number',
-          description:
-            'Phone number is required for payment. Please update your profile.',
-          type: 'warning',
-          duration: 4000,
-          onPress: () => {
-            hideMessage();
-            navigation.navigate('Profile');
-          },
-        });
-        return;
-      }
-
-      const user = {
-        email: userEmail,
-        phone: userPhone.toString(),
-        userId: userId,
-      };
-
-      setUserData(user);
 
       // Validate payment data
-      const validation = validatePaymentData(
-        seriesId,
-        userEmail,
-        userPhone,
-        amount,
-        userId,
+      const validation = validateBookPaymentData(
+        book.id,
+        userData.email,
+        userData.contact,
+        userData.id,
+        addressId,
       );
 
       if (!validation.isValid) {
-        showMessage({
-          message: 'Validation Error',
-          description: validation.errors.join('\n'),
-          type: 'danger',
-          duration: 4000,
-        });
+        console.error('❌ Validation failed:', validation.errors);
+        showErrorMessage('Validation Error', validation.errors.join('\n'));
+        setTimeout(() => navigation.goBack(), 2000);
         return;
       }
 
-      // Create payment session for test series
-      const sessionResponse = await createTestSeriesPaymentSession(
-        seriesId,
-        userEmail,
-        userPhone,
-        userId,
+      const sessionResponse = await createBookPaymentSession(
+        book.id, 
+        userData.id, 
+        userData.email, 
+        userData.contact, 
+        addressId, 
       );
+
 
       if (!sessionResponse.payment_session_id || !sessionResponse.order_id) {
         throw new Error('Invalid payment session response from server');
@@ -198,18 +156,18 @@ const TestSeriesPaymentScreen = ({navigation}) => {
       setShowWebView(true);
       setLoading(false);
     } catch (error) {
-      console.error('❌ Test Series Payment initialization error:', error);
+      console.error('❌ Book payment initialization error:', error);
       setLoading(false);
-      showMessage({
-        message: 'Payment Error',
-        description: error.message || 'Failed to initialize payment',
-        type: 'danger',
-        duration: 4000,
-        onPress: () => {
+      showPaymentInitErrorMessage(
+        () => {
           hideMessage();
-          initializePayment();
+          initializeBookPayment();
         },
-      });
+        () => {
+          hideMessage();
+          navigation.goBack();
+        },
+      );
     }
   };
 
@@ -228,7 +186,6 @@ const TestSeriesPaymentScreen = ({navigation}) => {
         handlePaymentResult({status: 'FAILED', error: data.error});
       }
     } catch (error) {
-      // Handle simple string messages with more validation
       const message = event.nativeEvent.data.toLowerCase();
       if (
         message.includes('payment_success') &&
@@ -258,15 +215,9 @@ const TestSeriesPaymentScreen = ({navigation}) => {
       setWebViewLoading(true);
 
       if (!result) {
-        showMessage({
-          message: 'Payment Status Unknown',
-          description: 'Unable to determine payment result. Please check your payment history.',
-          type: 'warning',
-          duration: 4000,
-          onPress: () => {
-            hideMessage();
-            navigation.goBack();
-          },
+        showPaymentStatusUnknownMessage(() => {
+          hideMessage();
+          navigation.navigate('Books');
         });
         return;
       }
@@ -285,113 +236,79 @@ const TestSeriesPaymentScreen = ({navigation}) => {
         txStatus === 'success' ||
         txStatus === 'COMPLETED'
       ) {
-        try {
-          // Verify payment on server if we have order details
-          if (orderId && sessionData) {
-            await verifyPayment(orderId, sessionData.payment_session_id);
-          }
-
-          showMessage({
-            message: 'Payment Successful! 🎉',
-            description: `Your test series payment has been processed successfully.${
-              orderId ? `\nOrder ID: ${orderId}` : ''
-            }`,
-            type: 'success',
-            duration: 4000,
-            onPress: () => {
-              hideMessage();
-              navigation.goBack();
-            },
-          });
-        } catch (verificationError) {
-          console.error('❌ Payment verification failed:', verificationError);
-          showMessage({
-            message: 'Payment Verification Failed',
-            description: 'Payment was successful but verification failed. Please contact support.',
-            type: 'warning',
-            duration: 4000,
-            onPress: () => {
-              hideMessage();
-              navigation.goBack();
-            },
-          });
-        }
+        showSuccessMessage(
+          'Payment Successful! 🎉',
+          `Your book purchase has been completed successfully.${
+            orderId ? `\nOrder ID: ${orderId}` : ''
+          }`,
+        );
+        setTimeout(() => navigation.navigate('Books'), 3000);
       } else if (
         txStatus === 'FAILED' ||
         txStatus === 'failed' ||
         txStatus === 'FAILURE' ||
         txStatus === 'ERROR'
       ) {
-        showMessage({
-          message: 'Payment Failed',
-          description:
-            result.message ||
+        showPaymentFailedMessage(
+          () => {
+            hideMessage();
+            initializeBookPayment();
+          },
+          () => {
+            hideMessage();
+            navigation.navigate('Books');
+          },
+          result.message ||
             result.error ||
             'Payment could not be processed. Please try again.',
-          type: 'danger',
-          duration: 4000,
-          onPress: () => {
-            hideMessage();
-            initializePayment();
-          },
-        });
+        );
       } else if (
         txStatus === 'CANCELLED' ||
         txStatus === 'cancelled' ||
         txStatus === 'CANCELED' ||
         txStatus === 'ABORTED'
       ) {
-        showMessage({
-          message: 'Payment Cancelled',
-          description: 'You cancelled the payment process.',
-          type: 'info',
-          duration: 3000,
-          onPress: () => {
+        showPaymentCancelledMessage(
+          () => {
             hideMessage();
-            initializePayment();
+            initializeBookPayment();
           },
-        });
+          () => {
+            hideMessage();
+            navigation.navigate('Books');
+          },
+        );
       } else {
         console.warn('⚠️ Unknown payment status:', txStatus);
-        showMessage({
-          message: 'Payment Status Unknown',
-          description: `Unable to determine payment result. Status: ${
+        showErrorMessage(
+          'Payment Status Unknown',
+          `Unable to determine payment result. Status: ${
             txStatus || 'Unknown'
-          }\nPlease check your payment history or contact support.`,
-          type: 'warning',
-          duration: 5000,
-          onPress: () => {
-            hideMessage();
-            navigation.goBack();
-          },
-        });
+          }\nPlease check your purchase history or contact support.`,
+        );
+        setTimeout(() => navigation.navigate('Books'), 4000);
       }
     } catch (error) {
-      console.error('❌ Error processing payment result:', error);
-      showMessage({
-        message: 'Error',
-        description:
-          'Failed to process payment result. Please contact support.',
-        type: 'danger',
-        duration: 4000,
-      });
+      console.error('❌ Error processing book payment result:', error);
+      showErrorMessage(
+        'Error',
+        'Failed to process payment result. Please contact support.',
+      );
     }
   };
 
   const closeWebView = () => {
-    showMessage({
-      message: 'Close Payment',
-      description:
-        'Are you sure you want to close the payment? Your payment will be cancelled.',
-      type: 'warning',
-      duration: 4000,
-      onPress: () => {
+    showClosePaymentConfirmation(
+      () => {
+        hideMessage();
+      },
+      () => {
         hideMessage();
         setShowWebView(false);
         setWebViewLoading(true);
-        navigation.goBack();
+        navigation.navigate('Books');
       },
-    });
+    );
   };
 
   const goBack = () => {
@@ -402,7 +319,6 @@ const TestSeriesPaymentScreen = ({navigation}) => {
     navigation.goBack();
   };
 
-  // Android 15 compatible HTML with proper viewport and safe area handling
   const createPaymentHTML = () => {
     if (!sessionData) return '';
 
@@ -412,7 +328,7 @@ const TestSeriesPaymentScreen = ({navigation}) => {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-    <title>Test Series Payment</title>
+    <title>Book Payment</title>
     <script src="https://sdk.cashfree.com/js/v3/cashfree.js"></script>
     <style>
         * {
@@ -429,9 +345,9 @@ const TestSeriesPaymentScreen = ({navigation}) => {
         
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             min-height: 100vh;
-            min-height: 100dvh; /* Android 15 dynamic viewport */
+            min-height: 100dvh;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -462,7 +378,7 @@ const TestSeriesPaymentScreen = ({navigation}) => {
             left: 0;
             right: 0;
             height: 4px;
-            background: linear-gradient(90deg, #4f46e5, #7c3aed);
+            background: linear-gradient(90deg, #667eea, #764ba2);
         }
         
         .header {
@@ -471,7 +387,7 @@ const TestSeriesPaymentScreen = ({navigation}) => {
         }
         
         .logo-container {
-            background: linear-gradient(135deg, #4f46e5, #7c3aed);
+            background: linear-gradient(135deg, #667eea, #764ba2);
             width: 64px;
             height: 64px;
             border-radius: 20px;
@@ -498,6 +414,43 @@ const TestSeriesPaymentScreen = ({navigation}) => {
             font-size: 14px;
         }
         
+        .book-info {
+            background: rgba(255, 255, 255, 0.7);
+            border-radius: 16px;
+            padding: 20px;
+            margin-bottom: 24px;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+        }
+        
+        .book-detail {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+            font-size: 14px;
+        }
+        
+        .book-detail:last-child {
+            margin-bottom: 0;
+            font-weight: 600;
+            font-size: 16px;
+            color: #667eea;
+            border-top: 1px solid rgba(0, 0, 0, 0.1);
+            padding-top: 12px;
+            margin-top: 12px;
+        }
+        
+        .book-label {
+            color: #4a5568;
+            font-weight: 500;
+        }
+        
+        .book-value {
+            color: #1a202c;
+            font-weight: 600;
+            text-align: right;
+        }
+        
         .initializing-container {
             text-align: center;
             padding: 40px 20px;
@@ -507,7 +460,7 @@ const TestSeriesPaymentScreen = ({navigation}) => {
             width: 50px;
             height: 50px;
             border: 4px solid #e2e8f0;
-            border-top: 4px solid #4f46e5;
+            border-top: 4px solid #667eea;
             border-radius: 50%;
             animation: spin 1s linear infinite;
             margin: 0 auto 20px;
@@ -543,7 +496,7 @@ const TestSeriesPaymentScreen = ({navigation}) => {
         }
         
         .retry-button {
-            background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
             border: none;
             padding: 12px 24px;
@@ -559,7 +512,6 @@ const TestSeriesPaymentScreen = ({navigation}) => {
             transform: translateY(1px);
         }
         
-        /* Android 15 responsive adjustments */
         @media (max-width: 480px) {
             body {
                 padding: max(10px, env(safe-area-inset-top)) 10px max(10px, env(safe-area-inset-bottom)) 10px;
@@ -573,7 +525,6 @@ const TestSeriesPaymentScreen = ({navigation}) => {
             }
         }
         
-        /* Android 15 edge-to-edge adjustments */
         @supports (height: 100dvh) {
             body {
                 min-height: 100dvh;
@@ -591,8 +542,23 @@ const TestSeriesPaymentScreen = ({navigation}) => {
             <div class="logo-container">
                 <div class="logo">📚</div>
             </div>
-            <h1 class="title">Test Series Payment</h1>
-            <p class="subtitle">Initializing secure payment gateway...</p>
+            <h1 class="title">Book Purchase</h1>
+            <p class="subtitle">Secure payment powered by Cashfree</p>
+        </div>
+
+        <div class="book-info">
+            <div class="book-detail">
+                <span class="book-label">Book:</span>
+                <span class="book-value">${book.bookName || 'N/A'}</span>
+            </div>
+            <div class="book-detail">
+                <span class="book-label">Email:</span>
+                <span class="book-value">${userData.email || 'N/A'}</span>
+            </div>
+            <div class="book-detail">
+                <span class="book-label">Amount:</span>
+                <span class="book-value">${formatCurrency(book.price)}</span>
+            </div>
         </div>
 
         <div class="initializing-container">
@@ -613,7 +579,6 @@ const TestSeriesPaymentScreen = ({navigation}) => {
         let initializationAttempts = 0;
         const maxAttempts = 3;
         
-        // Android 15 safe initialization
         function safeInitialize() {
             if (document.readyState === 'loading') {
                 document.addEventListener('DOMContentLoaded', initializePayment);
@@ -622,7 +587,6 @@ const TestSeriesPaymentScreen = ({navigation}) => {
             }
         }
         
-        // Initialize when page loads
         safeInitialize();
         
         function initializePayment() {
@@ -666,7 +630,7 @@ const TestSeriesPaymentScreen = ({navigation}) => {
                     paymentSessionId: "${sessionData.payment_session_id}",
                     redirectTarget: "_modal",
                     appearance: {
-                        primaryColor: "#4f46e5",
+                        primaryColor: "#667eea",
                         backgroundColor: "#ffffff"
                     }
                 }).then(function(result) {
@@ -679,7 +643,9 @@ const TestSeriesPaymentScreen = ({navigation}) => {
                                 result: {
                                     status: 'SUCCESS',
                                     orderId: '${sessionData.order_id}',
-                                    sessionId: '${sessionData.payment_session_id}',
+                                    sessionId: '${
+                                      sessionData.payment_session_id
+                                    }',
                                     paymentDetails: result.paymentDetails,
                                     ...result
                                 }
@@ -726,7 +692,6 @@ const TestSeriesPaymentScreen = ({navigation}) => {
             }
         }
         
-        // Enhanced message handling for Android 15
         window.addEventListener('message', function(event) {
             if (event.data && event.data.type) {
                 const messageData = {
@@ -770,14 +735,12 @@ const TestSeriesPaymentScreen = ({navigation}) => {
             }
         });
         
-        // Android 15 visibility handling
         document.addEventListener('visibilitychange', function() {
             if (document.visibilityState === 'visible' && paymentStarted) {
                 // Payment is visible again
             }
         });
         
-        // Prevent accidental navigation during payment
         window.addEventListener('beforeunload', function(e) {
             if (paymentStarted) {
                 e.preventDefault();
@@ -791,16 +754,13 @@ const TestSeriesPaymentScreen = ({navigation}) => {
 `;
   };
 
-  // Show loading screen while initializing
+  // Loading state
   if (loading) {
     return (
       <SafeAreaView style={[styles.container, {paddingTop: insets.top}]}>
-      
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#4f46e5" />
-          <Text style={styles.loadingText}>
-            Initializing Test Series Payment...
-          </Text>
+          <ActivityIndicator size="large" color="#667eea" />
+          <Text style={styles.loadingText}>Initializing Payment...</Text>
           <Text style={styles.loadingSubtext}>
             Setting up secure payment gateway
           </Text>
@@ -811,55 +771,24 @@ const TestSeriesPaymentScreen = ({navigation}) => {
 
   return (
     <SafeAreaView style={[styles.container, {paddingTop: insets.top}]}>
-    
-      <ScrollView contentContainerStyle={styles.scrollContainer}>
-        <View style={styles.header}>
-          <TouchableOpacity onPress={goBack} style={styles.backButton}>
-            <Text style={styles.backButtonText}>← Back</Text>
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Test Series Payment</Text>
-        </View>
-
-        {/* Payment Summary */}
-        <View style={styles.summaryContainer}>
-          <Text style={styles.summaryTitle}>Payment Summary</Text>
-          {seriesName && (
-            <View style={styles.summaryItem}>
-              <Text style={styles.summaryLabel}>Test Series:</Text>
-              <Text style={styles.summaryValue}>{seriesName}</Text>
-            </View>
-          )}
-          <View style={styles.summaryItem}>
-            <Text style={styles.summaryLabel}>Amount:</Text>
-            <Text style={styles.summaryValue}>{formatCurrency(amount)}</Text>
-          </View>
-          <View style={styles.summaryItem}>
-            <Text style={styles.summaryLabel}>Email:</Text>
-            <Text style={styles.summaryValue}>{userData.email}</Text>
-          </View>
-        </View>
-      </ScrollView>
-
-      {/* Android 15 Compatible WebView Modal */}
+      {/* Payment WebView Modal */}
       <Modal
         visible={showWebView}
         animationType="slide"
         presentationStyle="fullScreen"
         onRequestClose={closeWebView}>
         <SafeAreaView style={[styles.modalContainer, {paddingTop: insets.top}]}>
-        
-          
           <View style={styles.modalHeader}>
             <TouchableOpacity onPress={closeWebView} style={styles.closeButton}>
               <Text style={styles.closeButtonText}>✕ Close</Text>
             </TouchableOpacity>
-            <Text style={styles.modalTitle}>Test Series Payment</Text>
+            <Text style={styles.modalTitle}>Book Purchase</Text>
             <View style={styles.headerSpacer} />
           </View>
 
           {webViewLoading && (
             <View style={styles.webViewLoadingContainer}>
-              <ActivityIndicator size="large" color="#4f46e5" />
+              <ActivityIndicator size="large" color="#667eea" />
               <Text style={styles.webViewLoadingText}>
                 Loading Payment Gateway...
               </Text>
@@ -874,21 +803,15 @@ const TestSeriesPaymentScreen = ({navigation}) => {
             onError={error => {
               console.error('❌ WebView error:', error);
               setWebViewLoading(false);
-              showMessage({
-                message: 'Error',
-                description: 'Failed to load payment page',
-                type: 'danger',
-                duration: 3000,
-              });
+              showErrorMessage('Error', 'Failed to load payment page');
             }}
             style={styles.webview}
             javaScriptEnabled={true}
             domStorageEnabled={true}
             startInLoadingState={false}
             mixedContentMode="compatibility"
-            allowsInlineMediaPlaybook={true}
+            allowsInlineMediaPlayback={true}
             mediaPlaybackRequiresUserAction={false}
-            // Android 15 WebView optimizations
             allowsFullscreenVideo={true}
             allowsProtectedMedia={true}
             showsHorizontalScrollIndicator={false}
@@ -898,23 +821,21 @@ const TestSeriesPaymentScreen = ({navigation}) => {
           />
         </SafeAreaView>
       </Modal>
-      
-      <FlashMessage position="top" />
     </SafeAreaView>
   );
 };
 
-// Android 15 Compatible Styles
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#f8f9fa',
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 20,
+    backgroundColor: '#f8f9fa',
   },
   loadingText: {
     fontSize: 18,
@@ -929,81 +850,9 @@ const styles = StyleSheet.create({
     marginTop: 8,
     textAlign: 'center',
   },
-  scrollContainer: {
-    flexGrow: 1,
-    paddingHorizontal: 20,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
-  },
-  backButton: {
-    paddingVertical: 8,
-    paddingRight: 16,
-  },
-  backButtonText: {
-    fontSize: 16,
-    color: '#4f46e5',
-    fontWeight: '500',
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#333',
-    flex: 1,
-    textAlign: 'center',
-    marginRight: 60, // Compensate for back button
-  },
-  summaryContainer: {
-    backgroundColor: 'white',
-    borderRadius: 12,
-    padding: 20,
-    marginTop: 20,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-summaryTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#1a202c',
-    marginBottom: 16,
-    paddingBottom: 8,
-    borderBottomWidth: 2,
-    borderBottomColor: '#4f46e5',
-  },
-  summaryItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f1f3f4',
-  },
-  summaryLabel: {
-    fontSize: 16,
-    color: '#4a5568',
-    fontWeight: '500',
-    flex: 1,
-  },
-  summaryValue: {
-    fontSize: 16,
-    color: '#1a202c',
-    fontWeight: '600',
-    flex: 2,
-    textAlign: 'right',
-  },
   modalContainer: {
     flex: 1,
-    backgroundColor: '#ffffff',
+    backgroundColor: '#f5f5f5',
   },
   modalHeader: {
     flexDirection: 'row',
@@ -1011,21 +860,19 @@ summaryTitle: {
     justifyContent: 'space-between',
     paddingHorizontal: 20,
     paddingVertical: 16,
-    backgroundColor: '#4f46e5',
+    backgroundColor: 'white',
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255, 255, 255, 0.1)',
-    // Android 15 safe area handling
+    borderBottomColor: '#e0e0e0',
     ...Platform.select({
       android: {
         elevation: 4,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.25,
-        shadowRadius: 4,
       },
       ios: {
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
+        shadowOffset: {
+          width: 0,
+          height: 2,
+        },
         shadowOpacity: 0.1,
         shadowRadius: 4,
       },
@@ -1035,24 +882,24 @@ summaryTitle: {
     paddingVertical: 8,
     paddingHorizontal: 12,
     borderRadius: 8,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    minTouchTarget: 44, // Android 15 accessibility
+    backgroundColor: '#f8f9fa',
+    borderWidth: 1,
+    borderColor: '#e9ecef',
   },
   closeButtonText: {
-    fontSize: 16,
-    color: '#ffffff',
+    fontSize: 14,
+    color: '#dc3545',
     fontWeight: '600',
   },
   modalTitle: {
     fontSize: 18,
-    fontWeight: '700',
-    color: '#ffffff',
+    fontWeight: '600',
+    color: '#333',
     flex: 1,
     textAlign: 'center',
-    marginHorizontal: 16,
   },
   headerSpacer: {
-    width: 60, // Balance the close button width
+    width: 80,
   },
   webViewLoadingContainer: {
     position: 'absolute',
@@ -1060,34 +907,28 @@ summaryTitle: {
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(248, 250, 252, 0.95)',
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 1000,
-    // Android 15 backdrop blur effect
-    ...Platform.select({
-      android: {
-        elevation: 10,
-      },
-    }),
+    backdropFilter: 'blur(10px)',
   },
   webViewLoadingText: {
     fontSize: 16,
-    fontWeight: '600',
-    color: '#4a5568',
-    marginTop: 16,
+    color: '#495057',
+    marginTop: 12,
+    fontWeight: '500',
     textAlign: 'center',
   },
   webview: {
     flex: 1,
-    backgroundColor: '#ffffff',
-    // Android 15 WebView optimizations
+    backgroundColor: '#f5f5f5',
     ...Platform.select({
       android: {
-        opacity: 0.99, // Prevents rendering issues on some Android devices
+        opacity: 0.99,
       },
     }),
   },
 });
 
-export default TestSeriesPaymentScreen;
+export default BookPaymentScreen;

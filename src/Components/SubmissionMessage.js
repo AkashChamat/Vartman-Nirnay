@@ -21,7 +21,7 @@ export const hideMessage = () => {
       duration: 1,
     });
   } catch (error) {
-    console.log('Error hiding message:', error);
+
   }
 };
 

@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
   Image,
   Dimensions,
+  Platform,
 } from 'react-native';
 import DropDownPicker from 'react-native-dropdown-picker';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
@@ -33,6 +34,12 @@ const TestSeries = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(0);
   const [expandedFeatures, setExpandedFeatures] = useState({});
+
+  const {width: screenWidth, height: screenHeight} = Dimensions.get('window');
+  const isLargeScreen = screenHeight > 700;
+  const hasHomeButton = Platform.OS === 'android' && screenHeight < 750;
+  const listBottomPadding = hasHomeButton ? 140 : isLargeScreen ? 120 : 110;
+  const contentMarginBottom = hasHomeButton ? 70 : 60;
 
   // Dropdown state
   const [open, setOpen] = useState(false);
@@ -102,7 +109,6 @@ const TestSeries = () => {
 
     setCategories(categoryObjects);
     updateDropdownItems(categoryObjects);
-    
   };
 
   const fetchTestSeries = async () => {
@@ -302,7 +308,6 @@ const TestSeries = () => {
                 ]}>
                 {buttonText}
               </Text>
-             
             </TouchableScale>
           </View>
         </View>
@@ -380,7 +385,6 @@ const TestSeries = () => {
     });
   };
 
-
   const handleRetry = () => {
     fetchTestSeries();
   };
@@ -389,7 +393,7 @@ const TestSeries = () => {
     return (
       <View style={styles.container}>
         <Header />
-        <View style={styles.centerContainer}>
+        <View style={[styles.centerContainer, {marginBottom: contentMarginBottom}]}>
           <ActivityIndicator size="large" color="#42A5F5" />
           <Text style={styles.loadingText}>Loading Test Series...</Text>
         </View>
@@ -402,7 +406,7 @@ const TestSeries = () => {
     return (
       <View style={styles.container}>
         <Header />
-        <View style={styles.centerContainer}>
+        <View style={[styles.centerContainer, {marginBottom: contentMarginBottom}]}>
           <MaterialIcons name="error-outline" size={60} color="#F44336" />
           <Text style={styles.errorTitle}>Something went wrong</Text>
           <Text style={styles.errorMessage}>{error}</Text>
@@ -420,7 +424,7 @@ const TestSeries = () => {
     return (
       <View style={styles.container}>
         <Header />
-        <View style={styles.centerContainer}>
+        <View style={[styles.centerContainer, {marginBottom: contentMarginBottom}]}>
           <MaterialIcons name="school" size={60} color="#42A5F5" />
           <Text style={styles.title}>No Test Series Available</Text>
           <Text style={styles.subtitle}>
@@ -435,10 +439,9 @@ const TestSeries = () => {
   return (
     <View style={styles.container}>
       <Header />
-      <View style={styles.content}>
+      <View style={[styles.content, {marginBottom: contentMarginBottom}]}>
         {/* Category Filter */}
         <View style={styles.filterContainer}>
-          
           <View style={styles.dropdownContainer}>
             <View style={{position: 'relative', zIndex: 3000}}>
               {(open || selectedCategory !== 'all') && (
@@ -601,7 +604,7 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   listContainer: {
-    paddingBottom: 80,
+  
   },
   noResultsContainer: {
     flex: 1,
@@ -697,7 +700,6 @@ const styles = StyleSheet.create({
   },
   bottomSection: {
     alignItems: 'flex-end',
-    
   },
   actionButton: {
     backgroundColor: '#42A5F5',

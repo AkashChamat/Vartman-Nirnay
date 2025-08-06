@@ -117,8 +117,9 @@ const ChampionResult = ({route, navigation}) => {
     fetchResult();
   };
 
-  const handleGoBack = () => {
-    navigation.goBack();
+  // Updated function to navigate to Home screen
+  const handleGoHome = () => {
+    navigation.navigate('Home'); // Changed from goBack() to navigate to Home
   };
 
   const renderTabBar = () => (
@@ -166,8 +167,8 @@ const ChampionResult = ({route, navigation}) => {
         <MaterialIcons name="refresh" size={20} color="#FFFFFF" />
         <Text style={styles.retryButtonText}>Try Again</Text>
       </TouchableOpacity>
-      <TouchableOpacity style={styles.backButton} onPress={handleGoBack}>
-        <Text style={styles.backButtonText}>Go Back</Text>
+      <TouchableOpacity style={styles.backButton} onPress={handleGoHome}>
+        <Text style={styles.backButtonText}>Go to Home</Text>
       </TouchableOpacity>
     </View>
   );
@@ -398,7 +399,7 @@ const ChampionResult = ({route, navigation}) => {
       incorrectQuestions = 0,
       solvedQuestions = 0,
       unsolvedQuestions = 0,
-      totalScore = 0,
+      totalScore = 0, // Added totalScore field
       timeTaken = '',
       testTitle: testName = testTitle || 'Test',
       userRank = '',
@@ -429,64 +430,88 @@ const ChampionResult = ({route, navigation}) => {
         <View style={styles.statsContainer}>
           <Text style={styles.sectionTitle}>Test Results</Text>
 
-          {/* First Row: Total Questions and Correct Answers */}
+          {/* First Row: Total Score and Total Questions */}
           <View style={styles.statsRow}>
+            {renderCompactResultCard(
+              'Total Score',
+              totalScore.toString(),
+              'stars',
+              '#F59E0B',
+            )}
             {renderCompactResultCard(
               'Total Questions',
               totalQuestions.toString(),
               'quiz',
               '#6366F1',
             )}
+          </View>
+
+          {/* Second Row: Correct Answers and Wrong Answers */}
+          <View style={styles.statsRow}>
             {renderCompactResultCard(
               'Correct',
               correctQuestions.toString(),
               'check-circle',
               '#10B981',
             )}
-          </View>
-
-          {/* Second Row: Wrong and Unanswered */}
-          <View style={styles.statsRow}>
             {renderCompactResultCard(
               'Wrong',
               incorrectQuestions.toString(),
               'cancel',
               '#EF4444',
             )}
+          </View>
+
+          {/* Third Row: Unanswered and Time/Rank */}
+          <View style={styles.statsRow}>
             {renderCompactResultCard(
               'Unanswered',
               unsolvedQuestions.toString(),
               'help-outline',
               '#6B7280',
             )}
-          </View>
-
-          {/* Third Row: Rank and Time (if available) */}
-          {(userRank || timeTaken) && (
-            <View style={styles.statsRow}>
-              {userRank &&
-                renderCompactResultCard(
+            {/* Show either rank or time taken based on availability */}
+            {userRank
+              ? renderCompactResultCard(
                   'Rank',
                   userRank,
                   'leaderboard',
-                  '#F59E0B',
-                )}
-              {timeTaken &&
-                renderCompactResultCard(
+                  '#8B5CF6',
+                )
+              : timeTaken
+              ? renderCompactResultCard(
                   'Time Taken',
                   timeTaken,
                   'access-time',
                   '#8B5CF6',
+                )
+              : renderCompactResultCard(
+                  'Attempt',
+                  attemptNumber.toString(),
+                  'replay',
+                  '#8B5CF6',
                 )}
+          </View>
+
+          {/* Fourth Row: If both rank and time are available */}
+          {userRank && timeTaken && (
+            <View style={styles.statsRow}>
+              {renderCompactResultCard(
+                'Time Taken',
+                timeTaken,
+                'access-time',
+                '#8B5CF6',
+              )}
+              
             </View>
           )}
         </View>
 
         {/* Action Buttons */}
         <View style={styles.actionButtons}>
-          <TouchableOpacity style={styles.primaryButton} onPress={handleGoBack}>
-            <MaterialIcons name="arrow-back" size={20} color="#FFFFFF" />
-            <Text style={styles.primaryButtonText}>Back to Tests</Text>
+          <TouchableOpacity style={styles.primaryButton} onPress={handleGoHome}>
+            <MaterialIcons name="home" size={20} color="#FFFFFF" />
+            <Text style={styles.primaryButtonText}>Back to Home</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>

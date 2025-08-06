@@ -43,6 +43,8 @@ import {
   paperbyseriesUrl,
   vtcategoriesUrl,
   testseriesPaymentUrl,
+  getAllBooksUrl,
+  bookpaymentUrl,
 } from "./Url"
 import { __DEV__ } from "react-native"
 
@@ -83,14 +85,11 @@ export const getUserId = async () => {
 const isTokenExpired = (token) => {
   try {
     if (!token) {
-      console.log("[TOKEN-VALIDATION] No token provided")
+   
       return true
     }
-
-    console.log("[TOKEN-VALIDATION] Validating token using pure JS...")
     const expired = isJWTExpired(token)
 
-    console.log("[TOKEN-VALIDATION] Token validation result:", { expired })
     return expired
   } catch (error) {
     console.error("[TOKEN-VALIDATION] Token validation error:", error.message)
@@ -100,7 +99,7 @@ const isTokenExpired = (token) => {
 
 const handleTokenExpiration = async () => {
   try {
-    console.log("[TOKEN-EXPIRATION] Handling token expiration...")
+
     await AsyncStorage.removeItem("userToken")
     await AsyncStorage.removeItem("userData")
     if (tokenExpiredCallback) {
@@ -254,6 +253,7 @@ export const sponsorpdf = (payload) => getAPI(sponsorpdfUrl, payload, null, true
 export const winnertitle = (payload) => getAPI(winnertitleUrl, payload, null, true)
 export const sponsortitle = (payload) => getAPI(sponsortitleUrl, payload, null, true)
 export const materialtype = (payload) => getAPI(materialtypeUrl, payload, null, true)
+export const getAllBooks = () => getAPI(getAllBooksUrl, {}, null, true)
 
 export const championtest = (headers = {}, testId = null) => {
   if (testId) {
@@ -848,5 +848,108 @@ export const verifyTestSeriesPayment = async (orderId, sessionId) => {
     throw error
   }
 }
+
+export const createBookPaymentSession = async (bookId, userId, email, phone, addressId) => {
+  try {
+    if (!bookId) throw new Error("Book ID is required")
+    if (!userId) throw new Error("User ID is required")
+    if (!email || !email.trim() || !email.includes("@")) throw new Error("Valid email is required")
+    if (!phone || !/^\d{10}$/.test(phone.toString().replace(/\s+/g, ""))) {
+      throw new Error("Valid 10-digit phone number is required")
+    }
+    if (!addressId) throw new Error("Address ID is required")
+
+    // Clean and prepare parameters
+    const cleanEmail = email.trim()
+    const cleanPhone = phone.toString().replace(/\s+/g, "")
+    
+    console.log('🚀 Sending payment request with params:', {
+      bookId,
+      userId, 
+      email: cleanEmail,
+      phone: cleanPhone,
+      addressId
+    })
+
+    // Option 1: Try sending as URL query parameters
+    const queryParams = new URLSearchParams({
+      bookId: bookId.toString(),
+      userId: userId.toString(),
+      email: cleanEmail,
+      phone: cleanPhone,
+      addressId: addressId.toString()
+    })
+    
+    const urlWithParams = `${bookpaymentUrl}?${queryParams.toString()}`
+    
+    // Send POST request with parameters in URL
+    const response = await postAPI(urlWithParams, {}, {}, true) // Empty body, empty config, with token
+    
+    return response
+    
+  } catch (error) {
+    console.error("❌ Error creating book payment order:", error)
+    
+    if (error.response) {
+      console.error("❌ Response error details:", {
+        status: error.response.status,
+        data: error.response.data,
+        headers: error.response.headers
+      })
+      
+      switch (error.response.status) {
+        case 500:
+          const serverError = error.response.data?.message || error.response.data?.error || "Internal server error"
+          throw new Error(`Server Error: ${serverError}`)
+        case 400:
+          throw new Error("Invalid book payment parameters provided")
+        case 401:
+          throw new Error("Authentication failed. Please login again.")
+        case 404:
+          throw new Error("Book not found or unavailable for purchase")
+        default:
+          throw new Error(error.response?.data?.message || "Book payment order creation failed")
+      }
+    }
+    
+    throw new Error(error.message || "Failed to create book payment order")
+  }
+}
+
+export const verifyBookPayment = async (orderId, paymentId, sessionId) => {
+  try {
+    if (!orderId) {
+      throw new Error("Order ID is required for book payment verification")
+    }
+
+    const verificationData = {
+      orderId,
+      paymentId,
+      sessionId,
+    }
+
+    // Ensure this URL is defined in your `Url.js` file:
+    const verifyBookPaymentUrl = `${baseUrl}/verifyBookPayment`
+
+    const response = await postAPI(verifyBookPaymentUrl, verificationData, {}, true) // requiresAuth: true
+    return response
+  } catch (error) {
+    console.error("❌ Error verifying book payment:", error)
+    if (error.response) {
+      switch (error.response.status) {
+        case 404:
+          throw new Error("Book payment not found for verification")
+        case 400:
+          throw new Error("Invalid book payment verification data")
+        case 401:
+          throw new Error("Authentication failed during verification")
+        default:
+          throw new Error(error.response?.data?.message || "Book payment verification failed")
+      }
+    }
+    throw new Error(error.message || "Failed to verify book payment")
+  }
+}
+
 
 export { postAPI, getAPI, validateRegistrationPayload }

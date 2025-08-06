@@ -45,5 +45,6 @@ export const testseriesordersUrl = `${baseUrl}/testseries/user`;
 export const testseriesPaymentUrl = `${baseUrl}/createTestSeriesPayment`;
 export const bookpaymentUrl = `${baseUrl}/createBookPayment`;
 export const paidbooksUrl = `${baseUrl}//bookorders/user`;
-export const getallbooksUrl = `${baseUrl}/getAllBooks`;
+export const getAllBooksUrl = `${baseUrl}/getAllBooks`;
+
 

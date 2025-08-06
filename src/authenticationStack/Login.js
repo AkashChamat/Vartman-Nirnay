@@ -193,6 +193,12 @@ const LoginScreen = ({ navigation }) => {
   }
 
   const handleLogin = async () => {
+
+    console.log(
+    'atob:', typeof global.atob,
+    'btoa:', typeof global.btoa,
+    'Buffer:', typeof global.Buffer
+  );
     if (loading || authLoading) return
 
     if (!email || !password) {
@@ -207,13 +213,10 @@ const LoginScreen = ({ navigation }) => {
         password: password.trim(),
       }
 
-      console.log("[LOGIN] Attempting login...")
       const response = await loginAPI(payload)
 
       if (response && response.token) {
         try {
-          console.log("[LOGIN] Validating received token using pure JS...")
-
           // Use our pure JS JWT validation
           const validation = validateJWT(response.token)
 
@@ -225,7 +228,6 @@ const LoginScreen = ({ navigation }) => {
 
           // Extract user info using our pure JS function
           const userInfo = extractUserInfo(response.token)
-          console.log("[LOGIN] User info extracted:", userInfo ? Object.keys(userInfo) : "null")
 
           // Check if token is expired
           if (userInfo && userInfo.exp) {
@@ -237,7 +239,6 @@ const LoginScreen = ({ navigation }) => {
             }
           }
 
-          console.log("[LOGIN] Token validation successful, logging in...")
           await authLogin(response.token, response)
           setEmail("")
           setPassword("")
@@ -324,11 +325,9 @@ const LoginScreen = ({ navigation }) => {
         confirmPassword: regFormData.confirmPassword,
       }
 
-      console.log("[REGISTER] Attempting registration...")
       const response = await registerAPI(payload)
 
       if (response) {
-        console.log("[REGISTER] Registration successful")
         let successMessage = "Account created successfully!"
         if (response.message) {
           successMessage = response.message
@@ -367,7 +366,6 @@ const LoginScreen = ({ navigation }) => {
 
         if (response.token) {
           try {
-            console.log("[REGISTER] Validating registration token using pure JS...")
 
             // Use our pure JS JWT validation
             const validation = validateJWT(response.token)
@@ -377,7 +375,6 @@ const LoginScreen = ({ navigation }) => {
               if (userInfo && userInfo.exp) {
                 const currentTime = Math.floor(Date.now() / 1000)
                 if (userInfo.exp > currentTime) {
-                  console.log("[REGISTER] Auto-login with registration token")
                   await authLogin(response.token, response)
                   return
                 }

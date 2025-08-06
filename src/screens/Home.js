@@ -11,6 +11,7 @@ import {
   ActivityIndicator,
   Modal,
   Animated,
+  Platform,
 } from 'react-native';
 import {useNavigation} from '@react-navigation/native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
@@ -21,10 +22,11 @@ import Footer from '../Components/Footer';
 import ImageSlider from '../Components/ImageSlider';
 import TestTimer from '../Components/TestTimer'; 
 
-const {width} = Dimensions.get('window');
+const {width, height} = Dimensions.get('window');
 
 const Home = () => {
   const navigation = useNavigation();
+  
   const [sliderImages, setSliderImages] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [marqueeText, setMarqueeText] = useState(
@@ -33,6 +35,13 @@ const Home = () => {
   const [isMarqueeLoading, setIsMarqueeLoading] = useState(true);
   const [showFollowPopup, setShowFollowPopup] = useState(false);
   const [scaleAnim] = useState(new Animated.Value(0));
+
+  // Calculate dynamic bottom padding for ScrollView
+  // For devices with button navigation, we need more padding
+  const isLargeScreen = height > 700;
+  const hasHomeButton = Platform.OS === 'android' && height < 750; // Likely has home button
+  const scrollBottomPadding = hasHomeButton ? 100 : (isLargeScreen ? 90 : 80);
+  const footerHeight = hasHomeButton ? 70 : 60;
 
   useEffect(() => {
     const getSliderImages = async () => {
@@ -128,20 +137,6 @@ const Home = () => {
       screen: 'Gallery',
       color: '#FBE9E7',
     },
-    // {
-    //   id: '7',
-    //   title: 'Courses',
-    //   image: require('../assets/course.png'),
-    //   screen: 'Courses',
-    //   color: '#FFF3E0',
-    // },
-    // {
-    //   id: '8',
-    //   title: 'Packages',
-    //   image: require('../assets/packages.png'),
-    //   screen: 'Packages',
-    //   color: '#E1F5FE',
-    // },
     {
       id: '9',
       title: 'WhatsApp',
@@ -163,13 +158,13 @@ const Home = () => {
       screen: 'JobSearch',
       color: '#FBE9E7',
     },
-    // {
-    //   id: '12',
-    //   title: 'Book Store',
-    //   image: require('../assets/books.png'),
-    //   screen: 'BookStore',
-    //   color: '#E8F5E9',
-    // },
+    {
+      id: '12',
+      title: 'Book Store',
+      image: require('../assets/books.png'),
+      screen: 'Books',
+      color: '#E8F5E9',
+    },
   ];
 
   const openWhatsApp = () => {
@@ -240,10 +235,12 @@ const Home = () => {
     <View style={styles.container}>
       <Header />
 
-      {/* Body Scroll */}
-      <ScrollView
-        contentContainerStyle={{paddingBottom: 80}}
-        showsVerticalScrollIndicator={false}>
+      {/* Body Scroll with proper clipping */}
+      <View style={[styles.scrollContainer, {marginBottom: footerHeight}]}>
+        <ScrollView
+          contentContainerStyle={{paddingBottom: scrollBottomPadding}}
+          showsVerticalScrollIndicator={false}
+          style={styles.scrollView}>
         {/* Image Slider */}
         <ImageSlider images={sliderImages} isLoading={isLoading} />
 
@@ -294,7 +291,8 @@ const Home = () => {
               </View>
             ))}
         </View>
-      </ScrollView>
+        </ScrollView>
+      </View>
 
       <Modal
         visible={showFollowPopup}
@@ -374,6 +372,12 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f5f5f5',
+  },
+  scrollContainer: {
+    flex: 1,
+  },
+  scrollView: {
+    flex: 1,
   },
   timer: {
     marginTop: 10,

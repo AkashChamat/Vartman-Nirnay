@@ -328,6 +328,9 @@ const ChampionTest = ({route, navigation}) => {
   const currentQuestion = testData.questions[currentQuestionIndex];
   const answeredCount = Object.keys(selectedAnswers).length;
   const totalQuestions = testData?.questions?.length || 0;
+  
+  // Check if current question is answered
+  const isCurrentQuestionAnswered = selectedAnswers[currentQuestion.id] !== undefined;
 
   // Main Test Screen
   return (
@@ -388,7 +391,10 @@ const ChampionTest = ({route, navigation}) => {
         </View>
       </View>
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView 
+        style={styles.content} 
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scrollContent}>
         {/* Question Card */}
         <View style={styles.questionCard}>
           <Text style={styles.questionText}>
@@ -408,50 +414,60 @@ const ChampionTest = ({route, navigation}) => {
         </View>
       </ScrollView>
 
-      {/* Navigation with Skip Button */}
+      {/* Navigation with Skip Button - Fixed positioning */}
       <View style={styles.navigationContainer}>
-        <TouchableOpacity
-          style={[styles.navButton, styles.secondaryNavButton]}
-          onPress={onPrevious}
-          disabled={currentQuestionIndex === 0}>
-          <Text
-            style={[
-              styles.secondaryNavButtonText,
-              currentQuestionIndex === 0 && styles.disabledButtonText,
-            ]}>
-            Previous
-          </Text>
-        </TouchableOpacity>
+        <View style={styles.navigationBackground} />
+        <View style={styles.navigationContent}>
+          <TouchableOpacity
+            style={[styles.navButton, styles.secondaryNavButton]}
+            onPress={onPrevious}
+            disabled={currentQuestionIndex === 0}>
+            <Text
+              style={[
+                styles.secondaryNavButtonText,
+                currentQuestionIndex === 0 && styles.disabledButtonText,
+              ]}>
+              Previous
+            </Text>
+          </TouchableOpacity>
 
-        <TouchableOpacity
-          style={[styles.navButton, styles.skipButton]}
-          onPress={handleSkip}
-          disabled={currentQuestionIndex >= testData.questions.length - 1}>
-          <Text
-            style={[
-              styles.skipButtonText,
-              currentQuestionIndex >= testData.questions.length - 1 &&
-                styles.disabledButtonText,
-            ]}>
-            Skip
-          </Text>
-        </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.navButton, styles.skipButton]}
+            onPress={handleSkip}
+            disabled={currentQuestionIndex >= testData.questions.length - 1}>
+            <Text
+              style={[
+                styles.skipButtonText,
+                currentQuestionIndex >= testData.questions.length - 1 &&
+                  styles.disabledButtonText,
+              ]}>
+              Skip
+            </Text>
+          </TouchableOpacity>
 
-        <TouchableOpacity
-          style={[styles.navButton, styles.saveNextButton]}
-          onPress={onNext}
-          disabled={currentQuestionIndex >= testData.questions.length - 1}>
-          <Text
+          <TouchableOpacity
             style={[
-              styles.saveNextButtonText,
-              currentQuestionIndex >= testData.questions.length - 1 &&
-                styles.disabledButtonText,
-            ]}>
-            {currentQuestionIndex < testData.questions.length - 1
-              ? 'Save & Next'
-              : 'Last Question'}
-          </Text>
-        </TouchableOpacity>
+              styles.navButton, 
+              styles.saveNextButton,
+              !isCurrentQuestionAnswered && styles.disabledSaveNextButton
+            ]}
+            onPress={onNext}
+            disabled={
+              currentQuestionIndex >= testData.questions.length - 1 || 
+              !isCurrentQuestionAnswered
+            }>
+            <Text
+              style={[
+                styles.saveNextButtonText,
+                (currentQuestionIndex >= testData.questions.length - 1 || 
+                 !isCurrentQuestionAnswered) && styles.disabledButtonText,
+              ]}>
+              {currentQuestionIndex < testData.questions.length - 1
+                ? 'Save & Next'
+                : 'Last Question'}
+            </Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       {renderSubmissionLoading(isSubmitting, styles)}
@@ -459,7 +475,7 @@ const ChampionTest = ({route, navigation}) => {
   );
 };
 
-// Updated styles with header submit button
+// Updated styles with proper spacing and button logic
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -562,6 +578,9 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingHorizontal: 20,
   },
+  scrollContent: {
+    paddingBottom: 120, // Add padding to ensure content doesn't hide behind navigation
+  },
   questionCard: {
     backgroundColor: '#FFFFFF',
     borderRadius: 12,
@@ -645,11 +664,13 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   navigationContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: 'transparent',
+  },
+  navigationBackground: {
     backgroundColor: '#FFFFFF',
     borderTopWidth: 1,
     borderTopColor: '#E5E7EB',
@@ -658,6 +679,19 @@ const styles = StyleSheet.create({
     shadowOffset: {width: 0, height: -2},
     shadowOpacity: 0.1,
     shadowRadius: 4,
+    height: 100, // Fixed height to prevent content overlap
+  },
+  navigationContent: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    paddingBottom: 24, // Extra padding from device navigation
   },
   navButton: {
     paddingHorizontal: 20,
@@ -687,6 +721,11 @@ const styles = StyleSheet.create({
     shadowOffset: {width: 0, height: 2},
     shadowOpacity: 0.2,
     shadowRadius: 4,
+  },
+  disabledSaveNextButton: {
+    backgroundColor: '#D1D5DB',
+    elevation: 0,
+    shadowOpacity: 0,
   },
   submitButton: {
     backgroundColor: '#059669',

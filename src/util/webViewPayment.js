@@ -12,17 +12,13 @@ export const WebViewPaymentScreen = ({ sessionData, onPaymentResult, onClose }) 
   const paymentUrl = `https://checkout.cashfree.com/payments/v3?session_id=${sessionData.payment_session_id}`
 
   const handleNavigationStateChange = (navState) => {
-    console.log("🌐 WebView navigation:", navState.url)
 
     // Check for success/failure URLs
     if (navState.url.includes("success") || navState.url.includes("payment-success")) {
-      console.log("✅ Payment Success detected in WebView")
       onPaymentResult({ status: "SUCCESS", orderId: sessionData.order_id })
     } else if (navState.url.includes("failure") || navState.url.includes("payment-failed")) {
-      console.log("❌ Payment Failure detected in WebView")
       onPaymentResult({ status: "FAILED", orderId: sessionData.order_id })
     } else if (navState.url.includes("cancel") || navState.url.includes("payment-cancelled")) {
-      console.log("🚫 Payment Cancelled detected in WebView")
       onPaymentResult({ status: "CANCELLED", orderId: sessionData.order_id })
     }
   }
@@ -30,13 +26,11 @@ export const WebViewPaymentScreen = ({ sessionData, onPaymentResult, onClose }) 
   const handleMessage = (event) => {
     try {
       const data = JSON.parse(event.nativeEvent.data)
-      console.log("📨 WebView message:", data)
 
       if (data.type === "payment_result") {
         onPaymentResult(data.result)
       }
     } catch (error) {
-      console.log("📨 WebView message (raw):", event.nativeEvent.data)
     }
   }
 

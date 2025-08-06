@@ -1,4 +1,3 @@
-import "react-native-get-random-values"
 import React from "react"
 import { StatusBar, SafeAreaView, StyleSheet, Platform } from "react-native"
 import { AuthProvider } from "./src/Auth/AuthContext"
@@ -14,6 +13,13 @@ const AppLogger = {
 }
 
 const App = () => {
+
+  console.log(
+    'atob:', typeof global.atob,
+    'btoa:', typeof global.btoa,
+    'Buffer:', typeof global.Buffer
+  );
+  
   AppLogger.log("App component initializing", {
     platform: Platform.OS,
     version: Platform.Version,

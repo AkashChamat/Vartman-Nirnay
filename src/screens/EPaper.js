@@ -10,7 +10,6 @@ import {
   ScrollView,
   ActivityIndicator,
   Linking,
- 
   Platform,
   Animated,
 } from 'react-native';
@@ -27,7 +26,7 @@ import {
   showSuccessMessage,
 } from '../Components/SubmissionMessage';
 
-const {width} = Dimensions.get('window');
+const {width, height} = Dimensions.get('window');
 
 const SPACING = width * 0.03;
 const CARD_MARGIN = width * 0.015;
@@ -46,6 +45,12 @@ const EPapers = () => {
   const [downloadProgress, setDownloadProgress] = useState({});
   const [selectedFilter, setSelectedFilter] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
+
+  // Calculate dynamic bottom padding for ScrollView - same as Home component
+  const isLargeScreen = height > 700;
+  const hasHomeButton = Platform.OS === 'android' && height < 750;
+  const scrollBottomPadding = hasHomeButton ? 100 : (isLargeScreen ? 90 : 80);
+  const footerHeight = hasHomeButton ? 70 : 60;
 
   const fetchEPapers = async () => {
     try {
@@ -622,14 +627,19 @@ showErrorMessage('Error', 'PDF not available for this paper');
   return (
     <SafeAreaView style={styles.container}>
       <Header />
-      <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={styles.scrollViewContent}
-        showsVerticalScrollIndicator={false}>
-        <FilterSection />
-        <LatestPaper />
-        <PreviousEditions />
-      </ScrollView>
+      
+      {/* Body Scroll with proper clipping - same structure as Home component */}
+      <View style={[styles.scrollContainer, {marginBottom: footerHeight}]}>
+        <ScrollView
+          contentContainerStyle={{paddingBottom: scrollBottomPadding}}
+          showsVerticalScrollIndicator={false}
+          style={styles.scrollView}>
+          <FilterSection />
+          <LatestPaper />
+          <PreviousEditions />
+        </ScrollView>
+      </View>
+      
       <Footer />
     </SafeAreaView>
   );
@@ -640,12 +650,13 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#F5F7FA',
   },
+  scrollContainer: {
+    flex: 1,
+  },
   scrollView: {
     flex: 1,
   },
-  scrollViewContent: {
-    paddingBottom: width * 0.15,
-  },
+  // Remove the old scrollViewContent padding since we're using dynamic padding now
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -749,8 +760,6 @@ const styles = StyleSheet.create({
     width: width * 0.5,
     height: width * 0.07,
     alignItems: 'center',
-    // padding:8,
-    // justifyContent: 'center',
     transform: [
       {rotate: '-45deg'},
       {translateX: -width * 0.14},
@@ -835,7 +844,6 @@ const styles = StyleSheet.create({
     marginBottom: width * 0.02,
     textAlign: 'center',
   },
-  // Updated thumbnail styles
   thumbnailContainer: {
     height: '100%',
     width: '100%',
@@ -917,7 +925,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     textAlignVertical: 'center',
   },
-  // New pagination styles
   paginationContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',

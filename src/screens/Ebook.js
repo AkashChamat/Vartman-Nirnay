@@ -10,6 +10,7 @@ import {
   ActivityIndicator,
   RefreshControl,
   Dimensions,
+  Platform
 } from 'react-native';
 import {useNavigation} from '@react-navigation/native';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
@@ -48,6 +49,11 @@ const Ebook = () => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
+
+  const isLargeScreen = height > 700;
+  const hasHomeButton = Platform.OS === 'android' && height < 750; // Likely has home button
+  const listBottomPadding = hasHomeButton ? 140 : (isLargeScreen ? 120 : 110);
+  const contentMarginBottom = hasHomeButton ? 70 : 60;
 
   // Dropdown state
   const [open, setOpen] = useState(false);
@@ -378,13 +384,13 @@ const Ebook = () => {
       ) : (
         <>
           <Header />
-          <View style={styles.content}>
+           <View style={[styles.content, {marginBottom: contentMarginBottom}]}>
             {renderFilterDropdown()}
             <FlatList
               data={filteredMaterials}
               renderItem={renderMaterialItem}
               keyExtractor={item => item.id.toString()}
-              contentContainerStyle={styles.listContainer}
+              contentContainerStyle={[styles.listContainer,{paddingBottom:listBottomPadding}]}
               showsVerticalScrollIndicator={false}
               refreshControl={
                 <RefreshControl
@@ -426,7 +432,7 @@ const styles = StyleSheet.create({
   },
   listContainer: {
     padding: 16,
-    paddingBottom: 120,
+   
   },
 
   filterContainer: {

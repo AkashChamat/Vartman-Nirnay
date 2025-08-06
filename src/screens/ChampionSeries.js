@@ -270,6 +270,27 @@ const ChampionSeries = ({navigation}) => {
     });
   };
 
+  const handleDownloadTestPaper = async testPaper => {
+    if (!testPaper.downloadTestPaper) {
+      showMessage({
+        message: 'Download Not Available',
+        description: 'Test paper download is not available for this test.',
+        type: 'warning',
+        icon: 'auto',
+      });
+      return;
+    }
+
+    // You'll need to implement the actual download logic based on your API
+    // For now, showing a message that download functionality needs to be implemented
+    showMessage({
+      message: 'Download Started',
+      description: 'Test paper download will be implemented based on your API.',
+      type: 'info',
+      icon: 'auto',
+    });
+  };
+
   const formatTime = timeString => {
     // Handle time format properly
     if (timeString.includes(':')) {
@@ -482,12 +503,14 @@ const ChampionSeries = ({navigation}) => {
                 </TouchableOpacity>
               )}
 
-              {/* Download Button - Always visible */}
-              <TouchableOpacity
-                style={styles.downloadIconButton}
-                onPress={() => handleDownloadTestPaper(item)}>
-                <Icon name="file-download" size={18} color="#3182CE" />
-              </TouchableOpacity>
+              {/* Download Button - Only show if downloadTestPaper is true */}
+              {item.downloadTestPaper && (
+                <TouchableOpacity
+                  style={styles.downloadIconButton}
+                  onPress={() => handleDownloadTestPaper(item)}>
+                  <Icon name="file-download" size={18} color="#3182CE" />
+                </TouchableOpacity>
+              )}
             </View>
           </View>
         </View>

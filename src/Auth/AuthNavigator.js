@@ -42,6 +42,8 @@ import TestPaper from '../screens/TestSeries/TestPaper';
 import SeriesPayment from '../screens/TestSeries/SeriesPayment';
 import Test from '../screens/TestSeries/Test';
 import Books from '../screens/BookStore/Books'
+import BookPaymentScreen from '../screens/BookStore/BookPaymentScreen';
+
 
 const Stack = createStackNavigator();
 
@@ -102,7 +104,8 @@ const AuthNavigator = () => {
               <Stack.Screen name="TestPaper" component={TestPaper} />
               <Stack.Screen name="SeriesPayment" component={SeriesPayment} />
               <Stack.Screen name="Test" component={Test} />
-
+              <Stack.Screen name="Books" component={Books} />
+              <Stack.Screen name="BookPaymentScreen" component={BookPaymentScreen}/>
             </>
           ) : (
             <>

@@ -18,7 +18,6 @@ const base64UrlDecode = (str) => {
       try {
         return Buffer.from(base64, "base64").toString("utf8")
       } catch (bufferError) {
-        console.log("[JWT-UTILS] Buffer decode failed, using manual decode")
       }
     }
 
@@ -67,9 +66,6 @@ export const decodeJWT = (token) => {
     if (!token || typeof token !== "string") {
       throw new Error("Invalid token: token must be a non-empty string")
     }
-
-    console.log("[JWT-UTILS] Decoding JWT token...")
-
     // Split the token into parts
     const parts = token.split(".")
     if (parts.length !== 3) {
@@ -78,18 +74,11 @@ export const decodeJWT = (token) => {
 
     const [headerB64, payloadB64, signature] = parts
 
-    console.log("[JWT-UTILS] Token parts:", {
-      headerLength: headerB64.length,
-      payloadLength: payloadB64.length,
-      signatureLength: signature.length,
-    })
-
     // Decode header
     let header
     try {
       const headerJson = base64UrlDecode(headerB64)
       header = JSON.parse(headerJson)
-      console.log("[JWT-UTILS] Header decoded successfully:", header)
     } catch (error) {
       console.error("[JWT-UTILS] Header decode error:", error.message)
       throw new Error("Invalid token: failed to decode header")
@@ -99,15 +88,11 @@ export const decodeJWT = (token) => {
     let payload
     try {
       const payloadJson = base64UrlDecode(payloadB64)
-      console.log("[JWT-UTILS] Raw payload string length:", payloadJson.length)
-      console.log("[JWT-UTILS] First 50 chars of payload:", payloadJson.substring(0, 50))
 
       // Clean any potential invisible characters
       const cleanPayloadJson = payloadJson.replace(/[\x00-\x1F\x7F]/g, "")
-      console.log("[JWT-UTILS] Cleaned payload:", cleanPayloadJson)
 
       payload = JSON.parse(cleanPayloadJson)
-      console.log("[JWT-UTILS] Payload decoded successfully:", Object.keys(payload))
     } catch (error) {
       console.error("[JWT-UTILS] Payload decode error:", error.message)
       console.error("[JWT-UTILS] Raw payload base64:", payloadB64)
@@ -129,7 +114,6 @@ export const decodeJWT = (token) => {
 export const isJWTExpired = (token) => {
   try {
     if (!token) {
-      console.log("[JWT-UTILS] No token provided for expiration check")
       return true
     }
 
@@ -137,19 +121,11 @@ export const isJWTExpired = (token) => {
     const { payload } = decoded
 
     if (!payload.exp) {
-      console.log("[JWT-UTILS] Token has no expiration time")
       return false // If no exp claim, consider it valid
     }
 
     const currentTime = Math.floor(Date.now() / 1000)
     const isExpired = payload.exp <= currentTime
-
-    console.log("[JWT-UTILS] Token expiration check:", {
-      exp: payload.exp,
-      currentTime,
-      isExpired,
-      expiresIn: payload.exp - currentTime,
-    })
 
     return isExpired
   } catch (error) {
@@ -193,7 +169,6 @@ export const validateJWT = (token) => {
       }
     }
 
-    console.log("[JWT-UTILS] JWT validation successful")
     return {
       valid: true,
       header,
@@ -236,7 +211,6 @@ export const extractUserInfo = (token) => {
 // Test function for debugging
 export const testJwtDecode = (token) => {
   try {
-    console.log("[JWT-UTILS] Testing JWT decode with token:", token ? "Token provided" : "No token")
 
     if (!token) {
       return {
@@ -267,7 +241,6 @@ export const jwtDecode = (token) => {
   }
 }
 
-console.log("[JWT-UTILS] Pure JavaScript JWT utilities loaded successfully")
 
 // Export all functions for compatibility
 export default {
