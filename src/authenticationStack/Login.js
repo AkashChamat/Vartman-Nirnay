@@ -1,4 +1,5 @@
-import { useState, useEffect, useRef } from "react"
+import {isJWTExpired} from '../util/jwtUtils';
+import {useState, useEffect, useRef} from 'react';
 import {
   View,
   Text,
@@ -13,307 +14,277 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
-} from "react-native"
-import Icon from "react-native-vector-icons/MaterialIcons"
-import { Picker } from "@react-native-picker/picker"
-import { login as loginAPI, register as registerAPI, validateJWT, extractUserInfo } from "../util/apiCall"
-import { useAuth } from "../Auth/AuthContext"
-import { logError } from "../util/ErrorHandler"
+} from 'react-native';
+import Icon from 'react-native-vector-icons/MaterialIcons';
+import {Picker} from '@react-native-picker/picker';
+import {register as registerAPI} from '../util/apiCall';
+import {useAuth} from '../Auth/AuthContext';
+import {logError} from '../util/ErrorHandler';
 
-const { width } = Dimensions.get("window")
+const {width} = Dimensions.get('window');
 
-const LoginScreen = ({ navigation }) => {
-  const { login: authLogin, loading: authLoading } = useAuth()
+const LoginScreen = ({navigation}) => {
+  const {login: authLogin, isLoading: authLoading} = useAuth();
 
   // Form state for login
-  const [email, setEmail] = useState("")
-  const [password, setPassword] = useState("")
-  const [showPassword, setShowPassword] = useState(false)
-  const [loading, setLoading] = useState(false)
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   // Enhanced registration form state
   const [regFormData, setRegFormData] = useState({
-    userName: "",
-    email: "",
-    password: "",
-    confirmPassword: "",
-    contact: "",
-    examName: "UPSC",
+    userName: '',
+    email: '',
+    password: '',
+    confirmPassword: '',
+    contact: '',
+    examName: 'UPSC',
     addresses: [
       {
-        address: "",
-        state: "",
-        district: "",
-        city: "",
-        area: "",
-        pincode: "",
-        landmark: "",
+        address: '',
+        state: '',
+        district: '',
+        city: '',
+        area: '',
+        pincode: '',
+        landmark: '',
       },
     ],
-  })
+  });
 
-  const [showRegPassword, setShowRegPassword] = useState(false)
-  const [regLoading, setRegLoading] = useState(false)
+  const [showRegPassword, setShowRegPassword] = useState(false);
+  const [regLoading, setRegLoading] = useState(false);
 
   // Animation state
-  const [isLogin, setIsLogin] = useState(true)
-  const flipAnimation = useRef(new Animated.Value(0)).current
+  const [isLogin, setIsLogin] = useState(true);
+  const flipAnimation = useRef(new Animated.Value(0)).current;
 
   // References for measuring content size
-  const loginFormRef = useRef(null)
-  const registerFormRef = useRef(null)
-  const [loginHeight, setLoginHeight] = useState(0)
-  const [registerHeight, setRegisterHeight] = useState(0)
+  const loginFormRef = useRef(null);
+  const registerFormRef = useRef(null);
+  const [loginHeight, setLoginHeight] = useState(0);
+  const [registerHeight, setRegisterHeight] = useState(0);
 
-  const isMountedRef = useRef(true)
+  const isMountedRef = useRef(true);
 
   const maharashtraDistricts = [
-    "Ahmednagar",
-    "Akola",
-    "Amravati",
-    "Aurangabad",
-    "Beed",
-    "Bhandara",
-    "Buldhana",
-    "Chandrapur",
-    "Dhule",
-    "Gadchiroli",
-    "Gondia",
-    "Hingoli",
-    "Jalgaon",
-    "Jalna",
-    "Kolhapur",
-    "Latur",
-    "Mumbai City",
-    "Mumbai Suburban",
-    "Nagpur",
-    "Nanded",
-    "Nandurbar",
-    "Nashik",
-    "Osmanabad",
-    "Palghar",
-    "Parbhani",
-    "Pune",
-    "Raigad",
-    "Ratnagiri",
-    "Sangli",
-    "Satara",
-    "Sindhudurg",
-    "Solapur",
-    "Thane",
-    "Wardha",
-    "Washim",
-    "Yavatmal",
-  ]
+    'Ahmednagar',
+    'Akola',
+    'Amravati',
+    'Aurangabad',
+    'Beed',
+    'Bhandara',
+    'Buldhana',
+    'Chandrapur',
+    'Dhule',
+    'Gadchiroli',
+    'Gondia',
+    'Hingoli',
+    'Jalgaon',
+    'Jalna',
+    'Kolhapur',
+    'Latur',
+    'Mumbai City',
+    'Mumbai Suburban',
+    'Nagpur',
+    'Nanded',
+    'Nandurbar',
+    'Nashik',
+    'Osmanabad',
+    'Palghar',
+    'Parbhani',
+    'Pune',
+    'Raigad',
+    'Ratnagiri',
+    'Sangli',
+    'Satara',
+    'Sindhudurg',
+    'Solapur',
+    'Thane',
+    'Wardha',
+    'Washim',
+    'Yavatmal',
+  ];
 
   // Exam options
-  const examOptions = ["UPSC", "MPSC", "Banking", "Saralseva", "Railway", "Army Bharati", "SSC Exam", "Other"]
+  const examOptions = [
+    'UPSC',
+    'MPSC',
+    'Banking',
+    'Saralseva',
+    'Railway',
+    'Army Bharati',
+    'SSC Exam',
+    'Other',
+  ];
 
   useEffect(() => {
     return () => {
-      isMountedRef.current = false
-    }
-  }, [])
+      isMountedRef.current = false;
+    };
+  }, []);
 
   const handleRegChange = (name, value) => {
-    setRegFormData((prev) => ({ ...prev, [name]: value }))
-  }
+    setRegFormData(prev => ({...prev, [name]: value}));
+  };
 
   const handleAddressChange = (index, name, value) => {
-    const updatedAddresses = [...regFormData.addresses]
-    updatedAddresses[index] = { ...updatedAddresses[index], [name]: value }
-    setRegFormData((prev) => ({ ...prev, addresses: updatedAddresses }))
-  }
+    const updatedAddresses = [...regFormData.addresses];
+    updatedAddresses[index] = {...updatedAddresses[index], [name]: value};
+    setRegFormData(prev => ({...prev, addresses: updatedAddresses}));
+  };
 
   const handleForgotPassword = () => {
     if (navigation) {
-      navigation.navigate("SendOtp")
+      navigation.navigate('SendOtp');
     } else {
-      Alert.alert("Error", "Navigation not available")
+      Alert.alert('Error', 'Navigation not available');
     }
-  }
+  };
 
   const flipCard = () => {
-    if (loading || regLoading) return
+    if (loading || regLoading) return;
 
-    setEmail("")
-    setPassword("")
+    setEmail('');
+    setPassword('');
     setRegFormData({
-      userName: "",
-      email: "",
-      password: "",
-      confirmPassword: "",
-      contact: "",
-      examName: "UPSC",
+      userName: '',
+      email: '',
+      password: '',
+      confirmPassword: '',
+      contact: '',
+      examName: 'UPSC',
       addresses: [
         {
-          address: "",
-          state: "",
-          district: "",
-          city: "",
-          area: "",
-          pincode: "",
-          landmark: "",
+          address: '',
+          state: '',
+          district: '',
+          city: '',
+          area: '',
+          pincode: '',
+          landmark: '',
         },
       ],
-    })
+    });
 
     Animated.spring(flipAnimation, {
       toValue: isLogin ? 180 : 0,
       friction: 8,
       tension: 10,
       useNativeDriver: true,
-    }).start()
+    }).start();
 
     setTimeout(() => {
-      setIsLogin(!isLogin)
-    }, 100)
-  }
+      setIsLogin(!isLogin);
+    }, 100);
+  };
 
   const frontAnimatedStyle = {
     transform: [
       {
         rotateY: flipAnimation.interpolate({
           inputRange: [0, 180],
-          outputRange: ["0deg", "180deg"],
+          outputRange: ['0deg', '180deg'],
         }),
       },
     ],
-  }
+  };
 
   const backAnimatedStyle = {
     transform: [
       {
         rotateY: flipAnimation.interpolate({
           inputRange: [0, 180],
-          outputRange: ["180deg", "360deg"],
+          outputRange: ['180deg', '360deg'],
         }),
       },
     ],
-  }
+  };
 
   const handleLogin = async () => {
+  if (loading || authLoading) {
+    return;
+  }
 
-    console.log(
-    'atob:', typeof global.atob,
-    'btoa:', typeof global.btoa,
-    'Buffer:', typeof global.Buffer
-  );
-    if (loading || authLoading) return
+  if (!email || !password) {
+    Alert.alert('Error', 'Please enter both email and password');
+    return;
+  }
 
-    if (!email || !password) {
-      Alert.alert("Error", "Please enter both email and password")
-      return
-    }
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(email.trim())) {
+    Alert.alert('Validation Error', 'Please enter a valid email address');
+    return;
+  }
 
-    setLoading(true)
-    try {
-      const payload = {
-        email: email.trim().toLowerCase(),
-        password: password.trim(),
-      }
+  setLoading(true);
 
-      const response = await loginAPI(payload)
+  try {    
+    const result = await authLogin(email.trim(), password.trim());
 
-      if (response && response.token) {
-        try {
-          // Use our pure JS JWT validation
-          const validation = validateJWT(response.token)
-
-          if (!validation.valid) {
-            console.error("[LOGIN] Token validation failed:", validation.error)
-            Alert.alert("Error", "Invalid token received. Please try again.")
-            return
-          }
-
-          // Extract user info using our pure JS function
-          const userInfo = extractUserInfo(response.token)
-
-          // Check if token is expired
-          if (userInfo && userInfo.exp) {
-            const currentTime = Math.floor(Date.now() / 1000)
-            if (userInfo.exp <= currentTime) {
-              console.error("[LOGIN] Received expired token")
-              Alert.alert("Error", "Received expired token. Please try again.")
-              return
-            }
-          }
-
-          await authLogin(response.token, response)
-          setEmail("")
-          setPassword("")
-        } catch (tokenError) {
-          console.error("[LOGIN] Token processing error:", tokenError.message)
-          Alert.alert("Error", "Failed to process authentication token. Please try again.")
-        }
-      } else {
-        Alert.alert("Login Failed", "Unexpected response from server")
-      }
-    } catch (error) {
-      console.error("[LOGIN] Login error:", error)
-      if (error.response) {
-        const msg = error.response.data?.message || "Invalid credentials"
-        Alert.alert("Login Failed", msg)
-      } else if (error.request) {
-        Alert.alert("Network Error", "No response from server")
-      } else {
-        Alert.alert("Error", error.message)
-      }
-      logError("Login:handleLogin", error)
-    } finally {
-      if (isMountedRef.current) {
-        setLoading(false)
-      }
+    if (result.success) {
+      setEmail('');
+      setPassword('');
+    } 
+    
+  } catch (error) {
+    console.error('[LOGIN] Login error:', error);
+    Alert.alert('Login Error', 'An unexpected error occurred');
+  } finally {
+    if (isMountedRef.current) {
+      setLoading(false);
     }
   }
+};
 
   const handleRegister = async () => {
     if (regLoading) {
-      return
+      return;
     }
 
-    const errors = []
+    const errors = [];
 
     if (!regFormData.userName.trim()) {
-      errors.push("Full name is required")
+      errors.push('Full name is required');
     }
 
     if (!regFormData.email.trim()) {
-      errors.push("Email is required")
+      errors.push('Email is required');
     } else if (!/\S+@\S+\.\S+/.test(regFormData.email.trim())) {
-      errors.push("Please enter a valid email address")
+      errors.push('Please enter a valid email address');
     }
 
     if (!regFormData.contact.trim()) {
-      errors.push("Contact number is required")
+      errors.push('Contact number is required');
     } else if (!/^\d{10}$/.test(regFormData.contact.trim())) {
-      errors.push("Contact number must be exactly 10 digits")
+      errors.push('Contact number must be exactly 10 digits');
     }
 
     // District validation
-    const currentDistrict = regFormData.addresses[0].district
-    if (!currentDistrict || currentDistrict.trim() === "") {
-      errors.push("Please select a district")
+    const currentDistrict = regFormData.addresses[0].district;
+    if (!currentDistrict || currentDistrict.trim() === '') {
+      errors.push('Please select a district');
     }
 
     if (!regFormData.password) {
-      errors.push("Password is required")
+      errors.push('Password is required');
     } else if (regFormData.password.length < 6) {
-      errors.push("Password must be at least 6 characters long")
+      errors.push('Password must be at least 6 characters long');
     }
 
     if (!regFormData.confirmPassword) {
-      errors.push("Please confirm your password")
+      errors.push('Please confirm your password');
     } else if (regFormData.password !== regFormData.confirmPassword) {
-      errors.push("Passwords do not match")
+      errors.push('Passwords do not match');
     }
 
     if (errors.length > 0) {
-      Alert.alert("Validation Error", errors.join("\n"))
-      return
+      Alert.alert('Validation Error', errors.join('\n'));
+      return;
     }
 
-    setRegLoading(true)
+    setRegLoading(true);
     try {
       const payload = {
         userName: regFormData.userName.trim(),
@@ -323,127 +294,117 @@ const LoginScreen = ({ navigation }) => {
         district: regFormData.addresses[0].district.trim(),
         password: regFormData.password,
         confirmPassword: regFormData.confirmPassword,
-      }
+      };
 
-      const response = await registerAPI(payload)
+      const response = await registerAPI(payload);
 
       if (response) {
-        let successMessage = "Account created successfully!"
+        let successMessage =
+          'Account created successfully! Please login to continue.';
         if (response.message) {
-          successMessage = response.message
+          successMessage = response.message;
         }
 
-        Alert.alert("Registration Successful", successMessage, [
+        Alert.alert('Registration Successful', successMessage, [
           {
-            text: "OK",
+            text: 'OK',
             onPress: () => {
               // Reset form data
               setRegFormData({
-                userName: "",
-                email: "",
-                password: "",
-                confirmPassword: "",
-                contact: "",
-                examName: "UPSC",
+                userName: '',
+                email: '',
+                password: '',
+                confirmPassword: '',
+                contact: '',
+                examName: 'UPSC',
                 addresses: [
                   {
-                    address: "",
-                    state: "",
-                    district: "",
-                    city: "",
-                    area: "",
-                    pincode: "",
-                    landmark: "",
+                    address: '',
+                    state: '',
+                    district: '',
+                    city: '',
+                    area: '',
+                    pincode: '',
+                    landmark: '',
                   },
                 ],
-              })
+              });
+              // Switch to login form
               setTimeout(() => {
-                flipCard()
-              }, 500)
+                flipCard();
+              }, 500);
             },
           },
-        ])
-
-        if (response.token) {
-          try {
-
-            // Use our pure JS JWT validation
-            const validation = validateJWT(response.token)
-
-            if (validation.valid) {
-              const userInfo = extractUserInfo(response.token)
-              if (userInfo && userInfo.exp) {
-                const currentTime = Math.floor(Date.now() / 1000)
-                if (userInfo.exp > currentTime) {
-                  await authLogin(response.token, response)
-                  return
-                }
-              }
-            }
-          } catch (tokenError) {
-            console.error("[REGISTER] Registration token processing error:", tokenError.message)
-          }
-        }
+        ]);
       }
     } catch (error) {
-      console.error("[REGISTER] Registration failed:", error)
+      console.error('[REGISTER] Registration failed:', error);
 
-      let errorMessage = "Registration failed. Please try again."
+      let errorMessage = 'Registration failed. Please try again.';
 
       if (error.response) {
         if (error.response.data && error.response.data.message) {
-          errorMessage = error.response.data.message
+          errorMessage = error.response.data.message;
         } else if (error.response.status === 400) {
-          errorMessage = "Invalid registration data. Please check your inputs."
+          errorMessage = 'Invalid registration data. Please check your inputs.';
         } else if (error.response.status === 409) {
-          errorMessage = "Email already exists. Please use a different email."
+          errorMessage = 'Email already exists. Please use a different email.';
         } else if (error.response.status === 500) {
-          errorMessage = "Server error. Please try again later."
+          errorMessage = 'Server error. Please try again later.';
         }
       } else if (error.request) {
-        errorMessage = "Network error. Please check your internet connection."
+        errorMessage = 'Network error. Please check your internet connection.';
       } else if (error.message) {
-        errorMessage = error.message
+        errorMessage = error.message;
       }
 
-      Alert.alert("Registration Failed", errorMessage)
-      logError("Registration:handleRegister", error)
+      Alert.alert('Registration Failed', errorMessage);
+      logError('Registration:handleRegister', error);
     } finally {
       if (isMountedRef.current) {
-        setRegLoading(false)
+        setRegLoading(false);
       }
     }
-  }
+  };
 
-  const onLoginFormLayout = (event) => {
-    const { height } = event.nativeEvent.layout
-    setLoginHeight(height + 40)
-  }
+  const onLoginFormLayout = event => {
+    const {height} = event.nativeEvent.layout;
+    setLoginHeight(height + 40);
+  };
 
-  const onRegisterFormLayout = (event) => {
-    const { height } = event.nativeEvent.layout
-    setRegisterHeight(height + 40)
-  }
+  const onRegisterFormLayout = event => {
+    const {height} = event.nativeEvent.layout;
+    setRegisterHeight(height + 40);
+  };
 
-  const cardHeight = isLogin ? loginHeight : registerHeight
+  const cardHeight = isLogin ? loginHeight : registerHeight;
 
   return (
-    <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === "ios" ? "padding" : "height"}>
+    <KeyboardAvoidingView
+      style={styles.container}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
       <ScrollView
         contentContainerStyle={styles.scrollContainer}
         keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={false}
-      >
+        showsVerticalScrollIndicator={false}>
         <View style={styles.logoContainer}>
-          <Image style={styles.logo} source={require("../assets/logo.png")} resizeMode="contain" />
+          <Image
+            style={styles.logo}
+            source={require('../assets/logo.png')}
+            resizeMode="contain"
+          />
         </View>
 
         <View style={styles.formContainer}>
-          <View style={[styles.cardContainer, { height: Math.max(cardHeight, 400) }]}>
+          <View
+            style={[styles.cardContainer, {height: Math.max(cardHeight, 400)}]}>
             {/* Login Form - Front of Card */}
             <Animated.View
-              style={[styles.card, frontAnimatedStyle, { zIndex: isLogin ? 1 : 0, opacity: isLogin ? 1 : 0 }]}
-            >
+              style={[
+                styles.card,
+                frontAnimatedStyle,
+                {zIndex: isLogin ? 1 : 0, opacity: isLogin ? 1 : 0},
+              ]}>
               <View ref={loginFormRef} onLayout={onLoginFormLayout}>
                 <Text style={styles.heading}>Welcome Back</Text>
                 <Text style={styles.subheading}>Sign in to continue</Text>
@@ -473,24 +434,33 @@ const LoginScreen = ({ navigation }) => {
                     secureTextEntry={!showPassword}
                     editable={!loading && !authLoading}
                   />
-                  <TouchableOpacity onPress={() => setShowPassword(!showPassword)} disabled={loading || authLoading}>
-                    <Icon name={showPassword ? "visibility" : "visibility-off"} size={22} color="#5B9EED" />
+                  <TouchableOpacity
+                    onPress={() => setShowPassword(!showPassword)}
+                    disabled={loading || authLoading}>
+                    <Icon
+                      name={showPassword ? 'visibility' : 'visibility-off'}
+                      size={22}
+                      color="#5B9EED"
+                    />
                   </TouchableOpacity>
                 </View>
 
                 <TouchableOpacity
                   style={styles.forgotPassword}
                   onPress={handleForgotPassword}
-                  disabled={loading || authLoading}
-                >
-                  <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
+                  disabled={loading || authLoading}>
+                  <Text style={styles.forgotPasswordText}>
+                    Forgot Password?
+                  </Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
-                  style={[styles.button, (loading || authLoading) && styles.buttonDisabled]}
+                  style={[
+                    styles.button,
+                    (loading || authLoading) && styles.buttonDisabled,
+                  ]}
                   onPress={handleLogin}
-                  disabled={loading || authLoading}
-                >
+                  disabled={loading || authLoading}>
                   {loading || authLoading ? (
                     <View style={styles.buttonContent}>
                       <ActivityIndicator size="small" color="#fff" />
@@ -512,16 +482,19 @@ const LoginScreen = ({ navigation }) => {
 
             {/* Register Form - Back of Card */}
             <Animated.View
-              style={[styles.card, backAnimatedStyle, { zIndex: !isLogin ? 1 : 0, opacity: !isLogin ? 1 : 0 }]}
-            >
+              style={[
+                styles.card,
+                backAnimatedStyle,
+                {zIndex: !isLogin ? 1 : 0, opacity: !isLogin ? 1 : 0},
+              ]}>
               <View ref={registerFormRef} onLayout={onRegisterFormLayout}>
                 <Text style={styles.heading}>Create Account</Text>
                 <Text style={styles.subheading}>Sign up to get started</Text>
 
                 {/* User Name */}
                 <View>
-                  <Text style={{ padding: 10, color: "#000" }}>
-                    Full Name <Text style={{ color: "red" }}>*</Text>
+                  <Text style={{padding: 10, color: '#000'}}>
+                    Full Name <Text style={{color: 'red'}}>*</Text>
                   </Text>
                 </View>
                 <View style={styles.inputContainer}>
@@ -529,7 +502,7 @@ const LoginScreen = ({ navigation }) => {
                   <TextInput
                     placeholder="Full Name"
                     value={regFormData.userName}
-                    onChangeText={(value) => handleRegChange("userName", value)}
+                    onChangeText={value => handleRegChange('userName', value)}
                     style={styles.input}
                     editable={!regLoading}
                   />
@@ -537,8 +510,8 @@ const LoginScreen = ({ navigation }) => {
 
                 {/* Email */}
                 <View>
-                  <Text style={{ padding: 10, color: "#000" }}>
-                    Email <Text style={{ color: "red" }}>*</Text>
+                  <Text style={{padding: 10, color: '#000'}}>
+                    Email <Text style={{color: 'red'}}>*</Text>
                   </Text>
                 </View>
                 <View style={styles.inputContainer}>
@@ -546,7 +519,7 @@ const LoginScreen = ({ navigation }) => {
                   <TextInput
                     placeholder="Email Address"
                     value={regFormData.email}
-                    onChangeText={(value) => handleRegChange("email", value)}
+                    onChangeText={value => handleRegChange('email', value)}
                     keyboardType="email-address"
                     autoCapitalize="none"
                     style={styles.input}
@@ -556,8 +529,8 @@ const LoginScreen = ({ navigation }) => {
 
                 {/* Contact */}
                 <View>
-                  <Text style={{ padding: 10, color: "#000" }}>
-                    Contact <Text style={{ color: "red" }}>*</Text>
+                  <Text style={{padding: 10, color: '#000'}}>
+                    Contact <Text style={{color: 'red'}}>*</Text>
                   </Text>
                 </View>
                 <View style={styles.inputContainer}>
@@ -565,7 +538,7 @@ const LoginScreen = ({ navigation }) => {
                   <TextInput
                     placeholder="Contact Number (10 digits)"
                     value={regFormData.contact}
-                    onChangeText={(value) => handleRegChange("contact", value)}
+                    onChangeText={value => handleRegChange('contact', value)}
                     keyboardType="numeric"
                     maxLength={10}
                     style={styles.input}
@@ -575,22 +548,37 @@ const LoginScreen = ({ navigation }) => {
 
                 {/* District */}
                 <View>
-                  <Text style={{ padding: 10, color: "#000" }}>
-                    District <Text style={{ color: "red" }}>*</Text>
+                  <Text style={{padding: 10, color: '#000'}}>
+                    District <Text style={{color: 'red'}}>*</Text>
                   </Text>
                 </View>
                 <View style={styles.pickerContainer}>
-                  <Icon name="location-city" size={22} color="#5B9EED" style={styles.pickerIcon} />
+                  <Icon
+                    name="location-city"
+                    size={22}
+                    color="#5B9EED"
+                    style={styles.pickerIcon}
+                  />
                   <View style={styles.pickerWrapper}>
                     <Picker
                       selectedValue={regFormData.addresses[0].district}
-                      onValueChange={(value) => handleAddressChange(0, "district", value)}
+                      onValueChange={value =>
+                        handleAddressChange(0, 'district', value)
+                      }
                       style={styles.picker}
-                      enabled={!regLoading}
-                    >
-                      <Picker.Item label="Select District" value="" color="#777" />
+                      enabled={!regLoading}>
+                      <Picker.Item
+                        label="Select District"
+                        value=""
+                        color="#777"
+                      />
                       {maharashtraDistricts.map((district, index) => (
-                        <Picker.Item key={index} label={district} value={district} color="#333" />
+                        <Picker.Item
+                          key={index}
+                          label={district}
+                          value={district}
+                          color="#333"
+                        />
                       ))}
                     </Picker>
                   </View>
@@ -598,21 +586,32 @@ const LoginScreen = ({ navigation }) => {
 
                 {/* Exam Name Picker */}
                 <View>
-                  <Text style={{ padding: 10, color: "#000" }}>
-                    Select Exam <Text style={{ color: "red" }}>*</Text>
+                  <Text style={{padding: 10, color: '#000'}}>
+                    Select Exam <Text style={{color: 'red'}}>*</Text>
                   </Text>
                 </View>
                 <View style={styles.pickerContainer}>
-                  <Icon name="school" size={22} color="#5B9EED" style={styles.pickerIcon} />
+                  <Icon
+                    name="school"
+                    size={22}
+                    color="#5B9EED"
+                    style={styles.pickerIcon}
+                  />
                   <View style={styles.pickerWrapper}>
                     <Picker
                       selectedValue={regFormData.examName}
-                      onValueChange={(value) => handleRegChange("examName", value)}
+                      onValueChange={value =>
+                        handleRegChange('examName', value)
+                      }
                       style={styles.picker}
-                      enabled={!regLoading}
-                    >
+                      enabled={!regLoading}>
                       {examOptions.map((exam, index) => (
-                        <Picker.Item key={index} label={exam} value={exam} color="#333" />
+                        <Picker.Item
+                          key={index}
+                          label={exam}
+                          value={exam}
+                          color="#333"
+                        />
                       ))}
                     </Picker>
                   </View>
@@ -620,8 +619,8 @@ const LoginScreen = ({ navigation }) => {
 
                 {/* Password */}
                 <View>
-                  <Text style={{ padding: 10, color: "#000" }}>
-                    Password <Text style={{ color: "red" }}>*</Text>
+                  <Text style={{padding: 10, color: '#000'}}>
+                    Password <Text style={{color: 'red'}}>*</Text>
                   </Text>
                 </View>
                 <View style={styles.inputContainer}>
@@ -629,20 +628,26 @@ const LoginScreen = ({ navigation }) => {
                   <TextInput
                     placeholder="Password (min 6 chars)"
                     value={regFormData.password}
-                    onChangeText={(value) => handleRegChange("password", value)}
+                    onChangeText={value => handleRegChange('password', value)}
                     secureTextEntry={!showRegPassword}
                     style={styles.input}
                     editable={!regLoading}
                   />
-                  <TouchableOpacity onPress={() => setShowRegPassword(!showRegPassword)} disabled={regLoading}>
-                    <Icon name={showRegPassword ? "visibility" : "visibility-off"} size={22} color="#5B9EED" />
+                  <TouchableOpacity
+                    onPress={() => setShowRegPassword(!showRegPassword)}
+                    disabled={regLoading}>
+                    <Icon
+                      name={showRegPassword ? 'visibility' : 'visibility-off'}
+                      size={22}
+                      color="#5B9EED"
+                    />
                   </TouchableOpacity>
                 </View>
 
                 {/* Confirm Password */}
                 <View>
-                  <Text style={{ padding: 10, color: "#000" }}>
-                    Confirm Password <Text style={{ color: "red" }}>*</Text>
+                  <Text style={{padding: 10, color: '#000'}}>
+                    Confirm Password <Text style={{color: 'red'}}>*</Text>
                   </Text>
                 </View>
                 <View style={styles.inputContainer}>
@@ -650,21 +655,28 @@ const LoginScreen = ({ navigation }) => {
                   <TextInput
                     placeholder="Confirm Password"
                     value={regFormData.confirmPassword}
-                    onChangeText={(value) => handleRegChange("confirmPassword", value)}
+                    onChangeText={value =>
+                      handleRegChange('confirmPassword', value)
+                    }
                     secureTextEntry={!showRegPassword}
                     style={styles.input}
                     editable={!regLoading}
                   />
-                  <TouchableOpacity onPress={() => setShowRegPassword(!showRegPassword)} disabled={regLoading}>
-                    <Icon name={showRegPassword ? "visibility" : "visibility-off"} size={22} color="#5B9EED" />
+                  <TouchableOpacity
+                    onPress={() => setShowRegPassword(!showRegPassword)}
+                    disabled={regLoading}>
+                    <Icon
+                      name={showRegPassword ? 'visibility' : 'visibility-off'}
+                      size={22}
+                      color="#5B9EED"
+                    />
                   </TouchableOpacity>
                 </View>
 
                 <TouchableOpacity
                   style={[styles.button, regLoading && styles.buttonDisabled]}
                   onPress={handleRegister}
-                  disabled={regLoading}
-                >
+                  disabled={regLoading}>
                   {regLoading ? (
                     <View style={styles.buttonContent}>
                       <ActivityIndicator size="small" color="#fff" />
@@ -676,7 +688,9 @@ const LoginScreen = ({ navigation }) => {
                 </TouchableOpacity>
 
                 <View style={styles.switchContainer}>
-                  <Text style={styles.switchText}>Already have an account? </Text>
+                  <Text style={styles.switchText}>
+                    Already have an account?{' '}
+                  </Text>
                   <TouchableOpacity onPress={flipCard} disabled={regLoading}>
                     <Text style={styles.switchActionText}>Sign In</Text>
                   </TouchableOpacity>
@@ -687,9 +701,8 @@ const LoginScreen = ({ navigation }) => {
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
-  )
-}
-
+  );
+};
 
 const styles = StyleSheet.create({
   container: {

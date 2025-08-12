@@ -39,6 +39,7 @@ const Menu = () => {
     // {label: 'Packages', value: 'Packages', icon: 'box'},
     {label: 'Test Series', value: 'TestSeries', icon: 'edit'},
     {label: 'E-Book', value: 'Ebook', icon: 'book-open'},
+    {label:'Book Store', value:'Books', icon: 'book'},
     // {label: 'Courses', value: 'Courses', icon: 'layers'},
     {label: 'Contact Us', value: 'ContactUs', icon: 'message-square'},
     {

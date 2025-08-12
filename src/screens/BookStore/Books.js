@@ -9,10 +9,19 @@ import {
   Alert,
   Modal,
   ScrollView,
+  Dimensions,
+  Platform,
+  Animated,
 } from 'react-native';
 import {useNavigation, useFocusEffect} from '@react-navigation/native';
-import React, {useState, useEffect} from 'react';
-import {getAllBooks, getUserByEmail} from '../../util/apiCall';
+import React, {useState, useEffect, useRef} from 'react';
+import {Picker} from '@react-native-picker/picker';
+import {
+  getAllBooks,
+  getUserByEmail,
+  getBookCategories,
+  getBookSubCategories,
+} from '../../util/apiCall';
 import {useAuth} from '../../Auth/AuthContext';
 import Header from '../../Components/Header';
 import Footer from '../../Components/Footer';
@@ -21,25 +30,76 @@ const Books = () => {
   const navigation = useNavigation();
   const {getUserEmail} = useAuth();
 
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(26);
+  const [paginatedBooks, setPaginatedBooks] = useState([]);
+  const [totalPages, setTotalPages] = useState(1);
+
+  // Pagination functions
+  const calculatePagination = books => {
+    const total = Math.ceil(books.length / itemsPerPage);
+    setTotalPages(total);
+
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    const paginated = books.slice(startIndex, endIndex);
+
+    setPaginatedBooks(paginated);
+  };
+
+  const handlePageChange = page => {
+    setCurrentPage(page);
+  };
+
+  const goToPreviousPage = () => {
+    if (currentPage > 1) {
+      setCurrentPage(currentPage - 1);
+    }
+  };
+
+  const goToNextPage = () => {
+    if (currentPage < totalPages) {
+      setCurrentPage(currentPage + 1);
+    }
+  };
+
+  // Book and user states
   const [books, setBooks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [userData, setUserData] = useState(null);
-  
-  // Address selection modal states
+
+  // Filter states
+  const [categories, setCategories] = useState([]);
+  const [subCategories, setSubCategories] = useState([]);
+  const [selectedCategory, setSelectedCategory] = useState('');
+  const [selectedSubCategory, setSelectedSubCategory] = useState('');
+  const [filteredBooks, setFilteredBooks] = useState([]);
+  const [categoriesLoading, setCategoriesLoading] = useState(false);
+  const [subCategoriesLoading, setSubCategoriesLoading] = useState(false);
+
   const [showAddressModal, setShowAddressModal] = useState(false);
   const [selectedBook, setSelectedBook] = useState(null);
   const [selectedAddress, setSelectedAddress] = useState(null);
   const [addressLoading, setAddressLoading] = useState(false);
 
-  // Function to fetch books from API
+  const [showDemoModal, setShowDemoModal] = useState(false);
+  const [demoBook, setDemoBook] = useState(null);
+  const [demoLoading, setDemoLoading] = useState(false);
+
+  const {width, height} = Dimensions.get('window');
+  const isLargeScreen = height > 700;
+  const hasHomeButton = Platform.OS === 'android' && height < 750;
+  const scrollBottomPadding = hasHomeButton ? 40 : isLargeScreen ? 40 : 50;
+  const footerHeight = hasHomeButton ? 70 : 60;
+
   const fetchBooks = async () => {
     try {
       setLoading(true);
       setError(null);
-
       const data = await getAllBooks();
       setBooks(data);
+      setFilteredBooks(data);
     } catch (err) {
       console.error('Error fetching books:', err);
       setError(err.message);
@@ -49,107 +109,171 @@ const Books = () => {
     }
   };
 
-  // Function to fetch user data
+  const fetchCategories = async () => {
+    try {
+      setCategoriesLoading(true);
+      const data = await getBookCategories();
+      setCategories(data);
+    } catch (error) {
+      console.error('Error fetching categories:', error);
+    } finally {
+      setCategoriesLoading(false);
+    }
+  };
+
+  const fetchSubCategories = async categoryId => {
+    try {
+      setSubCategoriesLoading(true);
+      const data = await getBookSubCategories(categoryId);
+      setSubCategories(data);
+    } catch (error) {
+      console.error('Error fetching subcategories:', error);
+    } finally {
+      setSubCategoriesLoading(false);
+    }
+  };
+
   const fetchUserData = async () => {
     try {
       const email = await getUserEmail();
       if (!email) return null;
-
-      const response = await getUserByEmail(email);
-      return response;
+      return await getUserByEmail(email);
     } catch (error) {
       console.error('Error fetching user data:', error);
       return null;
     }
   };
 
-  // Fetch books when component mounts
   useEffect(() => {
     fetchBooks();
+    fetchCategories();
   }, []);
 
-  // Refresh user data when screen comes into focus
-  useFocusEffect(
-    React.useCallback(() => {
-      const loadUserData = async () => {
-        const user = await fetchUserData();
-        setUserData(user);
-      };
-      loadUserData();
-    }, [])
-  );
+  useEffect(() => {
+    calculatePagination(filteredBooks);
+  }, [currentPage, filteredBooks]);
 
-  // Handle book press
-  const handleBookPress = async (book) => {
-    if (book.price === 0) {
-      // Handle free book - navigate to reading screen
-      console.log('Opening free book:', book.bookName);
-      // Add your navigation logic here for free books
-      // navigation.navigate('BookReader', { book });
-      Alert.alert('Free Book', 'This feature will be available soon!');
-    } else {
-      // Handle paid book - check user data and show address selection
-      setSelectedBook(book);
-      setAddressLoading(true);
-      setShowAddressModal(true);
+  // Filter logic
+  const applyFilters = () => {
+    let filtered = books;
 
-      // Fetch fresh user data
-      const user = await fetchUserData();
-      setUserData(user);
-      setAddressLoading(false);
+    if (selectedCategory && selectedCategory !== 'all') {
+      filtered = filtered.filter(
+        book => book.categoryId?.toString() === selectedCategory,
+      );
+    }
 
-      if (!user) {
-        setShowAddressModal(false);
-        Alert.alert('Error', 'Please login to continue with the purchase.');
-        return;
-      }
+    if (selectedSubCategory && selectedSubCategory !== 'all') {
+      filtered = filtered.filter(
+        book => book.subCategoryId?.toString() === selectedSubCategory,
+      );
+    }
 
-      if (!user.contact) {
-        setShowAddressModal(false);
-        Alert.alert(
-          'Phone Number Required',
-          'Please add your phone number in profile to continue with the purchase.',
-          [
-            {
-              text: 'Go to Profile',
-              onPress: () => navigation.navigate('Profile'),
-            },
-            {
-              text: 'Cancel',
-              style: 'cancel',
-            },
-          ]
-        );
-        return;
-      }
+    setFilteredBooks(filtered);
+    setCurrentPage(1); // Reset to first page when filters change
+    calculatePagination(filtered);
+  };
 
-      if (!user.addresses || user.addresses.length === 0) {
-        setShowAddressModal(false);
-        Alert.alert(
-          'No Address Found',
-          'Please add an address in your profile to continue with the payment.',
-          [
-            {
-              text: 'Go to Profile',
-              onPress: () => navigation.navigate('Profile'),
-            },
-            {
-              text: 'Cancel',
-              style: 'cancel',
-            },
-          ]
-        );
-        return;
-      }
+  useEffect(() => {
+    applyFilters();
+  }, [selectedCategory, selectedSubCategory, books]);
+
+  // Handle category selection
+  const handleCategoryChange = async categoryId => {
+    setSelectedCategory(categoryId);
+    setSelectedSubCategory(''); // Reset subcategory
+    setSubCategories([]); // Clear previous subcategories
+
+    if (categoryId && categoryId !== 'all') {
+      await fetchSubCategories(categoryId);
     }
   };
 
-  // Handle address selection
-  const handleAddressSelection = (address) => {
+  const clearFilters = () => {
+    setSelectedCategory('');
+    setSelectedSubCategory('');
+    setSubCategories([]);
+    setFilteredBooks(books);
+    setCurrentPage(1);
+  };
+
+  // Demo modal handlers
+  const handleDemoPress = book => {
+    setDemoBook(book);
+    setShowDemoModal(true);
+  };
+
+  const handleViewDemoPdf = (pdfUrl, bookName) => {
+    setShowDemoModal(false);
+    navigation.navigate('PdfViewer', {
+      pdfUrl: pdfUrl,
+      title: bookName,
+    });
+  };
+
+  const closeDemoModal = () => {
+    setShowDemoModal(false);
+    setDemoBook(null);
+    setDemoLoading(false);
+  };
+
+  // Book purchase handlers
+  const handleBookPress = async book => {
+    if (book.price === 0) {
+      Alert.alert('Free Book', 'This feature will be available soon!');
+      return;
+    }
+
+    setSelectedBook(book);
+    setAddressLoading(true);
+    setShowAddressModal(true);
+
+    const user = await fetchUserData();
+    setUserData(user);
+    setAddressLoading(false);
+
+    if (!user) {
+      setShowAddressModal(false);
+      Alert.alert('Error', 'Please login to continue with the purchase.');
+      return;
+    }
+
+    if (!user.contact) {
+      setShowAddressModal(false);
+      Alert.alert(
+        'Phone Number Required',
+        'Please add your phone number in profile to continue with the purchase.',
+        [
+          {
+            text: 'Go to Profile',
+            onPress: () => navigation.navigate('Profile'),
+          },
+          {text: 'Cancel', style: 'cancel'},
+        ],
+      );
+      return;
+    }
+
+    if (!user.addresses || user.addresses.length === 0) {
+      setShowAddressModal(false);
+      Alert.alert(
+        'No Address Found',
+        'Please add an address in your profile to continue with the payment.',
+        [
+          {
+            text: 'Go to Profile',
+            onPress: () => navigation.navigate('Profile'),
+          },
+          {text: 'Cancel', style: 'cancel'},
+        ],
+      );
+    }
+  };
+
+  const handleAddressSelection = address => {
     setSelectedAddress(address);
   };
 
-  // Proceed to payment with selected address
   const proceedToPayment = () => {
     if (!selectedAddress) {
       Alert.alert('Error', 'Please select an address to continue.');
@@ -157,119 +281,368 @@ const Books = () => {
     }
 
     setShowAddressModal(false);
-    
-    // Navigate to payment screen with book and address data
     navigation.navigate('BookPaymentScreen', {
       book: selectedBook,
       addressId: selectedAddress.id,
       userData: userData,
     });
 
-    // Reset states
     setSelectedBook(null);
     setSelectedAddress(null);
   };
 
-  // Close address modal
   const closeAddressModal = () => {
     setShowAddressModal(false);
     setSelectedBook(null);
     setSelectedAddress(null);
   };
 
-  // Format currency
-  const formatCurrency = (amount) => {
+  const formatCurrency = amount => {
     if (!amount) return '₹0';
     return `₹${Number.parseFloat(amount).toLocaleString('en-IN', {
       minimumFractionDigits: 2,
     })}`;
   };
 
-  // Render address selection modal
+  useFocusEffect(
+    React.useCallback(() => {
+      const loadUserData = async () => {
+        const user = await fetchUserData();
+        setUserData(user);
+      };
+      loadUserData();
+    }, []),
+  );
+
+  // Render Filter Section
+  const renderFilterSection = () => (
+    <View style={styles.filterSection}>
+      <View style={styles.filterHeader}>
+        {(selectedCategory || selectedSubCategory) && (
+          <TouchableOpacity
+            style={styles.clearAllButton}
+            onPress={clearFilters}>
+            <Text style={styles.clearAllText}>Clear All</Text>
+          </TouchableOpacity>
+        )}
+      </View>
+
+      {/* Active Filters Display */}
+      {(selectedCategory || selectedSubCategory) && (
+        <View style={styles.activeFiltersContainer}>
+          <Text style={styles.activeFiltersLabel}>Active Filters:</Text>
+          <View style={styles.activeFiltersRow}>
+            {selectedCategory && selectedCategory !== 'all' && (
+              <View style={styles.filterTag}>
+                <Text style={styles.filterTagText}>
+                  {
+                    categories.find(c => c.id.toString() === selectedCategory)
+                      ?.category
+                  }
+                </Text>
+                <TouchableOpacity onPress={() => handleCategoryChange('')}>
+                  <Text style={styles.filterTagClose}>×</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+            {selectedSubCategory && selectedSubCategory !== 'all' && (
+              <View style={styles.filterTag}>
+                <Text style={styles.filterTagText}>
+                  {
+                    subCategories.find(
+                      s => s.id.toString() === selectedSubCategory,
+                    )?.subcategory
+                  }
+                </Text>
+                <TouchableOpacity onPress={() => setSelectedSubCategory('')}>
+                  <Text style={styles.filterTagClose}>×</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+          </View>
+        </View>
+      )}
+
+      {/* Filter Pickers */}
+      <View style={styles.filtersContainer}>
+        {/* Category Picker */}
+        <View style={styles.pickerWrapper}>
+          <Text style={styles.pickerLabel}>Category</Text>
+          <View style={styles.pickerContainer}>
+            <Picker
+              selectedValue={selectedCategory}
+              onValueChange={handleCategoryChange}
+              style={styles.picker}
+              enabled={!categoriesLoading}
+              dropdownIconColor="#007AFF"
+              mode="dropdown">
+              <Picker.Item
+                label="All Categories"
+                value=""
+                style={styles.pickerItem}
+              />
+              {categories.map(category => (
+                <Picker.Item
+                  key={category.id}
+                  label={category.category}
+                  value={category.id.toString()}
+                  style={styles.pickerItem}
+                />
+              ))}
+            </Picker>
+            {categoriesLoading && (
+              <View style={styles.pickerLoader}>
+                <ActivityIndicator size="small" color="#007AFF" />
+              </View>
+            )}
+          </View>
+        </View>
+
+        {/* Subcategory Picker */}
+        <View style={styles.pickerWrapper}>
+          <Text
+            style={[
+              styles.pickerLabel,
+              (!selectedCategory || selectedCategory === 'all') &&
+                styles.disabledLabel,
+            ]}>
+            Subcategory
+          </Text>
+          <View
+            style={[
+              styles.pickerContainer,
+              (!selectedCategory || selectedCategory === 'all') &&
+                styles.disabledPickerContainer,
+            ]}>
+            <Picker
+              selectedValue={selectedSubCategory}
+              onValueChange={setSelectedSubCategory}
+              style={styles.picker}
+              enabled={
+                !subCategoriesLoading &&
+                subCategories.length > 0 &&
+                selectedCategory &&
+                selectedCategory !== 'all'
+              }
+              dropdownIconColor={
+                !selectedCategory || selectedCategory === 'all'
+                  ? '#ccc'
+                  : '#007AFF'
+              }
+              mode="dropdown">
+              <Picker.Item
+                label={
+                  !selectedCategory || selectedCategory === 'all'
+                    ? 'Select Category First'
+                    : 'All Subcategories'
+                }
+                value=""
+                style={styles.pickerItem}
+              />
+              {subCategories.map(subCategory => (
+                <Picker.Item
+                  key={subCategory.id}
+                  label={subCategory.subcategory}
+                  value={subCategory.id.toString()}
+                  style={styles.pickerItem}
+                />
+              ))}
+            </Picker>
+            {subCategoriesLoading && (
+              <View style={styles.pickerLoader}>
+                <ActivityIndicator size="small" color="#007AFF" />
+              </View>
+            )}
+          </View>
+        </View>
+      </View>
+    </View>
+  );
+
+  // Render Demo Modal
+  const renderDemoModal = () => (
+    <Modal
+      visible={showDemoModal}
+      animationType="slide"
+      presentationStyle="pageSheet"
+      onRequestClose={closeDemoModal}>
+      <View style={styles.modalContainer}>
+        <View style={styles.modalHeader}>
+          <TouchableOpacity onPress={closeDemoModal} style={styles.closeButton}>
+            <Text style={styles.closeButtonText}>✕</Text>
+          </TouchableOpacity>
+          <Text style={styles.modalTitle}>Book Demo</Text>
+          <View style={styles.headerSpacer} />
+        </View>
+
+        <ScrollView
+          style={styles.modalContent}
+          showsVerticalScrollIndicator={false}>
+          {demoBook && (
+            <>
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>Book Preview</Text>
+                <Image
+                  source={{uri: demoBook.uploadThumbnail}}
+                  style={styles.thumbnailImage}
+                  resizeMode="contain"
+                />
+              </View>
+
+              {demoBook.uploadDemoPdf && (
+                <View style={styles.section}>
+                  <Text style={styles.sectionTitle}>Demo Content</Text>
+                  <TouchableOpacity
+                    style={[styles.button, styles.pdfButton]}
+                    onPress={() =>
+                      handleViewDemoPdf(
+                        demoBook.uploadDemoPdf,
+                        demoBook.bookName,
+                      )
+                    }
+                    disabled={demoLoading}>
+                    {demoLoading ? (
+                      <ActivityIndicator size="small" color="#ffffff" />
+                    ) : (
+                      <>
+                        <Text style={styles.buttonText}>📄</Text>
+                        <Text style={styles.buttonText}>View Demo PDF</Text>
+                      </>
+                    )}
+                  </TouchableOpacity>
+                  <Text style={styles.noteText}>
+                    This will open a preview of the book content
+                  </Text>
+                </View>
+              )}
+            </>
+          )}
+        </ScrollView>
+      </View>
+    </Modal>
+  );
+
+  const BlinkingBadge = ({text, style}) => {
+    const opacity = useRef(new Animated.Value(1)).current;
+
+    useEffect(() => {
+      const startBlinking = () => {
+        Animated.loop(
+          Animated.sequence([
+            Animated.timing(opacity, {
+              toValue: 0.3,
+              duration: 600,
+              useNativeDriver: true,
+            }),
+            Animated.timing(opacity, {
+              toValue: 1,
+              duration: 600,
+              useNativeDriver: true,
+            }),
+          ]),
+        ).start();
+      };
+
+      startBlinking();
+    }, [opacity]);
+
+    return (
+      <Animated.View style={[style, {opacity}]}>
+        <Text style={styles.blinkingText}>{text}</Text>
+      </Animated.View>
+    );
+  };
+
+  // Render Address Modal
   const renderAddressModal = () => (
     <Modal
       visible={showAddressModal}
       animationType="slide"
       presentationStyle="pageSheet"
       onRequestClose={closeAddressModal}>
-      <View style={modalStyles.container}>
-        <View style={modalStyles.header}>
-          <TouchableOpacity onPress={closeAddressModal} style={modalStyles.closeButton}>
-            <Text style={modalStyles.closeButtonText}>✕</Text>
+      <View style={styles.modalContainer}>
+        <View style={styles.modalHeader}>
+          <TouchableOpacity
+            onPress={closeAddressModal}
+            style={styles.closeButton}>
+            <Text style={styles.closeButtonText}>✕</Text>
           </TouchableOpacity>
-          <Text style={modalStyles.headerTitle}>Select Address</Text>
-          <View style={modalStyles.headerSpacer} />
+          <Text style={styles.modalTitle}>Select Address</Text>
+          <View style={styles.headerSpacer} />
         </View>
 
         {addressLoading ? (
-          <View style={modalStyles.loadingContainer}>
+          <View style={styles.centerContainer}>
             <ActivityIndicator size="large" color="#007AFF" />
-            <Text style={modalStyles.loadingText}>Loading addresses...</Text>
+            <Text style={styles.loadingText}>Loading addresses...</Text>
           </View>
         ) : (
-          <ScrollView style={modalStyles.content} showsVerticalScrollIndicator={false}>
-            {/* Book Summary */}
+          <ScrollView
+            style={styles.modalContent}
+            showsVerticalScrollIndicator={false}>
             {selectedBook && (
-              <View style={modalStyles.bookSummary}>
-                <Text style={modalStyles.summaryTitle}>Book Purchase</Text>
-                <View style={modalStyles.summaryRow}>
-                  <Text style={modalStyles.summaryLabel}>Book:</Text>
-                  <Text style={modalStyles.summaryValue}>{selectedBook.bookName}</Text>
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>Book Purchase</Text>
+                <View style={styles.row}>
+                  <Text style={styles.label}>Book:</Text>
+                  <Text style={styles.value}>{selectedBook.bookName}</Text>
                 </View>
-                <View style={modalStyles.summaryRow}>
-                  <Text style={modalStyles.summaryLabel}>Price:</Text>
-                  <Text style={modalStyles.summaryValue}>{formatCurrency(selectedBook.price)}</Text>
+                <View style={styles.row}>
+                  <Text style={styles.label}>Price:</Text>
+                  <Text style={styles.value}>
+                    {formatCurrency(selectedBook.price)}
+                  </Text>
                 </View>
                 {userData && (
-                  <View style={modalStyles.summaryRow}>
-                    <Text style={modalStyles.summaryLabel}>Email:</Text>
-                    <Text style={modalStyles.summaryValue}>{userData.email}</Text>
+                  <View style={styles.row}>
+                    <Text style={styles.label}>Email:</Text>
+                    <Text style={styles.value}>{userData.email}</Text>
                   </View>
                 )}
               </View>
             )}
 
-            {/* Address Selection */}
-            <View style={modalStyles.addressSection}>
-              <Text style={modalStyles.addressTitle}>Select Delivery Address</Text>
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Select Delivery Address</Text>
               {userData?.addresses?.map((address, index) => (
                 <TouchableOpacity
                   key={address.id}
                   style={[
-                    modalStyles.addressCard,
-                    selectedAddress?.id === address.id && modalStyles.selectedAddressCard,
+                    styles.addressCard,
+                    selectedAddress?.id === address.id && styles.selectedCard,
                   ]}
                   onPress={() => handleAddressSelection(address)}>
-                  <View style={modalStyles.addressHeader}>
+                  <View style={styles.addressHeader}>
                     <View
                       style={[
-                        modalStyles.radioButton,
-                        selectedAddress?.id === address.id && modalStyles.selectedRadioButton,
+                        styles.radioButton,
+                        selectedAddress?.id === address.id &&
+                          styles.selectedRadio,
                       ]}>
                       {selectedAddress?.id === address.id && (
-                        <View style={modalStyles.radioButtonInner} />
+                        <View style={styles.radioInner} />
                       )}
                     </View>
-                    <Text style={modalStyles.addressLabel}>Address {index + 1}</Text>
+                    <Text style={styles.addressLabel}>Address {index + 1}</Text>
                   </View>
-                  
-                  <View style={modalStyles.addressDetails}>
+
+                  <View style={styles.addressDetails}>
                     {address.address && (
-                      <Text style={modalStyles.addressText}>{address.address}</Text>
+                      <Text style={styles.addressText}>{address.address}</Text>
                     )}
                     {address.area && (
-                      <Text style={modalStyles.addressText}>{address.area}</Text>
+                      <Text style={styles.addressText}>{address.area}</Text>
                     )}
-                    <Text style={modalStyles.addressText}>
+                    <Text style={styles.addressText}>
                       {address.city && `${address.city}, `}
                       {address.district}
                       {address.pincode ? ` - ${address.pincode}` : ''}
                     </Text>
                     {address.state && (
-                      <Text style={modalStyles.addressText}>{address.state}</Text>
+                      <Text style={styles.addressText}>{address.state}</Text>
                     )}
                     {address.landmark && (
-                      <Text style={modalStyles.landmarkText}>
+                      <Text style={styles.landmarkText}>
                         Landmark: {address.landmark}
                       </Text>
                     )}
@@ -278,26 +651,27 @@ const Books = () => {
               ))}
 
               <TouchableOpacity
-                style={modalStyles.addAddressButton}
+                style={styles.addAddressButton}
                 onPress={() => {
                   closeAddressModal();
                   navigation.navigate('Profile');
                 }}>
-                <Text style={modalStyles.addAddressButtonText}>+ Add New Address</Text>
+                <Text style={styles.addAddressText}>+ Add New Address</Text>
               </TouchableOpacity>
             </View>
 
             <TouchableOpacity
               style={[
-                modalStyles.proceedButton,
-                !selectedAddress && modalStyles.proceedButtonDisabled,
+                styles.button,
+                styles.primaryButton,
+                !selectedAddress && styles.disabledButton,
               ]}
               onPress={proceedToPayment}
               disabled={!selectedAddress}>
               <Text
                 style={[
-                  modalStyles.proceedButtonText,
-                  !selectedAddress && modalStyles.proceedButtonTextDisabled,
+                  styles.buttonText,
+                  !selectedAddress && styles.disabledButtonText,
                 ]}>
                 Proceed to Payment
               </Text>
@@ -308,47 +682,145 @@ const Books = () => {
     </Modal>
   );
 
-  // Render individual book item
+  const renderPagination = () => {
+    if (filteredBooks.length <= itemsPerPage) {
+      return null; // Don't show pagination if total books <= 26
+    }
+
+    const pageNumbers = [];
+    const maxVisiblePages = 5;
+    let startPage = Math.max(1, currentPage - Math.floor(maxVisiblePages / 2));
+    let endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
+
+    if (endPage - startPage + 1 < maxVisiblePages) {
+      startPage = Math.max(1, endPage - maxVisiblePages + 1);
+    }
+
+    for (let i = startPage; i <= endPage; i++) {
+      pageNumbers.push(i);
+    }
+
+    return (
+      <View style={styles.paginationContainer}>
+        <TouchableOpacity
+          style={[
+            styles.paginationButton,
+            currentPage === 1 && styles.disabledPaginationButton,
+          ]}
+          onPress={goToPreviousPage}
+          disabled={currentPage === 1}>
+          <Text
+            style={[
+              styles.paginationButtonText,
+              currentPage === 1 && styles.disabledPaginationText,
+            ]}>
+            Previous
+          </Text>
+        </TouchableOpacity>
+
+        <View style={styles.pageNumbersContainer}>
+          {pageNumbers.map(number => (
+            <TouchableOpacity
+              key={number}
+              style={[
+                styles.pageNumberButton,
+                number === currentPage && styles.activePageButton,
+              ]}
+              onPress={() => handlePageChange(number)}>
+              <Text
+                style={[
+                  styles.pageNumberText,
+                  number === currentPage && styles.activePageText,
+                ]}>
+                {number}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        <TouchableOpacity
+          style={[
+            styles.paginationButton,
+            currentPage === totalPages && styles.disabledPaginationButton,
+          ]}
+          onPress={goToNextPage}
+          disabled={currentPage === totalPages}>
+          <Text
+            style={[
+              styles.paginationButtonText,
+              currentPage === totalPages && styles.disabledPaginationText,
+            ]}>
+            Next
+          </Text>
+        </TouchableOpacity>
+      </View>
+    );
+  };
+
+  // Render Book Item
   const renderBookItem = ({item}) => (
     <View style={styles.bookCard}>
       <Image
         source={{uri: item.uploadThumbnail}}
         style={styles.bookThumbnail}
-        resizeMode="cover"
       />
+
+      {/* Add blinking text only for paid books */}
+      {item.price > 0 && (
+        <BlinkingBadge
+          text="🚚 Free Delivery"
+          style={styles.blinkingTextContainer}
+        />
+      )}
 
       <View style={styles.bookInfo}>
         <Text style={styles.bookTitle} numberOfLines={2}>
           {item.bookName}
         </Text>
 
-        <Text style={styles.bookDescription} numberOfLines={1}>
-          {item.description}
-        </Text>
-
-        <View style={styles.bookMeta}>
-          <Text style={styles.publisher}>Author: {item.writerName}</Text>
-          <Text style={styles.category}>Publisher: {item.publisherName}</Text>
+        <View style={styles.category}>
+          <Text style={styles.categorytext}>{item.category.category}</Text>
         </View>
-{/* 
-        {item.price > 0 && (
-          <Text style={styles.price}>{formatCurrency(item.price)}</Text>
-        )} */}
 
-        <TouchableOpacity
-          style={[
-            styles.actionButton,
-            item.price === 0 ? styles.freeButton : styles.paidButton,
-          ]}
-          onPress={() => handleBookPress(item)}>
-          <Text
-            style={[
-              styles.actionButtonText,
-              item.price === 0 ? styles.freeButtonText : styles.paidButtonText,
-            ]}>
-            {item.price === 0 ? 'Read' : 'Get Access'}
+        {/* Author and Publisher */}
+        <View style={styles.bookMeta}>
+          <Text style={styles.authorText} numberOfLines={1}>
+            Author: {item.writerName}
           </Text>
-        </TouchableOpacity>
+          <Text style={styles.publisherText} numberOfLines={1}>
+            Publisher: {item.publisherName}
+          </Text>
+        </View>
+
+        <View style={styles.buttonContainer}>
+          {/* Show View Demo button only if uploadDemoPdf exists */}
+          {item.uploadDemoPdf && (
+            <TouchableOpacity
+              style={styles.demoButton}
+              onPress={() => handleDemoPress(item)}>
+              <Text style={styles.demoButtonText}>View Demo</Text>
+            </TouchableOpacity>
+          )}
+
+          <TouchableOpacity
+            style={[
+              styles.actionButton,
+              // If no demo button, make this button full width
+              !item.uploadDemoPdf && styles.fullWidthButton,
+              item.price === 0 ? styles.freeButton : styles.paidButton,
+            ]}
+            onPress={() => handleBookPress(item)}>
+            <Text
+              style={[
+                styles.actionButtonText,
+                item.price === 0
+                  ? styles.freeButtonText
+                  : styles.paidButtonText,
+              ]}>
+              {item.price === 0 ? 'Read' : 'Buy Now'}
+            </Text>
+          </TouchableOpacity>
+        </View>
       </View>
     </View>
   );
@@ -368,8 +840,10 @@ const Books = () => {
     return (
       <View style={styles.centerContainer}>
         <Text style={styles.errorText}>Error loading books</Text>
-        <TouchableOpacity style={styles.retryButton} onPress={fetchBooks}>
-          <Text style={styles.retryButtonText}>Retry</Text>
+        <TouchableOpacity
+          style={[styles.button, styles.primaryButton]}
+          onPress={fetchBooks}>
+          <Text style={styles.buttonText}>Retry</Text>
         </TouchableOpacity>
       </View>
     );
@@ -387,20 +861,52 @@ const Books = () => {
   return (
     <View style={styles.container}>
       <Header />
-      <FlatList
-        data={books}
-        renderItem={renderBookItem}
-        keyExtractor={item => item.id.toString()}
-        contentContainerStyle={styles.listContainer}
-        showsVerticalScrollIndicator={false}
-      />
+
+      {/* Filter Section */}
+      {renderFilterSection()}
+
+      <View style={[styles.scrollContainer, {marginBottom: footerHeight}]}>
+        <FlatList
+          data={paginatedBooks} // Changed from filteredBooks
+          renderItem={renderBookItem}
+          keyExtractor={item => item.id.toString()}
+          numColumns={2}
+          contentContainerStyle={[
+            styles.listContainer,
+            {paddingBottom: scrollBottomPadding},
+          ]}
+          showsVerticalScrollIndicator={false}
+          columnWrapperStyle={styles.listRow}
+          ListEmptyComponent={() => (
+            <View style={styles.emptyStateContainer}>
+              <Text style={styles.emptyStateText}>
+                No books found for selected filters
+              </Text>
+              <TouchableOpacity
+                style={styles.resetFilterButton}
+                onPress={clearFilters}>
+                <Text style={styles.resetFilterButtonText}>View All Books</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+          ListFooterComponent={renderPagination}
+        />
+      </View>
+     
       <Footer />
+
+      {/* Modals */}
       {renderAddressModal()}
+      {renderDemoModal()}
     </View>
   );
 };
 
 const styles = StyleSheet.create({
+  // Base containers
+  scrollContainer: {
+    flex: 1,
+  },
   container: {
     flex: 1,
     backgroundColor: '#f8f9fa',
@@ -412,117 +918,323 @@ const styles = StyleSheet.create({
     backgroundColor: '#f8f9fa',
   },
   listContainer: {
-    padding: 16,
+    paddingHorizontal: 8,
+    paddingVertical: 16,
     paddingBottom: 20,
   },
-  bookCard: {
+  listRow: {
+    justifyContent: 'space-between',
+    paddingHorizontal: 4,
+  },
+
+  // Filter Section Styles
+  filterSection: {
     backgroundColor: '#ffffff',
-    borderRadius: 12,
-    marginBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e1e5e9',
     elevation: 3,
     shadowColor: '#000',
     shadowOffset: {width: 0, height: 2},
     shadowOpacity: 0.1,
     shadowRadius: 4,
+    paddingVertical: 12,
+  },
+  filterHeader: {
     flexDirection: 'row',
-    padding: 12,
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    marginBottom: 8,
+  },
+  filterTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#1a1a1a',
+  },
+  clearAllButton: {
+    backgroundColor: '#ff6b6b',
+    borderRadius: 20,
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+  },
+  clearAllText: {
+    color: '#ffffff',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  activeFiltersContainer: {
+    paddingHorizontal: 16,
+    marginBottom: 12,
+  },
+  activeFiltersLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 6,
+  },
+  activeFiltersRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+  },
+  filterTag: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#007AFF',
+    borderRadius: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    marginRight: 8,
+    marginBottom: 4,
+  },
+  filterTagText: {
+    color: '#ffffff',
+    fontSize: 13,
+    fontWeight: '500',
+    marginRight: 6,
+  },
+  filterTagClose: {
+    color: '#ffffff',
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginLeft: 2,
+  },
+  filtersContainer: {
+    paddingHorizontal: 16,
+    flexDirection: 'row',
+    gap: 12,
+  },
+  pickerWrapper: {
+    flex: 1,
+  },
+  pickerLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 4,
+  },
+  disabledLabel: {
+    color: '#999',
+  },
+  pickerContainer: {
+    backgroundColor: '#f8f9fa',
+    borderRadius: 8,
+    borderWidth: 1.5,
+    borderColor: '#e1e5e9',
+    elevation: 1,
+    shadowColor: '#000',
+    shadowOffset: {width: 0, height: 1},
+    shadowOpacity: 0.05,
+    shadowRadius: 1,
+    minHeight: 42,
+    position: 'relative',
+  },
+  disabledPickerContainer: {
+    backgroundColor: '#f5f5f5',
+    borderColor: '#ddd',
+  },
+  picker: {
+    height: 42,
+    color: '#333',
+    fontSize: 12,
+  },
+  pickerItem: {
+    fontSize: 12,
+    color: '#333',
+  },
+  pickerLoader: {
+    position: 'absolute',
+    right: 12,
+    top: '50%',
+    transform: [{translateY: -10}],
+  },
+
+  // Empty State
+  emptyStateContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 60,
+  },
+  emptyStateText: {
+    fontSize: 18,
+    color: '#666',
+    textAlign: 'center',
+    marginBottom: 20,
+    fontWeight: '500',
+  },
+  resetFilterButton: {
+    backgroundColor: '#007AFF',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 25,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: {width: 0, height: 2},
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
+  resetFilterButtonText: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+
+  // Book cards
+  bookCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 12,
+    marginBottom: 16,
+    marginHorizontal: 4,
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: {width: 0, height: 2},
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    overflow: 'hidden',
+    width: '48%',
+    height: 340, // Fixed height for consistent alignment
+    flexDirection: 'column',
   },
   bookThumbnail: {
-    width: 80,
-    height: 120,
-    borderRadius: 8,
-    marginRight: 12,
+    width: '100%',
+    height: 180,
+    resizeMode: 'contain',
   },
   bookInfo: {
     flex: 1,
+    padding: 8,
     justifyContent: 'space-between',
+    flexDirection: 'column',
   },
   bookTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1a1a1a',
-    marginBottom: 4,
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#007AFF',
+    marginBottom: 6,
+    lineHeight: 16,
+    height: 32,
+    textAlignVertical: 'top',
   },
   bookDescription: {
-    fontSize: 14,
+    fontSize: 10,
     color: '#666',
-    marginBottom: 8,
+    marginBottom: 12,
   },
   bookMeta: {
     marginBottom: 8,
-  },
-  publisher: {
-    fontSize: 12,
-    color: '#888',
-    marginBottom: 2,
+    minHeight: 46,
   },
   category: {
+    backgroundColor: 'orange',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 12,
+    alignSelf: 'flex-start',
+    marginBottom: 6,
+  },
+  categorytext: {
+    color: '#fff',
     fontSize: 12,
+    fontWeight: 'bold',
+  },
+  authorText: {
+    fontSize: 11,
+    color: '#333',
+    fontWeight: '600',
+    marginBottom: 2,
+  },
+  publisherText: {
+    fontSize: 10,
+    color: '#666',
+    fontWeight: '400',
+  },
+  metaText: {
+    fontSize: 10,
     color: '#888',
   },
-  price: {
+
+  // Buttons
+  buttonContainer: {
+    flexDirection: 'row',
+    gap: 6,
+    marginTop: 'auto',
+    paddingTop: 8,
+  },
+  button: {
+    borderRadius: 8,
+    padding: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  buttonText: {
     fontSize: 16,
-    fontWeight: '700',
+    fontWeight: '600',
+    color: '#ffffff',
+  },
+  primaryButton: {
+    backgroundColor: '#007AFF',
+    marginTop: 20,
+  },
+  disabledButton: {
+    backgroundColor: '#ccc',
+  },
+  disabledButtonText: {
+    color: '#888',
+  },
+  demoButton: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: 6,
+    borderWidth: 1.5,
+    borderColor: '#007AFF',
+    backgroundColor: 'transparent',
+    alignItems: 'center',
+  },
+  demoButtonText: {
+    fontSize: 11,
+    fontWeight: '600',
     color: '#007AFF',
-    marginBottom: 8,
   },
   actionButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
+    flex: 1,
+    paddingVertical: 10,
     borderRadius: 6,
-    alignSelf: 'flex-start',
+    alignItems: 'center',
+  },
+  actionButtonText: {
+    fontSize: 11,
+    fontWeight: '600',
   },
   freeButton: {
     backgroundColor: '#34C759',
   },
-  paidButton: {
-    backgroundColor: '#007AFF',
-  },
-  actionButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
-  },
   freeButtonText: {
     color: '#ffffff',
+  },
+  paidButton: {
+    backgroundColor: '#007AFF',
   },
   paidButtonText: {
     color: '#ffffff',
   },
-  loadingText: {
-    marginTop: 12,
-    fontSize: 16,
-    color: '#666',
+  pdfButton: {
+    backgroundColor: '#FF6B35',
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 8,
   },
-  errorText: {
-    fontSize: 16,
-    color: '#d32f2f',
-    textAlign: 'center',
-    marginBottom: 16,
+  fullWidthButton: {
+    flex: 0,
+    width: '100%',
   },
-  emptyText: {
-    fontSize: 16,
-    color: '#666',
-    textAlign: 'center',
-  },
-  retryButton: {
-    backgroundColor: '#007AFF',
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 8,
-  },
-  retryButtonText: {
-    color: '#ffffff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-});
 
-const modalStyles = StyleSheet.create({
-  container: {
+  // Modal styles
+  modalContainer: {
     flex: 1,
     backgroundColor: '#f8f9fa',
   },
-  header: {
+  modalHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -544,7 +1256,7 @@ const modalStyles = StyleSheet.create({
     fontSize: 16,
     color: '#5f6368',
   },
-  headerTitle: {
+  modalTitle: {
     fontSize: 18,
     fontWeight: '600',
     color: '#1a1a1a',
@@ -552,21 +1264,13 @@ const modalStyles = StyleSheet.create({
   headerSpacer: {
     width: 32,
   },
-  content: {
+  modalContent: {
     flex: 1,
     padding: 20,
   },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  loadingText: {
-    marginTop: 12,
-    fontSize: 16,
-    color: '#666',
-  },
-  bookSummary: {
+
+  // Section styles
+  section: {
     backgroundColor: '#ffffff',
     borderRadius: 12,
     padding: 16,
@@ -577,38 +1281,31 @@ const modalStyles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 2,
   },
-  summaryTitle: {
-    fontSize: 18,
+  sectionTitle: {
+    fontSize: 16,
     fontWeight: '600',
     color: '#1a1a1a',
     marginBottom: 12,
   },
-  summaryRow: {
+  row: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     marginBottom: 8,
   },
-  summaryLabel: {
+  label: {
     fontSize: 14,
     color: '#666',
     fontWeight: '500',
   },
-  summaryValue: {
+  value: {
     fontSize: 14,
     color: '#1a1a1a',
     fontWeight: '500',
     flex: 1,
     textAlign: 'right',
   },
-  addressSection: {
-    marginBottom: 20,
-  },
-  addressTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1a1a1a',
-    marginBottom: 12,
-  },
+
+  // Address styles
   addressCard: {
     backgroundColor: '#ffffff',
     borderRadius: 12,
@@ -617,7 +1314,7 @@ const modalStyles = StyleSheet.create({
     borderWidth: 2,
     borderColor: '#e1e5e9',
   },
-  selectedAddressCard: {
+  selectedCard: {
     borderColor: '#007AFF',
     backgroundColor: '#f0f8ff',
   },
@@ -636,10 +1333,10 @@ const modalStyles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  selectedRadioButton: {
+  selectedRadio: {
     borderColor: '#007AFF',
   },
-  radioButtonInner: {
+  radioInner: {
     width: 10,
     height: 10,
     borderRadius: 5,
@@ -651,12 +1348,13 @@ const modalStyles = StyleSheet.create({
     color: '#1a1a1a',
   },
   addressDetails: {
-    marginLeft: 32,
+    paddingLeft: 32,
   },
   addressText: {
     fontSize: 14,
     color: '#666',
     marginBottom: 2,
+    lineHeight: 20,
   },
   landmarkText: {
     fontSize: 12,
@@ -665,36 +1363,137 @@ const modalStyles = StyleSheet.create({
     marginTop: 4,
   },
   addAddressButton: {
-    backgroundColor: '#f1f3f4',
-    borderRadius: 12,
-    padding: 16,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#e1e5e9',
+    backgroundColor: 'transparent',
+    borderWidth: 2,
+    borderColor: '#007AFF',
     borderStyle: 'dashed',
-  },
-  addAddressButtonText: {
-    fontSize: 14,
-    color: '#007AFF',
-    fontWeight: '500',
-  },
-  proceedButton: {
-    backgroundColor: '#007AFF',
     borderRadius: 12,
     padding: 16,
     alignItems: 'center',
-    marginTop: 20,
+    marginTop: 8,
   },
-  proceedButtonDisabled: {
+  addAddressText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#007AFF',
+  },
+
+  // Misc styles
+  thumbnailImage: {
+    width: '100%',
+    height: 300,
+    borderRadius: 8,
+  },
+  noteText: {
+    fontSize: 12,
+    color: '#666',
+    textAlign: 'center',
+    fontStyle: 'italic',
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 16,
+    color: '#007AFF',
+  },
+  errorText: {
+    fontSize: 16,
+    color: '#d32f2f',
+    textAlign: 'center',
+    marginBottom: 16,
+  },
+  emptyText: {
+    fontSize: 16,
+    color: '#666',
+    textAlign: 'center',
+  },
+
+  blinkingTextContainer: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    backgroundColor: 'rgba(52, 199, 89, 0.95)', // Green background for free delivery
+    borderRadius: 15,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    zIndex: 1,
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: {width: 0, height: 2},
+    shadowOpacity: 0.2,
+    shadowRadius: 3,
+  },
+  blinkingText: {
+    fontSize: 9,
+    fontWeight: '700',
+    color: '#ffffff',
+    textAlign: 'center',
+    letterSpacing: 0.5,
+  },
+  paginationContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: '#ffffff',
+    borderTopWidth: 1,
+    borderTopColor: '#e1e5e9',
+    marginTop: 16,
+    marginBottom: 20,
+    borderRadius: 8,
+    marginHorizontal: 8,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: {width: 0, height: 2},
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
+  paginationButton: {
+    backgroundColor: '#007AFF',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 8,
+    minWidth: 80,
+    alignItems: 'center',
+  },
+  disabledPaginationButton: {
     backgroundColor: '#ccc',
   },
-  proceedButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
+  paginationButtonText: {
     color: '#ffffff',
+    fontSize: 14,
+    fontWeight: '600',
   },
-  proceedButtonTextDisabled: {
-    color: '#999',
+  disabledPaginationText: {
+    color: '#888',
+  },
+  pageNumbersContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  pageNumberButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#f8f9fa',
+    borderWidth: 1,
+    borderColor: '#e1e5e9',
+  },
+  activePageButton: {
+    backgroundColor: '#007AFF',
+    borderColor: '#007AFF',
+  },
+  pageNumberText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#333',
+  },
+  activePageText: {
+    color: '#ffffff',
+    fontWeight: '600',
   },
 });
 

@@ -175,7 +175,6 @@ const generateHTMLWithWatermark = (testPaper, logoBase64) => {
         }
         
         .question {
-        
           margin: 0 0 20px 0;
           padding: 10px 15px;          
           border-left: 3px solid #007bff;
@@ -195,18 +194,34 @@ const generateHTMLWithWatermark = (testPaper, logoBase64) => {
           padding-top: 10px;
         }
         
-        .option {
+        .options-container {
           margin-left: 20px;
+        }
+        
+        .options-row {
+          display: flex;
+          justify-content: space-between;
           margin-bottom: 8px;
+          page-break-inside: avoid;
+        }
+        
+        .option {
+          flex: 0 0 48%;
           padding: 5px 0;
-            page-break-inside: avoid;
-
+          display: flex;
+          align-items: flex-start;
         }
         
         .option-letter {
           font-weight: bold;
           color: #007bff;
-          margin-right: 10px;
+          margin-right: 8px;
+          flex-shrink: 0;
+        }
+        
+        .option-text {
+          flex: 1;
+          word-wrap: break-word;
         }
         
         .instructions {
@@ -311,7 +326,7 @@ const generateHTMLWithWatermark = (testPaper, logoBase64) => {
 };
 
 /**
- * Generate questions HTML
+ * Generate questions HTML with 2-column option layout
  * @param {Array} questions - Array of question objects
  * @returns {string} HTML for questions
  */
@@ -323,23 +338,36 @@ const generateQuestionsHTML = questions => {
   return questions
     .map((question, index) => {
       const questionText = question.createQuestion || `Question ${index + 1}`;
-      const options = ['A', 'B', 'C', 'D', 'E']
-        .map(opt => {
-          const optValue = question[`option${opt}`];
-          return optValue && optValue.trim()
-            ? `
+      
+      // Get all options
+      const optionsData = ['A', 'B', 'C', 'D', 'E'].map(opt => ({
+        letter: opt,
+        text: question[`option${opt}`]
+      })).filter(opt => opt.text && opt.text.trim());
+
+      // Group options into rows of 2
+      const optionRows = [];
+      for (let i = 0; i < optionsData.length; i += 2) {
+        optionRows.push(optionsData.slice(i, i + 2));
+      }
+
+      const optionsHTML = optionRows.map(row => {
+        const rowHTML = row.map(option => `
           <div class="option">
-            <span class="option-letter">${opt}.</span>${optValue}
+            <span class="option-letter">${option.letter}.</span>
+            <span class="option-text">${option.text}</span>
           </div>
-        `
-            : '';
-        })
-        .join('');
+        `).join('');
+        
+        return `<div class="options-row">${rowHTML}</div>`;
+      }).join('');
 
       return `
       <div class="question">
         <div class="question-text">${index + 1}. ${questionText}</div>
-        ${options}
+        <div class="options-container">
+          ${optionsHTML}
+        </div>
       </div>
     `;
     })
@@ -479,49 +507,31 @@ const openFile = async filePath => {
  * @param {Object} testPaper - Test paper object containing questions and details
  * @returns {Promise<void>}
  */
-export const generateAndDownloadTestPaper = async testPaper => {
+export const generateAndDownloadTestPaper = async (testPaper, onProgress) => {
   try {
-    // Request storage permission
+    // Permission request
     const hasPermission = await requestStoragePermission();
     if (!hasPermission) {
       return;
     }
+    onProgress && onProgress(10);
 
     // Show loading indicator
     showPdfGeneratingMessage();
 
-    try {
-      // Generate PDF with watermark
-      const filePath = await generatePDFWithWatermark(testPaper);
+    // Generate PDF file
+    const filePath = await generatePDFWithWatermark(testPaper);
+    onProgress && onProgress(80);
 
-      showFileOpenFallbackMessage(filePath, () => hideMessage());
-    } catch (pdfError) {
-      console.error('❌ PDF generation failed:', pdfError);
-      throw pdfError;
-    }
+    showFileOpenFallbackMessage(filePath, () => hideMessage());
+
+    onProgress && onProgress(100);
+
+    return filePath;
   } catch (error) {
     console.error('❌ Download Error:', error);
-
-    let errorMessage = 'Unable to generate the test paper. Please try again.';
-
-    if (error.message?.includes('Permission')) {
-      errorMessage =
-        'Storage permission is required. Please grant permission and try again.';
-    } else if (
-      error.message?.includes('network') ||
-      error.message?.includes('Network')
-    ) {
-      errorMessage =
-        'Network error occurred. Please check your connection and try again.';
-    } else if (
-      error.message?.includes('space') ||
-      error.message?.includes('storage')
-    ) {
-      errorMessage =
-        'Insufficient storage space. Please free up some space and try again.';
-    }
-
     showPdfGenerationFailedMessage(error.message);
+    throw error;
   }
 };
 

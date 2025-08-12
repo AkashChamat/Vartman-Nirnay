@@ -40,11 +40,15 @@ export const materialtypeUrl = `${baseUrl}/AllVMMaterialTypes`;
 export const testseriesUrl = `${baseUrl}/AllTestSeries`;
 export const paperbyseriesUrl = `${baseUrl}/TestPapersByTestSeries`;
 export const vtcategoriesUrl = `${baseUrl}/AllVTCategories`;
-export const ebookordersUrl = `${baseUrl}/user`;
+export const ordersUrl = `${baseUrl}/user`;
 export const testseriesordersUrl = `${baseUrl}/testseries/user`;
 export const testseriesPaymentUrl = `${baseUrl}/createTestSeriesPayment`;
 export const bookpaymentUrl = `${baseUrl}/createBookPayment`;
-export const paidbooksUrl = `${baseUrl}//bookorders/user`;
+export const paidbooksUrl = `${baseUrl}/bookorders/user`;
 export const getAllBooksUrl = `${baseUrl}/getAllBooks`;
-
+export const saveAddressUrl = `${baseUrl}/saveAddress`;
+export const updateAddressUrl = `${baseUrl}/updateAddress`
+export const deleteAddressUrl = `${baseUrl}/deleteAddress`
+export const BookCategoryUrl = `${baseUrl}/getAllBkCategory`
+export const BookSubCategoryUrl = `${baseUrl}/getsubcategorybycategory`
 

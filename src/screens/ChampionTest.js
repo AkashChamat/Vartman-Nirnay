@@ -6,7 +6,10 @@ import {
   ScrollView,
   Dimensions,
   TouchableOpacity,
+  BackHandler,
+  Alert,
 } from 'react-native';
+import {useFocusEffect} from '@react-navigation/native';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import Header from '../Components/Header';
 import TestInstructions from '../Components/TestInstructions';
@@ -45,14 +48,15 @@ import {
   renderNavigationButtons,
   renderSubmissionLoading,
   initializeTestTimer,
-  fetchTestQuestions, 
+  fetchTestQuestions,
 } from '../Components/ChampionUtil';
 
 const {width} = Dimensions.get('window');
 
 const ChampionTest = ({route, navigation}) => {
   const {testId, testTitle, source} = route.params || {};
-
+  const [isNavigationWarningActive, setIsNavigationWarningActive] =
+    useState(false);
   // Determine which API to use based on source or route name
   const isFromTestPaper =
     source === 'TestPaper' || route.name === 'TestFromPaper';
@@ -131,6 +135,48 @@ const ChampionTest = ({route, navigation}) => {
     }
   }, [testId, isFromTestPaper]);
 
+  // Handle hardware back button and navigation gestures
+  useFocusEffect(
+    React.useCallback(() => {
+      const onBackPress = () => {
+        // Only show warning if test has started and not completed
+        if (testStarted && !isTestCompleted && !showInstructions) {
+          showNavigationWarning();
+          return true; // Prevent default back action
+        }
+        return false; // Allow default back action
+      };
+
+      const subscription = BackHandler.addEventListener(
+        'hardwareBackPress',
+        onBackPress,
+      );
+
+      return () => subscription.remove();
+    }, [testStarted, isTestCompleted, showInstructions]),
+  );
+
+  // Handle navigation gestures and other navigation events
+  useEffect(() => {
+    const unsubscribeBeforeRemove = navigation.addListener(
+      'beforeRemove',
+      e => {
+        // Only prevent navigation if test is active
+        if (!testStarted || isTestCompleted || showInstructions) {
+          return; // Allow navigation
+        }
+
+        // Prevent default behavior of leaving the screen
+        e.preventDefault();
+
+        // Show navigation warning
+        showNavigationWarning();
+      },
+    );
+
+    return unsubscribeBeforeRemove;
+  }, [navigation, testStarted, isTestCompleted, showInstructions]);
+
   // Event handlers using utility functions
   const onInstructionsAccept = () => {
     handleInstructionsAccept(setShowInstructions, setInstructionsAccepted);
@@ -169,13 +215,87 @@ const ChampionTest = ({route, navigation}) => {
   // Handle time up - only if test is not completed
   const handleTimeUp = () => {
     if (isTestCompleted) {
-      return; 
+      return;
     }
 
     showTimeUpMessage(() => {
       hideMessage();
       submitTest();
     });
+  };
+
+  // Handle test submission when user wants to navigate away
+  const submitTestAndNavigateBack = async () => {
+    const userId = getUserId();
+
+    if (!userId) {
+      showErrorMessage('Error', 'User not authenticated. Please login again.');
+      return;
+    }
+
+    if (!testStartTime) {
+      showErrorMessage(
+        'Error',
+        'Test timing data is missing. Please try again.',
+      );
+      return;
+    }
+
+    setIsTestCompleted(true);
+
+    try {
+      await handleTestSubmission(
+        testId,
+        selectedAnswers,
+        setIsSubmitting,
+        userId,
+        testStartTime,
+        response => {
+          // Success callback - navigate back without showing submission message
+          hideMessage();
+          navigation.goBack(); // Go back to previous screen
+        },
+        errorMessage => {
+          // Error callback - reset completion state on error
+          setIsTestCompleted(false);
+          showErrorMessage('Submission Failed', errorMessage);
+        },
+      );
+    } catch (error) {
+      console.error('❌ Test submission failed with error:', error);
+      // Reset completion state on error
+      setIsTestCompleted(false);
+    }
+  };
+
+  const showNavigationWarning = () => {
+    if (isNavigationWarningActive) return; // Prevent multiple alerts
+
+    setIsNavigationWarningActive(true);
+
+    Alert.alert(
+      'Submit Test?',
+      'If you navigate away, your test will be automatically submitted with current answers. Do you want to continue?',
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+          onPress: () => {
+            setIsNavigationWarningActive(false);
+          },
+        },
+        {
+          text: 'OK',
+          style: 'destructive',
+          onPress: () => {
+            setIsNavigationWarningActive(false);
+            // Set a flag to indicate this is a forced navigation
+            submitTestAndNavigateBack();
+          },
+        },
+      ],
+      {cancelable: false},
+    );
   };
 
   const handleSubmitTest = () => {
@@ -223,7 +343,6 @@ const ChampionTest = ({route, navigation}) => {
       return;
     }
 
-  
     setIsTestCompleted(true);
 
     try {
@@ -241,7 +360,7 @@ const ChampionTest = ({route, navigation}) => {
                 userId: userId,
                 testPaperId: testId,
                 testTitle: testData.testTitle,
-                source: source, 
+                source: source,
               });
             },
             () => {
@@ -328,9 +447,10 @@ const ChampionTest = ({route, navigation}) => {
   const currentQuestion = testData.questions[currentQuestionIndex];
   const answeredCount = Object.keys(selectedAnswers).length;
   const totalQuestions = testData?.questions?.length || 0;
-  
+
   // Check if current question is answered
-  const isCurrentQuestionAnswered = selectedAnswers[currentQuestion.id] !== undefined;
+  const isCurrentQuestionAnswered =
+    selectedAnswers[currentQuestion.id] !== undefined;
 
   // Main Test Screen
   return (
@@ -391,8 +511,8 @@ const ChampionTest = ({route, navigation}) => {
         </View>
       </View>
 
-      <ScrollView 
-        style={styles.content} 
+      <ScrollView
+        style={styles.content}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}>
         {/* Question Card */}
@@ -432,6 +552,30 @@ const ChampionTest = ({route, navigation}) => {
           </TouchableOpacity>
 
           <TouchableOpacity
+            style={[
+              styles.navButton,
+              styles.saveNextButton,
+              !isCurrentQuestionAnswered && styles.disabledSaveNextButton,
+            ]}
+            onPress={onNext}
+            disabled={
+              currentQuestionIndex >= testData.questions.length - 1 ||
+              !isCurrentQuestionAnswered
+            }>
+            <Text
+              style={[
+                styles.saveNextButtonText,
+                (currentQuestionIndex >= testData.questions.length - 1 ||
+                  !isCurrentQuestionAnswered) &&
+                  styles.disabledButtonText,
+              ]}>
+              {currentQuestionIndex < testData.questions.length - 1
+                ? 'Save & Next'
+                : 'Last Question'}
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
             style={[styles.navButton, styles.skipButton]}
             onPress={handleSkip}
             disabled={currentQuestionIndex >= testData.questions.length - 1}>
@@ -442,29 +586,6 @@ const ChampionTest = ({route, navigation}) => {
                   styles.disabledButtonText,
               ]}>
               Skip
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[
-              styles.navButton, 
-              styles.saveNextButton,
-              !isCurrentQuestionAnswered && styles.disabledSaveNextButton
-            ]}
-            onPress={onNext}
-            disabled={
-              currentQuestionIndex >= testData.questions.length - 1 || 
-              !isCurrentQuestionAnswered
-            }>
-            <Text
-              style={[
-                styles.saveNextButtonText,
-                (currentQuestionIndex >= testData.questions.length - 1 || 
-                 !isCurrentQuestionAnswered) && styles.disabledButtonText,
-              ]}>
-              {currentQuestionIndex < testData.questions.length - 1
-                ? 'Save & Next'
-                : 'Last Question'}
             </Text>
           </TouchableOpacity>
         </View>
@@ -691,7 +812,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 20,
     paddingVertical: 12,
-    paddingBottom: 24, // Extra padding from device navigation
+    paddingBottom: 26, // Extra padding from device navigation
   },
   navButton: {
     paddingHorizontal: 20,

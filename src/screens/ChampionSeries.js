@@ -9,21 +9,16 @@ import {
   Image,
   Dimensions,
   Animated,
+  Platform,
 } from 'react-native';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import Header from '../Components/Header';
 import TestTimer from '../Components/TestTimer';
-import {
-  championpaper,
-  getpaperbyid,
-  getAttemptCount,
-  getUserId,
-} from '../util/apiCall';
-import {showMessage} from 'react-native-flash-message';
-
 import Footer from '../Components/Footer';
-import {useAuth} from '../Auth/AuthContext';
+import {championpaper, getAttemptCount, getUserId} from '../util/apiCall';
+import {showMessage} from 'react-native-flash-message';
+import {generateAndDownloadTestPaper} from '../Components/PDFGenerator';
 
 const {width} = Dimensions.get('window');
 
@@ -33,93 +28,56 @@ const ChampionSeries = ({navigation}) => {
   const [error, setError] = useState(null);
   const [attemptCounts, setAttemptCounts] = useState({});
   const [loadingAttempts, setLoadingAttempts] = useState(false);
-  const {getUserId: getAuthUserId} = useAuth();
+  const [downloadingPapers, setDownloadingPapers] = useState({});
+
   const fetchAttemptCounts = async papers => {
     try {
       setLoadingAttempts(true);
       const userId = await getUserId();
-
-      if (!userId) {
-        return;
-      }
+      if (!userId) return;
 
       const attemptCountsData = {};
-
-      const promises = papers.map(async (paper, index) => {
+      const promises = papers.map(async paper => {
         try {
-          const startTime = Date.now();
           const attemptData = await getAttemptCount(userId, paper.id);
-          const endTime = Date.now();
-
           let count = 0;
-
           if (attemptData && typeof attemptData === 'object') {
-            if (attemptData.attemptCount !== undefined) {
+            if (attemptData.attemptCount !== undefined)
               count = attemptData.attemptCount;
-            } else if (attemptData.count !== undefined) {
-              count = attemptData.count;
-            } else if (
+            else if (attemptData.count !== undefined) count = attemptData.count;
+            else if (
               attemptData.data &&
               attemptData.data.attemptCount !== undefined
-            ) {
+            )
               count = attemptData.data.attemptCount;
-            } else if (
-              attemptData.data &&
-              attemptData.data.count !== undefined
-            ) {
+            else if (attemptData.data && attemptData.data.count !== undefined)
               count = attemptData.data.count;
-            }
           } else if (typeof attemptData === 'number') {
             count = attemptData;
           }
-
           attemptCountsData[paper.id] = count;
         } catch (error) {
           console.error(
-            `❌ ==> Error fetching attempt count for paper ${paper.id}`,
+            `Error fetching attempt count for paper ${paper.id}`,
+            error,
           );
-          console.error(`📝 ==> Paper title: "${paper.testTitle}"`);
-          console.error(`🔍 ==> Error details:`, {
-            message: error.message,
-            status: error.response?.status,
-            statusText: error.response?.statusText,
-            data: error.response?.data,
-          });
-
           attemptCountsData[paper.id] = 0; // Default to 0 if error
         }
       });
 
       await Promise.all(promises);
-
       setAttemptCounts(attemptCountsData);
-
-      const totalAttempts = Object.values(attemptCountsData).reduce(
-        (sum, count) => sum + count,
-        0,
-      );
-
-      Object.entries(attemptCountsData).forEach(([paperId, count]) => {
-        const paper = papers.find(p => p.id.toString() === paperId.toString());
-      });
     } catch (error) {
-      console.error('❌ ==> Critical error in fetchAttemptCounts:');
-      console.error('🔍 ==> Error details:', {
-        message: error.message,
-        stack: error.stack,
-        name: error.name,
-      });
+      console.error('Critical error in fetchAttemptCounts:', error);
     } finally {
       setLoadingAttempts(false);
     }
   };
 
   const getAttemptCountForPaper = paperId => {
-    const count = attemptCounts[paperId] || 0;
-    return count;
+    return attemptCounts[paperId] || 0;
   };
 
-  // Optimized BlinkingNewBadge that stops after a certain time
   const BlinkingNewBadge = ({testTitle}) => {
     const [fadeAnim] = useState(new Animated.Value(1));
     const [shouldBlink, setShouldBlink] = useState(true);
@@ -129,29 +87,23 @@ const ChampionSeries = ({navigation}) => {
     useEffect(() => {
       if (!shouldBlink) return;
 
-      const startBlinking = () => {
-        animationRef.current = Animated.loop(
-          Animated.sequence([
-            Animated.timing(fadeAnim, {
-              toValue: 0.3,
-              duration: 350,
-              useNativeDriver: true,
-            }),
-            Animated.timing(fadeAnim, {
-              toValue: 1,
-              duration: 350,
-              useNativeDriver: true,
-            }),
-          ]),
-          {iterations: -1},
-        );
+      animationRef.current = Animated.loop(
+        Animated.sequence([
+          Animated.timing(fadeAnim, {
+            toValue: 0.3,
+            duration: 350,
+            useNativeDriver: true,
+          }),
+          Animated.timing(fadeAnim, {
+            toValue: 1,
+            duration: 350,
+            useNativeDriver: true,
+          }),
+        ]),
+        {iterations: -1},
+      );
+      animationRef.current.start();
 
-        animationRef.current.start();
-      };
-
-      startBlinking();
-
-      // Stop blinking after 10 seconds to reduce resource usage
       timeoutRef.current = setTimeout(() => {
         setShouldBlink(false);
       }, 10000);
@@ -169,7 +121,6 @@ const ChampionSeries = ({navigation}) => {
     }, [fadeAnim, shouldBlink]);
 
     if (!shouldBlink) {
-      // Show static badge after blinking stops
       return (
         <View style={styles.newBadge}>
           <Text style={styles.newBadgeText}>NEW</Text>
@@ -184,21 +135,66 @@ const ChampionSeries = ({navigation}) => {
     );
   };
 
-  // Check if paper is the latest (first in sorted array)
   const isLatestPaper = testPaper => {
     return testPapers.length > 0 && testPapers[0].id === testPaper.id;
   };
 
-  // Function to check test timing
+  const fetchTestPapers = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const response = await championpaper();
+      const activePapers = (response.data || response)
+        .filter(paper => paper.status === true)
+        .sort((a, b) => b.id - a.id);
+      setTestPapers(activePapers);
+      await fetchAttemptCounts(activePapers);
+    } catch (err) {
+      setError('Failed to load test papers');
+      console.error('Error in fetchTestPapers:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchTestPapers();
+  }, []);
+
+  const formatDate = dateString => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+    });
+  };
+
+  const formatTime = timeString => {
+    if (timeString.includes(':')) {
+      const [hours, minutes] = timeString.split(':').map(num => parseInt(num));
+      const date = new Date();
+      date.setHours(hours, minutes, 0, 0);
+      return date.toLocaleTimeString('en-US', {
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true,
+      });
+    }
+    const time = new Date(timeString);
+    return time.toLocaleTimeString('en-US', {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true,
+    });
+  };
+
   const checkTestTiming = testPaper => {
     const now = new Date();
 
-    // Create start datetime
     const startDateTime = new Date(
       `${testPaper.testStartDate}T${testPaper.startTime}`,
     );
-
-    // Create end datetime
     const endDateTime = new Date(
       `${testPaper.testEndDate}T${testPaper.endTime}`,
     );
@@ -228,93 +224,7 @@ const ChampionSeries = ({navigation}) => {
     };
   };
 
-  const fetchTestPapers = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-
-      const response = await championpaper();
-
-      // Filter out inactive tests (status: false) and sort in descending order by ID
-      const activePapers = (response.data || response)
-        .filter(paper => paper.status === true) // Only show active tests
-        .sort((a, b) => b.id - a.id);
-
-      setTestPapers(activePapers);
-
-      await fetchAttemptCounts(activePapers);
-      setError(null);
-    } catch (err) {
-      const errorMessage = 'Failed to load test papers';
-      setError(errorMessage);
-      console.error('❌ ==> Error in fetchTestPapers:', {
-        message: err.message,
-        status: err.response?.status,
-        data: err.response?.data,
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchTestPapers();
-  }, []);
-
-  const formatDate = dateString => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-    });
-  };
-
-  const handleDownloadTestPaper = async testPaper => {
-    if (!testPaper.downloadTestPaper) {
-      showMessage({
-        message: 'Download Not Available',
-        description: 'Test paper download is not available for this test.',
-        type: 'warning',
-        icon: 'auto',
-      });
-      return;
-    }
-
-    // You'll need to implement the actual download logic based on your API
-    // For now, showing a message that download functionality needs to be implemented
-    showMessage({
-      message: 'Download Started',
-      description: 'Test paper download will be implemented based on your API.',
-      type: 'info',
-      icon: 'auto',
-    });
-  };
-
-  const formatTime = timeString => {
-    // Handle time format properly
-    if (timeString.includes(':')) {
-      const [hours, minutes] = timeString.split(':').map(num => parseInt(num));
-      const date = new Date();
-      date.setHours(hours, minutes, 0, 0);
-      return date.toLocaleTimeString('en-US', {
-        hour: '2-digit',
-        minute: '2-digit',
-        hour12: true,
-      });
-    }
-
-    const time = new Date(timeString);
-    return time.toLocaleTimeString('en-US', {
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: true,
-    });
-  };
-
-  // Simplified handleStartTest - only check timing, no attempt limits
   const handleStartTest = testPaper => {
-    // Check test timing
     const timingCheck = checkTestTiming(testPaper);
     if (!timingCheck.canStart) {
       showMessage({
@@ -329,8 +239,10 @@ const ChampionSeries = ({navigation}) => {
       return;
     }
 
-    // All checks passed, navigate to test
     const attemptCount = getAttemptCountForPaper(testPaper.id);
+
+    // You can add attempt limits checks here if needed
+
     navigation.navigate('ChampionTest', {
       testId: testPaper.id,
       testTitle: testPaper.testTitle || 'Champion Test',
@@ -342,7 +254,6 @@ const ChampionSeries = ({navigation}) => {
   };
 
   const handleViewResult = testPaper => {
-    // Check if results are available
     if (!testPaper.showTestResult) {
       showMessage({
         message: 'Results Not Available',
@@ -352,32 +263,27 @@ const ChampionSeries = ({navigation}) => {
       });
       return;
     }
-
     navigation.navigate('TestResult', {
       testId: testPaper.id,
       testTitle: testPaper.testTitle,
     });
   };
 
-  // Handle test press from timer component
-  const handleTestPress = latestPaper => {
-    if (latestPaper) {
-      handleStartTest(latestPaper);
-    }
-  };
-
   const handleViewAllResult = testPaper => {
-    // Navigate to AllResults screen with test details
+    console.log('Navigating with pdfUrl:', testPaper.allResultPdf);
     navigation.navigate('AllResult', {
       testId: testPaper.id,
       testTitle: testPaper.testTitle,
-      pdfUrl: testPaper.allResultPdf || null, // Optional PDF URL if available
+      pdfUrl: testPaper.allResultPdf || null,
+      testStartDate: testPaper.testStartDate,
+      noOfQuestions: testPaper.noOfQuestions,
+      totalMarks: testPaper.totalMarks,
     });
   };
+
   const handleViewMyResult = async testPaper => {
     try {
-      const userId = getAuthUserId();
-
+      const userId = await getUserId();
       if (!userId) {
         showMessage({
           message: 'User not authenticated',
@@ -387,9 +293,7 @@ const ChampionSeries = ({navigation}) => {
         return;
       }
 
-      // Check if user has attempted the test
       const attemptCount = getAttemptCountForPaper(testPaper.id);
-
       if (attemptCount === 0) {
         showMessage({
           message: 'No Attempts Found',
@@ -397,13 +301,11 @@ const ChampionSeries = ({navigation}) => {
           type: 'warning',
           icon: 'auto',
         });
-
         return;
       }
 
-      // Navigate to ChampionResult
       navigation.navigate('ChampionResult', {
-        userId: userId,
+        userId,
         testPaperId: testPaper.id,
         testTitle: testPaper.testTitle,
         source: 'ChampionSeries',
@@ -418,11 +320,41 @@ const ChampionSeries = ({navigation}) => {
     }
   };
 
+  const handleDownloadTestPaper = async testPaper => {
+    if (!testPaper) {
+      showMessage({
+        message: 'Error',
+        description: 'Test paper data not available.',
+        type: 'danger',
+      });
+      return;
+    }
+
+    try {
+      setDownloadingPapers(prev => ({...prev, [testPaper.id]: true}));
+
+      await generateAndDownloadTestPaper(testPaper);
+
+      showMessage({
+        message: 'Download complete',
+        description: 'Your test paper PDF has been saved.',
+        type: 'success',
+      });
+    } catch (error) {
+      console.error('Download failed:', error);
+      showMessage({
+        message: 'Download Failed',
+        description: error.message || 'An unexpected error occurred.',
+        type: 'danger',
+      });
+    } finally {
+      setDownloadingPapers(prev => ({...prev, [testPaper.id]: false}));
+    }
+  };
+
   const renderTestCard = ({item}) => {
     const attemptCount = getAttemptCountForPaper(item.id);
-    const isNew = isLatestPaper(item); // Show badge for the latest paper
-
-    // Check if image exists and is valid
+    const isNew = isLatestPaper(item);
     const hasValidImage = item.image && item.image.trim() !== '';
 
     return (
@@ -468,15 +400,6 @@ const ChampionSeries = ({navigation}) => {
             </View>
           </View>
 
-          {/* Result availability message */}
-          {/* {!item.showTestResult && !item.showAllResult && (
-          <View style={styles.attemptInfoContainer}>
-            <Text style={styles.resultMessage}>
-              Results will not be shown
-            </Text>
-          </View>
-        )} */}
-
           <View style={styles.buttonContainerCompact}>
             <TouchableOpacity
               style={styles.startButtonCompact}
@@ -485,7 +408,6 @@ const ChampionSeries = ({navigation}) => {
             </TouchableOpacity>
 
             <View style={styles.resultActionsGroup}>
-              {/* All Result Button - Only show if showAllResult is true */}
               {item.showAllResult && (
                 <TouchableOpacity
                   style={styles.resultButtonCompact}
@@ -494,7 +416,6 @@ const ChampionSeries = ({navigation}) => {
                 </TouchableOpacity>
               )}
 
-              {/* My Result Button - Only show if showTestResult is true */}
               {item.showTestResult && (
                 <TouchableOpacity
                   style={styles.resultButtonCompact}
@@ -503,12 +424,16 @@ const ChampionSeries = ({navigation}) => {
                 </TouchableOpacity>
               )}
 
-              {/* Download Button - Only show if downloadTestPaper is true */}
               {item.downloadTestPaper && (
                 <TouchableOpacity
                   style={styles.downloadIconButton}
-                  onPress={() => handleDownloadTestPaper(item)}>
-                  <Icon name="file-download" size={18} color="#3182CE" />
+                  onPress={() => handleDownloadTestPaper(item)}
+                  disabled={downloadingPapers[item.id]}>
+                  {downloadingPapers[item.id] ? (
+                    <ActivityIndicator size="small" color="#3182CE" />
+                  ) : (
+                    <Icon name="file-download" size={18} color="#3182CE" />
+                  )}
                 </TouchableOpacity>
               )}
             </View>
@@ -547,6 +472,7 @@ const ChampionSeries = ({navigation}) => {
           <ActivityIndicator size="large" color="#0288D1" />
           <Text style={styles.loadingText}>Loading test papers...</Text>
         </View>
+        <Footer />
       </View>
     );
   }
@@ -562,7 +488,14 @@ const ChampionSeries = ({navigation}) => {
           </Text>
         </View>
 
-        <TestTimer navigation={navigation} onTestPress={handleTestPress} />
+        <TestTimer
+          navigation={navigation}
+          onTestPress={paper => {
+            if (isLatestPaper(paper)) {
+              handleStartTest(paper);
+            }
+          }}
+        />
 
         {error ? (
           renderErrorState()
@@ -587,14 +520,37 @@ const ChampionSeries = ({navigation}) => {
 export default ChampionSeries;
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#FAFBFD',
+  container: {flex: 1, backgroundColor: '#FAFBFD'},
+  content: {flex: 1, paddingHorizontal: 16},
+  headerSection: {paddingVertical: 12, marginBottom: 8},
+  pageTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#0288D1',
+    textAlign: 'center',
+    marginBottom: 4,
   },
-  content: {
-    flex: 1,
-    paddingHorizontal: 16,
+  pageSubtitle: {
+    fontSize: 12,
+    color: '#0D47A1',
+    textAlign: 'center',
   },
+  listContainer: {paddingBottom: 100},
+  card: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    marginBottom: 16,
+    elevation: 3,
+    shadowColor: '#8B9DC3',
+    shadowOffset: {width: 0, height: 2},
+    shadowOpacity: 0.1,
+    shadowRadius: 6,
+    borderWidth: 0.5,
+    borderColor: '#F0F4F8',
+    overflow: 'hidden',
+  },
+  imageContainer: {position: 'relative', height: 180},
+  testImage: {width: '100%', height: '100%'},
   noImageContainer: {
     width: '100%',
     height: '100%',
@@ -610,52 +566,7 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     marginTop: 8,
   },
-  headerSection: {
-    paddingVertical: 12,
-    marginBottom: 8,
-  },
-  pageTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#0288D1',
-    textAlign: 'center',
-    marginBottom: 4,
-  },
-  pageSubtitle: {
-    fontSize: 12,
-    color: '#0D47A1',
-    textAlign: 'center',
-  },
-  listContainer: {
-    paddingBottom: 100,
-  },
-  card: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    marginBottom: 16,
-    elevation: 3,
-    shadowColor: '#8B9DC3',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 6,
-    borderWidth: 0.5,
-    borderColor: '#F0F4F8',
-    overflow: 'hidden',
-  },
-  imageContainer: {
-    position: 'relative',
-    height: 180,
-  },
-  testImage: {
-    width: '100%',
-    height: '100%',
-  },
-  cardContent: {
-    padding: 16,
-  },
+  cardContent: {padding: 16},
   cardTitle: {
     fontSize: 13,
     fontWeight: '700',
@@ -663,6 +574,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     lineHeight: 22,
     alignSelf: 'center',
+    textAlign: 'center',
   },
   detailsContainer: {
     flexDirection: 'row',
@@ -670,9 +582,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     paddingHorizontal: 8,
   },
-  detailRow: {
-    alignItems: 'center',
-  },
+  detailRow: {alignItems: 'center'},
   detailLabel: {
     fontSize: 12,
     color: '#8B9DC3',
@@ -684,18 +594,13 @@ const styles = StyleSheet.create({
     color: '#2D3748',
     fontWeight: '700',
   },
-  attemptInfoContainer: {
-    backgroundColor: '#F7FAFC',
-    borderRadius: 8,
-    padding: 8,
-    marginBottom: 12,
+  buttonContainerCompact: {flexDirection: 'column', gap: 8},
+  startButtonCompact: {
+    backgroundColor: '#3182CE',
+    paddingVertical: 12,
+    borderRadius: 10,
     alignItems: 'center',
-  },
-  resultMessage: {
-    fontSize: 11,
-    color: '#E53E3E',
-    textAlign: 'center',
-    fontWeight: '500',
+    justifyContent: 'center',
   },
   startButtonText: {
     color: '#FFFFFF',
@@ -703,17 +608,33 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     textAlign: 'center',
   },
-  resultButtonText: {
-    color: '#3182CE',
-    fontSize: 11,
-    fontWeight: '600',
-    textAlign: 'center',
+  resultActionsGroup: {
+    flexDirection: 'row',
+    gap: 6,
+    alignItems: 'center',
   },
-  disabledResultText: {
-    color: '#A0AEC0',
-    fontSize: 11,
+  resultButtonCompact: {
+    flex: 1,
+    paddingVertical: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#3182CE',
+  },
+  resultButtonTextCompact: {
+    color: '#3182CE',
+    fontSize: 12,
     fontWeight: '600',
-    textAlign: 'center',
+  },
+  downloadIconButton: {
+    padding: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minWidth: 36,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#3182CE',
   },
   loadingContainer: {
     flex: 1,
@@ -724,11 +645,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#0288D1',
     marginTop: 12,
-  },
-  loadingSubText: {
-    fontSize: 14,
-    color: '#718096',
-    marginTop: 4,
   },
   emptyState: {
     flex: 1,
@@ -789,44 +705,5 @@ const styles = StyleSheet.create({
     fontSize: width * 0.035,
     letterSpacing: 0.5,
     transform: [{rotate: '0deg'}],
-  },
-  buttonContainerCompact: {
-    flexDirection: 'column',
-    gap: 8,
-  },
-  startButtonCompact: {
-    backgroundColor: '#3182CE',
-    paddingVertical: 12,
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  resultActionsGroup: {
-    flexDirection: 'row',
-    gap: 6,
-    alignItems: 'center',
-  },
-  resultButtonCompact: {
-    flex: 1,
-    paddingVertical: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: '#3182CE',
-  },
-  downloadIconButton: {
-    padding: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-    minWidth: 36,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: '#3182CE',
-  },
-  resultButtonTextCompact: {
-    color: '#3182CE',
-    fontSize: 12,
-    fontWeight: '600',
   },
 });

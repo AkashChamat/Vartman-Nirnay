@@ -19,16 +19,16 @@ const ImageSlider = ({ images = [], isLoading = false, onImagePress }) => {
   
   // Responsive sizing logic
   const isTablet = windowWidth >= 768;
-  const sliderWidth = windowWidth - (isTablet ? 40 : 10); // More margin on tablets
+  const sliderWidth = windowWidth - (isTablet ? 15 :6); // More margin on tablets
   
   // Dynamic height calculation
   const getSliderHeight = () => {
     if (isTablet) {
       // For tablets, use a larger height with aspect ratio
-      return Math.min(250, windowWidth * 0.35);
+      return Math.min(200, windowWidth * 0.28);
     } else {
       // For mobile, use smaller height
-      return Math.min(180, windowWidth * 0.45);
+      return Math.min(160, windowWidth * 0.4);
     }
   };
   
@@ -127,7 +127,7 @@ const ImageSlider = ({ images = [], isLoading = false, onImagePress }) => {
 
 const styles = StyleSheet.create({
   container: {
-    marginVertical: 10,
+    marginVertical: 2,
     alignItems: 'center',
   },
   carouselContainer: {
@@ -175,7 +175,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    marginTop: 10,
+    marginTop: 2,
   },
   dot: {
     borderRadius: 5,

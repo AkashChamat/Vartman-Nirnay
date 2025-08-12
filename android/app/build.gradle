@@ -78,7 +78,8 @@ android {
             signingConfig signingConfigs.release
             minifyEnabled enableProguardInReleaseBuilds
             shrinkResources false
-            proguardFiles getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro"
+            proguardFiles getDefaultProguardFile("proguard-android-optimize.txt"),
+            "proguard-rules.pro"
         }
     }
     
@@ -109,6 +110,12 @@ android {
                 'META-INF/NOTICE.txt'
             ]
         }
+         packagingOptions {
+        pickFirst '**/libc++_shared.so'
+        pickFirst '**/libjsc.so'
+        pickFirst '**/libhermes.so'
+    }
+    
     }
 
      // ADDED: Configure bundle for 16KB page size support
@@ -123,6 +130,8 @@ android {
             enableSplit = true
         }
     }
+
+   
 
 }
 

@@ -45,6 +45,11 @@ import {
   testseriesPaymentUrl,
   getAllBooksUrl,
   bookpaymentUrl,
+  saveAddressUrl,
+  deleteAddressUrl,
+  updateAddressUrl,
+  BookCategoryUrl,
+  BookSubCategoryUrl,
 } from "./Url"
 import { __DEV__ } from "react-native"
 
@@ -148,6 +153,57 @@ const createAxiosInstance = () => {
 }
 
 const apiClient = createAxiosInstance()
+
+const putAPI = async (url, body, headers = {}, requiresAuth = false) => {
+  try {
+    const config = {
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+        "User-Agent": "MyReactNativeApp/1.0",
+        ...headers,
+      },
+    };
+
+    let response;
+    if (requiresAuth) {
+      response = await apiClient.put(url, body, config);
+    } else {
+      response = await axios.put(url, body, config);
+    }
+
+    return response.data;
+  } catch (error) {
+    throw error;
+  }
+};
+
+// Add this deleteAPI function to your apiCall.js file (or wherever your API functions are)
+
+const deleteAPI = async (url, headers = {}, requiresAuth = false) => {
+  try {
+    const config = {
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+        "User-Agent": "MyReactNativeApp/1.0",
+        ...headers,
+      },
+    };
+
+    let response;
+    if (requiresAuth) {
+      response = await apiClient.delete(url, config);
+    } else {
+      response = await axios.delete(url, config);
+    }
+
+    return response.data;
+  } catch (error) {
+    throw error;
+  }
+};
+
 
 const postAPI = async (url, body, headers = {}, requiresAuth = false) => {
   try {
@@ -951,5 +1007,29 @@ export const verifyBookPayment = async (orderId, paymentId, sessionId) => {
   }
 }
 
+
+// Add Address
+export const addAddress = async (body) => {
+  // body: { userId, ...address fields }, must include userId
+  return await postAPI(saveAddressUrl, body, {}, true);
+};
+
+// Update Address
+export const updateAddress = async (addressId, body) => {
+  const urlWithId = `${updateAddressUrl}/${addressId}`;
+  return await putAPI(urlWithId, body, {}, true);
+};
+
+// Update your deleteAddress function to use deleteAPI instead of postAPI  
+export const deleteAddress = async (addressId) => {
+  return await deleteAPI(`${deleteAddressUrl}/${addressId}`, {}, true);
+};
+
+export const getBookCategories = () => getAPI(BookCategoryUrl, {}, null, true)
+
+export const getBookSubCategories = (categoryId) => {
+  const url = `${BookSubCategoryUrl}/${categoryId}`;
+  return getAPI(url, {}, null, true);
+}
 
 export { postAPI, getAPI, validateRegistrationPayload }

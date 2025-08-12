@@ -1,254 +1,503 @@
+// /**
+//  * Fixed JWT utilities - ONLY fixes the atob error, nothing else changed
+//  */
+
+// /**
+//  * Manual Base64 URL decode - works in all React Native environments
+//  */
+// const base64UrlDecode = (str) => {
+//   if (!str || typeof str !== 'string') {
+//     throw new Error('Invalid base64 string provided');
+//   }
+
+//   // Replace URL-safe characters with standard base64 characters
+//   let base64 = str.replace(/-/g, '+').replace(/_/g, '/');
+
+//   // Add padding if needed
+//   const padding = base64.length % 4;
+//   if (padding) {
+//     base64 += '='.repeat(4 - padding);
+//   }
+
+//   // Manual base64 decode implementation
+//   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=';
+//   let result = '';
+//   let i = 0;
+
+//   base64 = base64.replace(/[^A-Za-z0-9+/=]/g, '');
+
+//   while (i < base64.length) {
+//     const encoded1 = chars.indexOf(base64.charAt(i++));
+//     const encoded2 = chars.indexOf(base64.charAt(i++));
+//     const encoded3 = chars.indexOf(base64.charAt(i++));
+//     const encoded4 = chars.indexOf(base64.charAt(i++));
+
+//     const bitmap = (encoded1 << 18) | (encoded2 << 12) |
+//                    ((encoded3 & 63) << 6) | (encoded4 & 63);
+
+//     result += String.fromCharCode((bitmap >> 16) & 255);
+
+//     if (encoded3 !== 64) {
+//       result += String.fromCharCode((bitmap >> 8) & 255);
+//     }
+
+//     if (encoded4 !== 64) {
+//       result += String.fromCharCode(bitmap & 255);
+//     }
+//   }
+
+//   return result;
+// };
+
+// /**
+//  * Decode JWT token payload
+//  */
+// export const decodeJWTPayload = (token) => {
+//   if (!token || typeof token !== 'string') {
+//     return null;
+//   }
+
+//   try {
+//     const parts = token.split('.');
+//     if (parts.length !== 3) {
+//       return null;
+//     }
+
+//     const payload = base64UrlDecode(parts[1]);
+//     return JSON.parse(payload);
+//   } catch (error) {
+//     console.error('[JWT] Failed to decode token payload:', error.message);
+//     return null;
+//   }
+// };
+
+// /**
+//  * Check if JWT token is expired
+//  */
+// export const isJWTExpired = (token) => {
+//   if (!token) return true;
+
+//   try {
+//     const payload = decodeJWTPayload(token);
+//     if (!payload || !payload.exp) return true;
+
+//     const currentTime = Math.floor(Date.now() / 1000);
+//     return payload.exp <= currentTime;
+//   } catch (error) {
+//     return true;
+//   }
+// };
+
+// /**
+//  * Extract user information from JWT token
+//  */
+// export const extractUserInfo = (token) => {
+//   try {
+//     const payload = decodeJWTPayload(token);
+//     if (!payload) return null;
+
+//     return {
+//       id: payload.id || payload.sub || payload.userId || payload.user_id || null,
+//       email: payload.email || payload.userEmail || payload.user_email || payload.sub || null,
+//       name: payload.name || payload.userName || payload.user_name || payload.fullName || payload.full_name || null,
+//       role: payload.role || payload.roles || null,
+//       exp: payload.exp || null,
+//       iat: payload.iat || null,
+//       branchCode: payload.branchCode || payload.branch_code || null,
+//       systems: payload.systems || null,
+//     };
+//   } catch (error) {
+//     return null;
+//   }
+// };
+
+// /**
+//  * Safe JWT validation
+//  */
+// export const safeValidateJWT = (token, context = 'Unknown') => {
+//   const result = {
+//     valid: false,
+//     error: null,
+//     decoded: null,
+//     userInfo: null,
+//     isExpired: true,
+//   };
+
+//   try {
+//     if (!token || typeof token !== 'string' || token.trim() === '') {
+//       result.error = 'Invalid or empty token';
+//       return result;
+//     }
+
+//     const parts = token.split('.');
+//     if (parts.length !== 3) {
+//       result.error = `Invalid JWT structure`;
+//       return result;
+//     }
+
+//     const payload = decodeJWTPayload(token);
+//     if (!payload) {
+//       result.error = 'Failed to decode JWT payload';
+//       return result;
+//     }
+
+//     const isExpired = isJWTExpired(token);
+//     const userInfo = extractUserInfo(token);
+
+//     result.valid = true;
+//     result.decoded = payload;
+//     result.userInfo = userInfo;
+//     result.isExpired = isExpired;
+//     result.error = null;
+
+//     return result;
+//   } catch (error) {
+//     result.error = error.message;
+//     return result;
+//   }
+// };
+
+// export const debugJWT = (token, context = 'Debug') => {
+//   return safeValidateJWT(token, context);
+// };
+
+// export const testJWTUtilities = () => {
+//   return { success: true };
+// };
+
+// export default {
+//   decodeJWTPayload,
+//   isJWTExpired,
+//   extractUserInfo,
+//   safeValidateJWT,
+//   debugJWT,
+//   testJWTUtilities
+// };
+
 /**
- * Pure JavaScript JWT utilities without any dependencies
+ * Simple JWT utilities - No external dependencies
+ * Based on your working project implementation
  */
 
-// Enhanced Base64 URL-safe decode function
-const base64UrlDecode = (str) => {
+/**
+ * Fixed JWT utilities for React Native
+ * Resolves the JSON Parse error and token expiration issues
+ */
+
+// Improved base64 URL decode function
+const base64UrlDecode = str => {
+  if (!str || typeof str !== 'string') {
+    console.error('[JWT] Invalid base64 string:', typeof str);
+    throw new Error('Invalid base64 string provided');
+  }
+
   try {
-    // Convert base64url to base64
-    let base64 = str.replace(/-/g, "+").replace(/_/g, "/")
-
-    // Add padding if needed
-    while (base64.length % 4) {
-      base64 += "="
-    }
-
-    // Try using Buffer first (if available in React Native)
-    if (typeof Buffer !== "undefined") {
-      try {
-        return Buffer.from(base64, "base64").toString("utf8")
-      } catch (bufferError) {
+    // Try native implementation first
+    if (typeof global.atob !== 'undefined') {
+      let base64 = str.replace(/-/g, '+').replace(/_/g, '/');
+      const padding = base64.length % 4;
+      if (padding) {
+        base64 += '='.repeat(4 - padding);
       }
+      return global.atob(base64);
     }
 
-    // Manual base64 decode with better character handling
-    const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
-    let result = ""
-    let i = 0
+    // Fallback to manual implementation
+    let base64 = str.replace(/-/g, '+').replace(/_/g, '/');
+    const padding = base64.length % 4;
+    if (padding) {
+      base64 += '='.repeat(4 - padding);
+    }
 
-    // Clean the input
-    base64 = base64.replace(/[^A-Za-z0-9+/=]/g, "")
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=';
+    let result = '';
+    let i = 0;
+
+    base64 = base64.replace(/[^A-Za-z0-9+/=]/g, '');
 
     while (i < base64.length) {
-      const encoded1 = chars.indexOf(base64.charAt(i++))
-      const encoded2 = chars.indexOf(base64.charAt(i++))
-      const encoded3 = chars.indexOf(base64.charAt(i++))
-      const encoded4 = chars.indexOf(base64.charAt(i++))
+      const encoded1 = chars.indexOf(base64.charAt(i++));
+      const encoded2 = chars.indexOf(base64.charAt(i++));
+      const encoded3 = chars.indexOf(base64.charAt(i++));
+      const encoded4 = chars.indexOf(base64.charAt(i++));
 
       if (encoded1 === -1 || encoded2 === -1) {
-        throw new Error("Invalid base64 character")
+        break;
       }
 
       const bitmap =
-        (encoded1 << 18) | (encoded2 << 12) | ((encoded3 === -1 ? 0 : encoded3) << 6) | (encoded4 === -1 ? 0 : encoded4)
+        (encoded1 << 18) |
+        (encoded2 << 12) |
+        ((encoded3 === -1 ? 0 : encoded3 & 63) << 6) |
+        (encoded4 === -1 ? 0 : encoded4 & 63);
 
-      result += String.fromCharCode((bitmap >> 16) & 255)
+      result += String.fromCharCode((bitmap >> 16) & 255);
 
       if (encoded3 !== -1 && encoded3 !== 64) {
-        result += String.fromCharCode((bitmap >> 8) & 255)
+        result += String.fromCharCode((bitmap >> 8) & 255);
       }
 
       if (encoded4 !== -1 && encoded4 !== 64) {
-        result += String.fromCharCode(bitmap & 255)
+        result += String.fromCharCode(bitmap & 255);
       }
     }
 
-    return result
+    return result;
   } catch (error) {
-    console.error("[JWT-UTILS] Base64 decode error:", error.message)
-    throw new Error("Failed to decode base64 string: " + error.message)
+    console.error('[JWT] Base64 decode error:', error);
+    throw new Error(`Failed to decode base64: ${error.message}`);
   }
-}
+};
 
-// Pure JavaScript JWT decoder
-export const decodeJWT = (token) => {
-  try {
-    if (!token || typeof token !== "string") {
-      throw new Error("Invalid token: token must be a non-empty string")
-    }
-    // Split the token into parts
-    const parts = token.split(".")
-    if (parts.length !== 3) {
-      throw new Error(`Invalid token format: expected 3 parts, got ${parts.length}`)
-    }
-
-    const [headerB64, payloadB64, signature] = parts
-
-    // Decode header
-    let header
+ const isJWTExpiredAsync = async (token) => {
+  return new Promise((resolve) => {
     try {
-      const headerJson = base64UrlDecode(headerB64)
-      header = JSON.parse(headerJson)
-    } catch (error) {
-      console.error("[JWT-UTILS] Header decode error:", error.message)
-      throw new Error("Invalid token: failed to decode header")
-    }
-
-    // Decode payload
-    let payload
-    try {
-      const payloadJson = base64UrlDecode(payloadB64)
-
-      // Clean any potential invisible characters
-      const cleanPayloadJson = payloadJson.replace(/[\x00-\x1F\x7F]/g, "")
-
-      payload = JSON.parse(cleanPayloadJson)
-    } catch (error) {
-      console.error("[JWT-UTILS] Payload decode error:", error.message)
-      console.error("[JWT-UTILS] Raw payload base64:", payloadB64)
-      throw new Error("Invalid token: failed to decode payload - " + error.message)
-    }
-
-    return {
-      header,
-      payload,
-      signature,
-    }
-  } catch (error) {
-    console.error("[JWT-UTILS] JWT decode failed:", error.message)
-    throw error
-  }
-}
-
-// Check if JWT token is expired
-export const isJWTExpired = (token) => {
-  try {
-    if (!token) {
-      return true
-    }
-
-    const decoded = decodeJWT(token)
-    const { payload } = decoded
-
-    if (!payload.exp) {
-      return false // If no exp claim, consider it valid
-    }
-
-    const currentTime = Math.floor(Date.now() / 1000)
-    const isExpired = payload.exp <= currentTime
-
-    return isExpired
-  } catch (error) {
-    console.error("[JWT-UTILS] Token expiration check failed:", error.message)
-    return true // If we can't decode it, consider it expired
-  }
-}
-
-// Get payload from JWT token
-export const getJWTPayload = (token) => {
-  try {
-    const decoded = decodeJWT(token)
-    return decoded.payload
-  } catch (error) {
-    console.error("[JWT-UTILS] Failed to get JWT payload:", error.message)
-    return null
-  }
-}
-
-// Validate JWT token structure and basic claims
-export const validateJWT = (token) => {
-  try {
-    const decoded = decodeJWT(token)
-    const { header, payload } = decoded
-
-    // Basic validation - make it less strict
-    if (!header.alg) {
-      throw new Error("Token header missing algorithm")
-    }
-
-    // Make type validation optional since many JWTs don't include it
-    if (header.typ && header.typ.toLowerCase() !== "jwt") {
-      console.warn("[JWT-UTILS] Token header has unexpected type:", header.typ)
-    }
-
-    // Check for required payload claims (customize as needed)
-    const requiredClaims = ["sub", "iat"] // subject and issued at
-    for (const claim of requiredClaims) {
-      if (!payload[claim]) {
-        console.warn(`[JWT-UTILS] Token missing recommended claim: ${claim}`)
+      if (!token) {
+        console.log('[JWT] No token provided');
+        resolve(true);
+        return;
       }
+
+      const parts = token.split('.');
+      if (parts.length !== 3) {
+        console.log('[JWT] Invalid token structure');
+        resolve(true);
+        return;
+      }
+
+      const decodedPayload = base64UrlDecode(parts[1]);
+      const payload = JSON.parse(decodedPayload);
+      const currentTime = Math.floor(Date.now() / 1000);
+
+      console.log(`[JWT] Token exp: ${payload.exp}, Current time: ${currentTime}, Expired: ${payload.exp < currentTime}`);
+      
+      resolve(payload.exp < currentTime);
+    } catch (error) {
+      console.error('[JWT] Error checking token expiration:', error);
+      resolve(true);
     }
+  });
+};
+
+// Synchronous version (keep for backward compatibility)
+ const isJWTExpired = token => {
+  if (!token) return true;
+
+  try {
+    const parts = token.split('.');
+    if (parts.length !== 3) return true;
+
+    const decodedPayload = base64UrlDecode(parts[1]);
+    const payload = JSON.parse(decodedPayload);
+    const currentTime = Math.floor(Date.now() / 1000);
+
+    console.log(`[JWT] Token exp: ${payload.exp}, Current time: ${currentTime}, Expired: ${payload.exp < currentTime}`);
+
+    return payload.exp < currentTime;
+  } catch (error) {
+    console.error('[JWT] Error checking token expiration:', error);
+    return true;
+  }
+};
+
+
+
+// Async decode JWT payload
+ const decodeJWTPayloadAsync = async (token) => {
+  return new Promise((resolve) => {
+    try {
+      if (!token) {
+        resolve(null);
+        return;
+      }
+
+      const parts = token.split('.');
+      if (parts.length !== 3) {
+        resolve(null);
+        return;
+      }
+
+      const decodedPayload = base64UrlDecode(parts[1]);
+      const payload = JSON.parse(decodedPayload);
+      resolve(payload);
+    } catch (error) {
+      console.error('[JWT] Error decoding JWT payload:', error);
+      resolve(null);
+    }
+  });
+};
+
+// Synchronous version
+ const decodeJWTPayload = token => {
+  if (!token) return null;
+
+  try {
+    const parts = token.split('.');
+    if (parts.length !== 3) return null;
+
+    const decodedPayload = base64UrlDecode(parts[1]);
+    return JSON.parse(decodedPayload);
+  } catch (error) {
+    console.error('[JWT] Error decoding JWT payload:', error);
+    return null;
+  }
+};
+
+// Async extract user info
+ const extractUserInfoAsync = async (token) => {
+  try {
+    const payload = await decodeJWTPayloadAsync(token);
+    if (!payload) return null;
 
     return {
-      valid: true,
-      header,
-      payload,
-    }
+      id: payload.id || payload.sub || null,
+      email: payload.email || payload.sub || null,
+      name: payload.name || payload.userName || null,
+      exp: payload.exp || null,
+      iat: payload.iat || null,
+    };
   } catch (error) {
-    console.error("[JWT-UTILS] JWT validation failed:", error.message)
+    console.error('[JWT] Error extracting user info:', error);
+    return null;
+  }
+};
+
+// Synchronous version
+ const extractUserInfo = token => {
+  try {
+    const payload = decodeJWTPayload(token);
+    if (!payload) return null;
+
     return {
+      id: payload.id || payload.sub || null,
+      email: payload.email || payload.sub || null,
+      name: payload.name || payload.userName || null,
+      exp: payload.exp || null,
+      iat: payload.iat || null,
+    };
+  } catch (error) {
+    console.error('[JWT] Error extracting user info:', error);
+    return null;
+  }
+};
+
+// Enhanced async safe validation
+ const safeValidateJWTAsync = async (token, context = 'Unknown') => {
+  return new Promise(async (resolve) => {
+    const result = {
       valid: false,
-      error: error.message,
-    }
-  }
-}
+      error: null,
+      decoded: null,
+      userInfo: null,
+      isExpired: true,
+    };
 
-// Extract user info from JWT payload
-export const extractUserInfo = (token) => {
-  try {
-    const payload = getJWTPayload(token)
-    if (!payload) {
-      return null
-    }
-
-    // Extract common user fields (customize based on your token structure)
-    return {
-      id: payload.sub || payload.id || payload.userId,
-      email: payload.email,
-      name: payload.name || payload.username,
-      role: payload.role,
-      exp: payload.exp,
-      iat: payload.iat,
-      // Add any other fields your app needs
-      ...payload,
-    }
-  } catch (error) {
-    console.error("[JWT-UTILS] Failed to extract user info:", error.message)
-    return null
-  }
-}
-
-// Test function for debugging
-export const testJwtDecode = (token) => {
-  try {
-
-    if (!token) {
-      return {
-        success: false,
-        error: "No token provided",
+    try {
+      if (!token || typeof token !== 'string') {
+        result.error = 'Invalid token';
+        resolve(result);
+        return;
       }
-    }
 
-    const result = decodeJWT(token)
-    return {
-      success: true,
-      result: result,
-    }
-  } catch (error) {
-    return {
-      success: false,
-      error: error.message,
-    }
-  }
-}
+      const parts = token.split('.');
+      if (parts.length !== 3) {
+        result.error = 'Invalid JWT structure';
+        resolve(result);
+        return;
+      }
 
-export const jwtDecode = (token) => {
+      const payload = await decodeJWTPayloadAsync(token);
+      if (!payload) {
+        result.error = 'Failed to decode payload';
+        resolve(result);
+        return;
+      }
+
+      const isExpired = await isJWTExpiredAsync(token);
+      const userInfo = await extractUserInfoAsync(token);
+
+      result.valid = true;
+      result.decoded = payload;
+      result.userInfo = userInfo;
+      result.isExpired = isExpired;
+      result.error = null;
+
+      resolve(result);
+    } catch (error) {
+      result.error = error.message;
+      resolve(result);
+    }
+  });
+};
+
+// Synchronous version
+ const safeValidateJWT = (token, context = 'Unknown') => {
+  const result = {
+    valid: false,
+    error: null,
+    decoded: null,
+    userInfo: null,
+    isExpired: true,
+  };
+
   try {
-    const decoded = decodeJWT(token)
-    return decoded.payload 
+    if (!token || typeof token !== 'string') {
+      result.error = 'Invalid token';
+      return result;
+    }
+
+    const parts = token.split('.');
+    if (parts.length !== 3) {
+      result.error = 'Invalid JWT structure';
+      return result;
+    }
+
+    const payload = decodeJWTPayload(token);
+    if (!payload) {
+      result.error = 'Failed to decode payload';
+      return result;
+    }
+
+    result.valid = true;
+    result.decoded = payload;
+    result.userInfo = extractUserInfo(token);
+    result.isExpired = isJWTExpired(token);
+    result.error = null;
+
+    return result;
   } catch (error) {
-    throw error
+    result.error = error.message;
+    return result;
   }
-}
+};
+
+ const testJWTUtilities = () => ({success: true});
+ const debugJWT = token => safeValidateJWT(token);
 
 
-// Export all functions for compatibility
-export default {
-  decodeJWT,
+export {
   isJWTExpired,
-  getJWTPayload,
-  validateJWT,
+  isJWTExpiredAsync,
+  decodeJWTPayload,
+  decodeJWTPayloadAsync,
   extractUserInfo,
-  testJwtDecode,
-  jwtDecode,
-}
+  extractUserInfoAsync,
+  safeValidateJWT,
+  safeValidateJWTAsync,
+  testJWTUtilities,
+  debugJWT,
+};
+
+export default {
+  isJWTExpired,
+  isJWTExpiredAsync,
+  decodeJWTPayload,
+  decodeJWTPayloadAsync,
+  extractUserInfo,
+  extractUserInfoAsync,
+  safeValidateJWT,
+  safeValidateJWTAsync,
+  testJWTUtilities,
+  debugJWT,
+};
+
