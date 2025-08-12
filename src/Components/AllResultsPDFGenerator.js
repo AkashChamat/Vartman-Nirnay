@@ -378,7 +378,6 @@ export const generateAllResultsPDF = async (resultsData, testInfo, onProgress) =
     const filePath = await generateAllResultsPDFWithWatermark(resultsData, testInfo);
     onProgress && onProgress(80);
 
-    // Show success message with option to open file
     showFileOpenFallbackMessage(filePath, () => hideMessage());
 
     onProgress && onProgress(100);
