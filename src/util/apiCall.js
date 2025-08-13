@@ -1,7 +1,7 @@
 import axios from "axios"
 import AsyncStorage from "@react-native-async-storage/async-storage"
 // Import our pure JS JWT utilities - fix the import path
-import { isJWTExpired, decodeJWT, getJWTPayload, validateJWT, extractUserInfo } from "./jwtUtils"
+import { isJWTExpired, decodeJWTPayload, safeValidateJWT, extractUserInfo } from "./jwtUtils"
 import {
   sliderImagesUrl,
   epaperUrl,
@@ -579,7 +579,7 @@ export const resetPassword = async (email, password, confirmPassword) => {
 }
 
 // Export our pure JS JWT utilities for use in other parts of the app
-export { decodeJWT, getJWTPayload, validateJWT, extractUserInfo, isJWTExpired }
+export { decodeJWTPayload, safeValidateJWT, extractUserInfo, isJWTExpired }
 
 // Continue with all your other existing functions...
 export const getAttemptCount = async (userId, paperId) => {

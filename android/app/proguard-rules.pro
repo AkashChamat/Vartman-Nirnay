@@ -187,3 +187,23 @@
 # Keep attributes for debugging
 -keepattributes *Annotation*
 -keepattributes SourceFile,LineNumberTable
+
+# CRITICAL: Protect base-64 npm package specifically
+-keep class * {
+    *** decode(java.lang.String);
+    *** encode(java.lang.String);
+}
+-keepclassmembers class * {
+    public static ** decode(**);
+    public static ** encode(**);
+}
+
+# Protect require() calls for npm packages
+-dontwarn **.base_64.**
+-dontwarn **.base64.**
+
+# Keep global object assignments
+-keep class * {
+    *** global;
+    *** globalThis;
+}

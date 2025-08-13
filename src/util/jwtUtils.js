@@ -1,190 +1,6 @@
-// /**
-//  * Fixed JWT utilities - ONLY fixes the atob error, nothing else changed
-//  */
+import {decode} from 'base-64';
 
-// /**
-//  * Manual Base64 URL decode - works in all React Native environments
-//  */
-// const base64UrlDecode = (str) => {
-//   if (!str || typeof str !== 'string') {
-//     throw new Error('Invalid base64 string provided');
-//   }
 
-//   // Replace URL-safe characters with standard base64 characters
-//   let base64 = str.replace(/-/g, '+').replace(/_/g, '/');
-
-//   // Add padding if needed
-//   const padding = base64.length % 4;
-//   if (padding) {
-//     base64 += '='.repeat(4 - padding);
-//   }
-
-//   // Manual base64 decode implementation
-//   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=';
-//   let result = '';
-//   let i = 0;
-
-//   base64 = base64.replace(/[^A-Za-z0-9+/=]/g, '');
-
-//   while (i < base64.length) {
-//     const encoded1 = chars.indexOf(base64.charAt(i++));
-//     const encoded2 = chars.indexOf(base64.charAt(i++));
-//     const encoded3 = chars.indexOf(base64.charAt(i++));
-//     const encoded4 = chars.indexOf(base64.charAt(i++));
-
-//     const bitmap = (encoded1 << 18) | (encoded2 << 12) |
-//                    ((encoded3 & 63) << 6) | (encoded4 & 63);
-
-//     result += String.fromCharCode((bitmap >> 16) & 255);
-
-//     if (encoded3 !== 64) {
-//       result += String.fromCharCode((bitmap >> 8) & 255);
-//     }
-
-//     if (encoded4 !== 64) {
-//       result += String.fromCharCode(bitmap & 255);
-//     }
-//   }
-
-//   return result;
-// };
-
-// /**
-//  * Decode JWT token payload
-//  */
-// export const decodeJWTPayload = (token) => {
-//   if (!token || typeof token !== 'string') {
-//     return null;
-//   }
-
-//   try {
-//     const parts = token.split('.');
-//     if (parts.length !== 3) {
-//       return null;
-//     }
-
-//     const payload = base64UrlDecode(parts[1]);
-//     return JSON.parse(payload);
-//   } catch (error) {
-//     console.error('[JWT] Failed to decode token payload:', error.message);
-//     return null;
-//   }
-// };
-
-// /**
-//  * Check if JWT token is expired
-//  */
-// export const isJWTExpired = (token) => {
-//   if (!token) return true;
-
-//   try {
-//     const payload = decodeJWTPayload(token);
-//     if (!payload || !payload.exp) return true;
-
-//     const currentTime = Math.floor(Date.now() / 1000);
-//     return payload.exp <= currentTime;
-//   } catch (error) {
-//     return true;
-//   }
-// };
-
-// /**
-//  * Extract user information from JWT token
-//  */
-// export const extractUserInfo = (token) => {
-//   try {
-//     const payload = decodeJWTPayload(token);
-//     if (!payload) return null;
-
-//     return {
-//       id: payload.id || payload.sub || payload.userId || payload.user_id || null,
-//       email: payload.email || payload.userEmail || payload.user_email || payload.sub || null,
-//       name: payload.name || payload.userName || payload.user_name || payload.fullName || payload.full_name || null,
-//       role: payload.role || payload.roles || null,
-//       exp: payload.exp || null,
-//       iat: payload.iat || null,
-//       branchCode: payload.branchCode || payload.branch_code || null,
-//       systems: payload.systems || null,
-//     };
-//   } catch (error) {
-//     return null;
-//   }
-// };
-
-// /**
-//  * Safe JWT validation
-//  */
-// export const safeValidateJWT = (token, context = 'Unknown') => {
-//   const result = {
-//     valid: false,
-//     error: null,
-//     decoded: null,
-//     userInfo: null,
-//     isExpired: true,
-//   };
-
-//   try {
-//     if (!token || typeof token !== 'string' || token.trim() === '') {
-//       result.error = 'Invalid or empty token';
-//       return result;
-//     }
-
-//     const parts = token.split('.');
-//     if (parts.length !== 3) {
-//       result.error = `Invalid JWT structure`;
-//       return result;
-//     }
-
-//     const payload = decodeJWTPayload(token);
-//     if (!payload) {
-//       result.error = 'Failed to decode JWT payload';
-//       return result;
-//     }
-
-//     const isExpired = isJWTExpired(token);
-//     const userInfo = extractUserInfo(token);
-
-//     result.valid = true;
-//     result.decoded = payload;
-//     result.userInfo = userInfo;
-//     result.isExpired = isExpired;
-//     result.error = null;
-
-//     return result;
-//   } catch (error) {
-//     result.error = error.message;
-//     return result;
-//   }
-// };
-
-// export const debugJWT = (token, context = 'Debug') => {
-//   return safeValidateJWT(token, context);
-// };
-
-// export const testJWTUtilities = () => {
-//   return { success: true };
-// };
-
-// export default {
-//   decodeJWTPayload,
-//   isJWTExpired,
-//   extractUserInfo,
-//   safeValidateJWT,
-//   debugJWT,
-//   testJWTUtilities
-// };
-
-/**
- * Simple JWT utilities - No external dependencies
- * Based on your working project implementation
- */
-
-/**
- * Fixed JWT utilities for React Native
- * Resolves the JSON Parse error and token expiration issues
- */
-
-// Improved base64 URL decode function
 const base64UrlDecode = str => {
   if (!str || typeof str !== 'string') {
     console.error('[JWT] Invalid base64 string:', typeof str);
@@ -192,65 +8,23 @@ const base64UrlDecode = str => {
   }
 
   try {
-    // Try native implementation first
-    if (typeof global.atob !== 'undefined') {
-      let base64 = str.replace(/-/g, '+').replace(/_/g, '/');
-      const padding = base64.length % 4;
-      if (padding) {
-        base64 += '='.repeat(4 - padding);
-      }
-      return global.atob(base64);
-    }
-
-    // Fallback to manual implementation
+    // Convert base64url to base64 format
     let base64 = str.replace(/-/g, '+').replace(/_/g, '/');
     const padding = base64.length % 4;
     if (padding) {
       base64 += '='.repeat(4 - padding);
     }
 
-    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=';
-    let result = '';
-    let i = 0;
-
-    base64 = base64.replace(/[^A-Za-z0-9+/=]/g, '');
-
-    while (i < base64.length) {
-      const encoded1 = chars.indexOf(base64.charAt(i++));
-      const encoded2 = chars.indexOf(base64.charAt(i++));
-      const encoded3 = chars.indexOf(base64.charAt(i++));
-      const encoded4 = chars.indexOf(base64.charAt(i++));
-
-      if (encoded1 === -1 || encoded2 === -1) {
-        break;
-      }
-
-      const bitmap =
-        (encoded1 << 18) |
-        (encoded2 << 12) |
-        ((encoded3 === -1 ? 0 : encoded3 & 63) << 6) |
-        (encoded4 === -1 ? 0 : encoded4 & 63);
-
-      result += String.fromCharCode((bitmap >> 16) & 255);
-
-      if (encoded3 !== -1 && encoded3 !== 64) {
-        result += String.fromCharCode((bitmap >> 8) & 255);
-      }
-
-      if (encoded4 !== -1 && encoded4 !== 64) {
-        result += String.fromCharCode(bitmap & 255);
-      }
-    }
-
-    return result;
+    // Use the imported decode function directly
+    return decode(base64);
   } catch (error) {
     console.error('[JWT] Base64 decode error:', error);
     throw new Error(`Failed to decode base64: ${error.message}`);
   }
 };
 
- const isJWTExpiredAsync = async (token) => {
-  return new Promise((resolve) => {
+const isJWTExpiredAsync = async token => {
+  return new Promise(resolve => {
     try {
       if (!token) {
         console.log('[JWT] No token provided');
@@ -269,8 +43,12 @@ const base64UrlDecode = str => {
       const payload = JSON.parse(decodedPayload);
       const currentTime = Math.floor(Date.now() / 1000);
 
-      console.log(`[JWT] Token exp: ${payload.exp}, Current time: ${currentTime}, Expired: ${payload.exp < currentTime}`);
-      
+      console.log(
+        `[JWT] Token exp: ${
+          payload.exp
+        }, Current time: ${currentTime}, Expired: ${payload.exp < currentTime}`,
+      );
+
       resolve(payload.exp < currentTime);
     } catch (error) {
       console.error('[JWT] Error checking token expiration:', error);
@@ -280,7 +58,7 @@ const base64UrlDecode = str => {
 };
 
 // Synchronous version (keep for backward compatibility)
- const isJWTExpired = token => {
+const isJWTExpired = token => {
   if (!token) return true;
 
   try {
@@ -291,7 +69,11 @@ const base64UrlDecode = str => {
     const payload = JSON.parse(decodedPayload);
     const currentTime = Math.floor(Date.now() / 1000);
 
-    console.log(`[JWT] Token exp: ${payload.exp}, Current time: ${currentTime}, Expired: ${payload.exp < currentTime}`);
+    console.log(
+      `[JWT] Token exp: ${
+        payload.exp
+      }, Current time: ${currentTime}, Expired: ${payload.exp < currentTime}`,
+    );
 
     return payload.exp < currentTime;
   } catch (error) {
@@ -300,11 +82,9 @@ const base64UrlDecode = str => {
   }
 };
 
-
-
 // Async decode JWT payload
- const decodeJWTPayloadAsync = async (token) => {
-  return new Promise((resolve) => {
+const decodeJWTPayloadAsync = async token => {
+  return new Promise(resolve => {
     try {
       if (!token) {
         resolve(null);
@@ -328,7 +108,7 @@ const base64UrlDecode = str => {
 };
 
 // Synchronous version
- const decodeJWTPayload = token => {
+const decodeJWTPayload = token => {
   if (!token) return null;
 
   try {
@@ -344,7 +124,7 @@ const base64UrlDecode = str => {
 };
 
 // Async extract user info
- const extractUserInfoAsync = async (token) => {
+const extractUserInfoAsync = async token => {
   try {
     const payload = await decodeJWTPayloadAsync(token);
     if (!payload) return null;
@@ -363,7 +143,7 @@ const base64UrlDecode = str => {
 };
 
 // Synchronous version
- const extractUserInfo = token => {
+const extractUserInfo = token => {
   try {
     const payload = decodeJWTPayload(token);
     if (!payload) return null;
@@ -382,8 +162,8 @@ const base64UrlDecode = str => {
 };
 
 // Enhanced async safe validation
- const safeValidateJWTAsync = async (token, context = 'Unknown') => {
-  return new Promise(async (resolve) => {
+const safeValidateJWTAsync = async (token, context = 'Unknown') => {
+  return new Promise(async resolve => {
     const result = {
       valid: false,
       error: null,
@@ -431,7 +211,7 @@ const base64UrlDecode = str => {
 };
 
 // Synchronous version
- const safeValidateJWT = (token, context = 'Unknown') => {
+const safeValidateJWT = (token, context = 'Unknown') => {
   const result = {
     valid: false,
     error: null,
@@ -471,9 +251,8 @@ const base64UrlDecode = str => {
   }
 };
 
- const testJWTUtilities = () => ({success: true});
- const debugJWT = token => safeValidateJWT(token);
-
+const testJWTUtilities = () => ({success: true});
+const debugJWT = token => safeValidateJWT(token);
 
 export {
   isJWTExpired,
@@ -500,4 +279,6 @@ export default {
   testJWTUtilities,
   debugJWT,
 };
+
+
 

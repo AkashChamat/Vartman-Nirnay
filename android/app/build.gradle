@@ -135,12 +135,12 @@ android {
 
 }
 
-// Skip metro bundling if already bundled manually
-afterEvaluate {
-    if (gradle.startParameter.taskNames.any { it.contains("assembleRelease") }) {
-        tasks.findByName("createBundleReleaseJsAndAssets")?.enabled = false
-    }
-}
+//  Skip metro bundling if already bundled manually
+// afterEvaluate {
+//     if (gradle.startParameter.taskNames.any { it.contains("assembleRelease") }) {
+//         tasks.findByName("createBundleReleaseJsAndAssets")?.enabled = false
+//     }
+// }
 
 dependencies {
     implementation("com.facebook.react:react-android")
