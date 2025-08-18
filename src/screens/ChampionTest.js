@@ -18,10 +18,8 @@ import TestMenu from '../Components/TestMenu';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {useAuth} from '../Auth/AuthContext';
 
-// Import API functions
 import {getAPI} from '../util/apiCall';
 import {TestPaperByIdUrl} from '../util/Url';
-
 import {
   showSubmissionMessage,
   showTimeUpMessage,
@@ -253,7 +251,7 @@ const ChampionTest = ({route, navigation}) => {
         response => {
           // Success callback - navigate back without showing submission message
           hideMessage();
-          navigation.goBack(); // Go back to previous screen
+          navigation.goBack(); //Go back to previous screen
         },
         errorMessage => {
           // Error callback - reset completion state on error
@@ -272,7 +270,6 @@ const ChampionTest = ({route, navigation}) => {
     if (isNavigationWarningActive) return; // Prevent multiple alerts
 
     setIsNavigationWarningActive(true);
-
     Alert.alert(
       'Submit Test?',
       'If you navigate away, your test will be automatically submitted with current answers. Do you want to continue?',
@@ -390,7 +387,6 @@ const ChampionTest = ({route, navigation}) => {
     fetchTestData(testId);
   };
 
-  // Check if user is authenticated before rendering
   if (!isAuthenticated && !authLoading) {
     return (
       <View

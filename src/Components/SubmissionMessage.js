@@ -35,7 +35,6 @@ export const showSubmissionMessage = (onViewResult, onGoHome) => {
       <View style={styles.container}>
         <View style={styles.contentWrapper}>
           <Text style={styles.title}>Test Submitted Successfully!</Text>
-          <Text style={styles.subtitle}>You can now view your results.</Text>
         </View>
         <View style={styles.buttonsContainer}>
           <TouchableOpacity 
@@ -47,15 +46,7 @@ export const showSubmissionMessage = (onViewResult, onGoHome) => {
           >
             <Text style={styles.buttonTextSecondary}>Back to Home</Text>
           </TouchableOpacity>
-          <TouchableOpacity 
-            style={[styles.button, styles.buttonPrimary]} 
-            onPress={() => {
-              hideMessage();
-              onViewResult();
-            }}
-          >
-            <Text style={styles.buttonTextPrimary}>View Result</Text>
-          </TouchableOpacity>
+         
         </View>
       </View>
     ),

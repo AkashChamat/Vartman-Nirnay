@@ -217,7 +217,6 @@ const LoginScreen = ({navigation}) => {
     Alert.alert('Validation Error', 'Please enter a valid email address');
     return;
   }
-
   setLoading(true);
 
   try {    

@@ -326,7 +326,7 @@ const ChampionSeries = ({navigation}) => {
         message: 'Error',
         description: 'Test paper data not available.',
         type: 'danger',
-      });
+      }); 
       return;
     }
 
@@ -408,34 +408,61 @@ const ChampionSeries = ({navigation}) => {
             </TouchableOpacity>
 
             <View style={styles.resultActionsGroup}>
-              {item.showAllResult && (
-                <TouchableOpacity
-                  style={styles.resultButtonCompact}
-                  onPress={() => handleViewAllResult(item)}>
-                  <Text style={styles.resultButtonTextCompact}>All Result</Text>
-                </TouchableOpacity>
-              )}
-
-              {item.showTestResult && (
-                <TouchableOpacity
-                  style={styles.resultButtonCompact}
-                  onPress={() => handleViewMyResult(item)}>
-                  <Text style={styles.resultButtonTextCompact}>My Result</Text>
-                </TouchableOpacity>
-              )}
-
-              {item.downloadTestPaper && (
-                <TouchableOpacity
-                  style={styles.downloadIconButton}
-                  onPress={() => handleDownloadTestPaper(item)}
-                  disabled={downloadingPapers[item.id]}>
-                  {downloadingPapers[item.id] ? (
-                    <ActivityIndicator size="small" color="#3182CE" />
-                  ) : (
-                    <Icon name="file-download" size={18} color="#3182CE" />
-                  )}
-                </TouchableOpacity>
-              )}
+              <TouchableOpacity
+                style={[
+                  styles.resultButtonCompact,
+                  !item.showAllResult && styles.disabledButton,
+                ]}
+                onPress={() =>
+                  item.showAllResult ? handleViewAllResult(item) : null
+                }
+                disabled={!item.showAllResult}>
+                <Text
+                  style={[
+                    styles.resultButtonTextCompact,
+                    !item.showAllResult && styles.disabledButtonText,
+                  ]}>
+                  All Result
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.resultButtonCompact,
+                  !item.showTestResult && styles.disabledButton,
+                ]}
+                onPress={() =>
+                  item.showTestResult ? handleViewMyResult(item) : null
+                }
+                disabled={!item.showTestResult}>
+                <Text
+                  style={[
+                    styles.resultButtonTextCompact,
+                    !item.showTestResult && styles.disabledButtonText,
+                  ]}>
+                  My Result
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.downloadIconButton,
+                  !item.downloadTestPaper && styles.disabledButton,
+                ]}
+                onPress={() =>
+                  item.downloadTestPaper ? handleDownloadTestPaper(item) : null
+                }
+                disabled={
+                  !item.downloadTestPaper || downloadingPapers[item.id]
+                }>
+                {downloadingPapers[item.id] ? (
+                  <ActivityIndicator size="small" color="#3182CE" />
+                ) : (
+                  <Icon
+                    name="file-download"
+                    size={18}
+                    color={!item.downloadTestPaper ? '#B0BEC5' : '#3182CE'}
+                  />
+                )}
+              </TouchableOpacity>
             </View>
           </View>
         </View>
@@ -705,5 +732,12 @@ const styles = StyleSheet.create({
     fontSize: width * 0.035,
     letterSpacing: 0.5,
     transform: [{rotate: '0deg'}],
+  },
+  disabledButton: {
+    backgroundColor: '#E8EAF6',
+    borderColor: '#B0BEC5',
+  },
+  disabledButtonText: {
+    color: '#B0BEC5',
   },
 });
