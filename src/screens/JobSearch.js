@@ -22,9 +22,11 @@ import MonthYearPicker from '../Components/MonthYearPicker';
 import fs from 'react-native-fs';
 import Header from '../Components/Header';
 import Footer from '../Components/Footer';
+import RNFS from 'react-native-fs';
 import {
   showErrorMessage,
-  showInfoMessage,
+  showSuccessMessage,
+  showSimpleInfoMessage,
 } from '../Components/SubmissionMessage';
 
 // Get device dimensions for responsive design
@@ -171,134 +173,73 @@ const JobAlerts = () => {
     }
   };
 
-  const requestStoragePermission = async () => {
-    if (Platform.OS !== 'android') return true;
-
-    try {
-      const granted = await PermissionsAndroid.request(
-        PermissionsAndroid.PERMISSIONS.WRITE_EXTERNAL_STORAGE,
-        {
-          title: 'Storage Permission',
-          message:
-            'Application needs access to your storage to download PDF files',
-          buttonPositive: 'Allow',
-          buttonNegative: 'Deny',
-        },
-      );
-      return granted === PermissionsAndroid.RESULTS.GRANTED;
-    } catch (err) {
-      console.error('Error requesting storage permission:', err);
-      return false;
-    }
-  };
-
   // Enhanced download function with progress tracking
   const handleDownloadPdf = async pdfUrl => {
-    if (!pdfUrl) {
-      showErrorMessage('Error', 'PDF not available for this job alert');
-      return;
-    }
+  if (!pdfUrl) {
+    showErrorMessage('Error', 'PDF not available for this job alert');
+    return;
+  }
 
-    // Prevent multiple downloads
-    if (downloading) {
-      showInfoMessage(
-        'Download in Progress',
-        'Please wait for the current download to complete.',
-      );
-      return;
-    }
+  if (downloading) {
+    showSimpleInfoMessage(
+      'Download in Progress',
+      'Please wait for the current download to complete.',
+    );
+    return;
+  }
 
-    const hasPermission = await requestStoragePermission();
-    if (!hasPermission) {
-      showErrorMessage(
-        'Permission Denied',
-        'Storage permission is required to download PDF files',
-      );
-
-      return;
-    }
-
-    // Initialize download states
+  try {
     setDownloading(true);
-    setShowDownloadProgress(true);
-    setDownloadProgress(0);
-    setDownloadStatus('Preparing download...');
+    const fileName = `${selectedJob.title.replace(/[^a-zA-Z0-9]/g, '_')}_${Date.now()}.pdf`;
 
-    // Animate progress bar appearance
-    Animated.timing(progressAnimation, {
-      toValue: 1,
-      duration: 300,
-      useNativeDriver: false,
-    }).start();
-
-    try {
-      const fileName =
-        pdfUrl.substring(pdfUrl.lastIndexOf('/') + 1) ||
-        `${selectedJob.title.replace(/\s+/g, '_')}.pdf`;
-
-      const downloadPath =
-        Platform.OS === 'ios'
-          ? `${fs.DocumentDirectoryPath}/${fileName}`
-          : `${fs.DownloadDirectoryPath}/${fileName}`;
-
-      setDownloadStatus('Downloading...');
-
-      const downloadOptions = {
-        fromUrl: pdfUrl,
-        toFile: downloadPath,
-        background: true,
-        discretionary: true,
-        progress: res => {
-          const progressPercent = Math.round(
-            (res.bytesWritten / res.contentLength) * 100,
-          );
-          setDownloadProgress(progressPercent);
-          setDownloadStatus(`Downloading... ${progressPercent}%`);
-        },
-      };
-
-      const result = await fs.downloadFile(downloadOptions).promise;
-
-      if (result.statusCode === 200) {
-        setDownloadStatus('Download completed!');
-
-        // Show success animation
-        setTimeout(() => {
-          setDownloading(false);
-          setShowDownloadProgress(false);
-
-          if (Platform.OS === 'ios') {
-            fs.readFile(downloadPath, 'base64').then(base64Data => {
-              const shareOptions = {
-                title: 'Save PDF',
-                url: `data:application/pdf;base64,${base64Data}`,
-                message: 'Save your PDF file',
-              };
-              showInfoMessage(
-                'Download Complete',
-                'PDF downloaded successfully. You can find it in your documents folder.',
-              );
-            });
-          } else {
-            showInfoMessage(
-              'Download Complete',
-              `PDF saved to Downloads folder as ${fileName}`,
-            );
-          }
-        }, 1000);
-      } else {
-        throw new Error('Download failed');
-      }
-    } catch (error) {
-      setDownloading(false);
-      setShowDownloadProgress(false);
-      setDownloadStatus('');
-      showErrorMessage('Download Failed', 'Could not download the PDF file');
-
-      console.error('Download error:', error);
+    let downloadDest;
+    if (Platform.OS === 'android') {
+      downloadDest = `${fs.DownloadDirectoryPath}/${fileName}`;
+    } else {
+      downloadDest = `${fs.DocumentDirectoryPath}/${fileName}`;
     }
-  };
 
+    const downloadOptions = {
+      fromUrl: pdfUrl,
+      toFile: downloadDest,
+      background: true,
+      progressDivider: 2,
+      begin: res => {},
+      progress: res => {
+        // Keep progress tracking but don't show UI updates
+        const progressPercent = (res.bytesWritten / res.contentLength) * 100;
+      },
+    };
+
+    const downloadTask = fs.downloadFile(downloadOptions);
+    const result = await downloadTask.promise;
+
+    if (result.statusCode === 200) {
+      if (Platform.OS === 'android') {
+        try {
+          await fs.scanFile(downloadDest);
+        } catch (err) {
+          console.error('Error scanning file:', err);
+        }
+      }
+      
+      // Reset downloading state immediately
+      setDownloading(false);
+      
+      // Show success message
+      showSuccessMessage(
+        'Download Complete',
+        `PDF saved successfully as ${fileName}`,
+      );
+    } else {
+      throw new Error(`Download failed with status code: ${result.statusCode}`);
+    }
+  } catch (error) {
+    setDownloading(false);
+    showErrorMessage('Download Failed', 'Could not download the PDF file');
+    console.error('Download error:', error);
+  }
+};
   const openJobDetails = job => {
     setSelectedJob(job);
     setModalVisible(true);
@@ -306,11 +247,7 @@ const JobAlerts = () => {
 
   const closeJobDetails = () => {
     setModalVisible(false);
-    // Reset download states when modal closes
     setDownloading(false);
-    setShowDownloadProgress(false);
-    setDownloadProgress(0);
-    setDownloadStatus('');
   };
 
   const FiltersSection = () => (
@@ -340,15 +277,35 @@ const JobAlerts = () => {
       onPress={() => openJobDetails(item)}
       activeOpacity={0.7}>
       <View style={styles.cardContent}>
-        <View style={styles.categoryBadge}>
-          <Text style={styles.categoryText}>{item.adsCategory}</Text>
+        {/* Left side - Image and Category */}
+        <View style={styles.leftSection}>
+          <View style={styles.imageContainer}>
+            {item.image ? (
+              <Image
+                source={{uri: item.image}}
+                style={styles.cardImage}
+                resizeMode="cover"
+              />
+            ) : (
+              <View style={styles.placeholderImage}>
+                <Text style={styles.placeholderImageText}>No Image</Text>
+              </View>
+            )}
+          </View>
+
+          <View style={styles.categoryBadge}>
+            <Text style={styles.categoryText}>{item.adsCategory}</Text>
+          </View>
         </View>
 
-        <Text style={styles.cardTitle} numberOfLines={2}>
-          {item.title}
-        </Text>
-        <View style={styles.cardBottomRow}>
-          <Text style={styles.cardCategory}>{item.adsExamCategory}</Text>
+        {/* Right side - Title */}
+        <View style={styles.rightSection}>
+          <Text style={styles.cardTitle} numberOfLines={4}>
+            {item.title} :{' '}
+            <Text style={styles.cardDescription} numberOfLines={4}>
+              {item.description}
+            </Text>
+          </Text>
         </View>
       </View>
     </TouchableOpacity>
@@ -418,20 +375,7 @@ const JobAlerts = () => {
             </TouchableOpacity>
 
             <View style={styles.modalHeaderRow}>
-              <View style={styles.modalThumbnailContainer}>
-                {selectedJob.image ? (
-                  <Image
-                    source={{uri: selectedJob.image}}
-                    style={styles.modalThumbnail}
-                    resizeMode="cover"
-                  />
-                ) : (
-                  <View style={styles.modalPlaceholderThumbnail}>
-                    <Text style={styles.placeholderText}>No Image</Text>
-                  </View>
-                )}
-              </View>
-
+             
               <View style={styles.modalHeaderInfo}>
                 <Text style={styles.modalTitle} numberOfLines={3}>
                   {selectedJob.title}
@@ -446,12 +390,6 @@ const JobAlerts = () => {
                     {selectedJob.adsCategory}
                   </Text>
                 </View>
-              </View>
-
-              <View style={styles.detailsItem}>
-                <Text style={styles.detailsValue}>
-                  {selectedJob.adsExamCategory}
-                </Text>
               </View>
             </View>
 
@@ -723,30 +661,67 @@ const styles = StyleSheet.create({
     maxWidth: isTablet ? '48%' : undefined,
   },
   cardContent: {
-    position: 'relative',
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+  },
+  leftSection: {
+    alignItems: 'center',
+    marginRight: getSpacing(16),
+    width: getSpacing(80),
+  },
+  imageContainer: {
+    width: getSpacing(80),
+    height: getSpacing(80),
+    borderRadius: getSpacing(8),
+    overflow: 'hidden',
+    marginBottom: getSpacing(8),
+  },
+  cardImage: {
+    width: '100%',
+    height: '100%',
+  },
+  placeholderImage: {
+    width: '100%',
+    height: '100%',
+    backgroundColor: '#E2E8F0',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: getSpacing(8),
+  },
+  placeholderImageText: {
+    color: '#A0AEC0',
+    fontSize: getFontSize(10),
+    fontWeight: '500',
+    textAlign: 'center',
   },
   categoryBadge: {
-    position: 'absolute',
-    top: 0,
-    right: 0,
     backgroundColor: '#FF7B69',
     paddingHorizontal: getSpacing(8),
     paddingVertical: getSpacing(4),
     borderRadius: getSpacing(12),
-    zIndex: 1,
+    alignSelf: 'center',
   },
   categoryText: {
     color: '#fff',
     fontWeight: 'bold',
     fontSize: getFontSize(10),
+    textAlign: 'center',
+  },
+  rightSection: {
+    flex: 1,
+    justifyContent: 'flex-start',
+    paddingTop: getSpacing(4),
   },
   cardTitle: {
-    fontSize: getFontSize(14),
+    fontSize: getFontSize(12),
+    fontWeight: 'bold',
+    color: '#5B95C4',
+    lineHeight: getFontSize(20),
+  },
+  cardDescription: {
+    fontSize: getFontSize(10),
     fontWeight: 'bold',
     color: '#2D3748',
-    marginBottom: getSpacing(8),
-    marginTop: getSpacing(4),
-    paddingRight: getSpacing(60),
     lineHeight: getFontSize(20),
   },
   cardBottomRow: {
@@ -794,6 +769,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: getSpacing(12),
     right: getSpacing(12),
+    
     zIndex: 1,
     backgroundColor: 'rgba(0,0,0,0.6)',
     width: getSpacing(30),
