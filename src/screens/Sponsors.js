@@ -1,17 +1,28 @@
-import { StyleSheet, Text, View, Image, ActivityIndicator, Dimensions, TouchableOpacity, ScrollView } from 'react-native';
-import React, { useState, useEffect, useRef } from 'react';
+import {
+  StyleSheet,
+  Text,
+  View,
+  Image,
+  ActivityIndicator,
+  Dimensions,
+  TouchableOpacity,
+  ScrollView,
+  Platform,
+} from 'react-native';
+import React, {useState, useEffect, useRef} from 'react';
 import Carousel from 'react-native-reanimated-carousel';
-import { sponsor, sponsorpdf, sponsortitle } from '../util/apiCall';
-import { useNavigation } from '@react-navigation/native';
+import {sponsor, sponsorpdf, sponsortitle} from '../util/apiCall';
+import {useNavigation} from '@react-navigation/native';
 import Header from '../Components/Header';
 import Footer from '../Components/Footer';
 import Icon from 'react-native-vector-icons/MaterialIcons';
-import { 
-  showPdfNotAvailableMessage, 
-  showNoPdfDataMessage, 
-  showPdfLoadFailedMessage 
+import {
+  showPdfNotAvailableMessage,
+  showNoPdfDataMessage,
+  showPdfLoadFailedMessage,
 } from '../Components/SubmissionMessage';
-
+import RNFS from 'react-native-fs';
+import {showMessage} from 'react-native-flash-message';
 
 const windowWidth = Dimensions.get('window').width;
 const windowHeight = Dimensions.get('window').height;
@@ -27,9 +38,98 @@ const Sponsors = () => {
   const [title, setTitle] = useState('Champion Series Prize Distribution'); // Default title
   const [titleLoading, setTitleLoading] = useState(true);
   const carouselRef = useRef(null);
-  
+  const [downloadingPdf, setDownloadingPdf] = useState(false);
+
   // Add this ref to track if we're manually navigating
   const isManualNavigation = useRef(false);
+
+  const handleDownloadSponsorPDF = async () => {
+    try {
+      setDownloadingPdf(true);
+      const response = await sponsorpdf();
+
+      if (response && Array.isArray(response) && response.length > 0) {
+        const pdfData = response[0];
+
+        if (!pdfData.pdf) {
+          showMessage({
+            message: 'PDF Not Available',
+            description: 'PDF is not available for download.',
+            type: 'warning',
+            icon: 'auto',
+          });
+          return;
+        }
+
+        // Create filename from description or use default
+        const fileName = `${(
+          pdfData.description || 'Champion_Series_Prize_Distribution'
+        ).replace(/[^a-zA-Z0-9]/g, '_')}_${Date.now()}.pdf`;
+
+        let downloadDest;
+        if (Platform.OS === 'android') {
+          downloadDest = `${RNFS.DownloadDirectoryPath}/${fileName}`;
+        } else {
+          downloadDest = `${RNFS.DocumentDirectoryPath}/${fileName}`;
+        }
+
+        const downloadOptions = {
+          fromUrl: pdfData.pdf,
+          toFile: downloadDest,
+          background: true,
+          progressDivider: 2,
+          begin: res => {
+          },
+          progress: res => {
+            const progressPercent =
+              (res.bytesWritten / res.contentLength) * 100;
+          },
+        };
+
+        const downloadTask = RNFS.downloadFile(downloadOptions);
+        const result = await downloadTask.promise;
+
+        if (result.statusCode === 200) {
+          if (Platform.OS === 'android') {
+            try {
+              await RNFS.scanFile(downloadDest);
+            } catch (err) {
+              console.error('Error scanning file:', err);
+            }
+          }
+
+          showMessage({
+            message: 'Download Complete',
+            description: 'Your PDF has been saved successfully.',
+            type: 'success',
+            icon: 'auto',
+          });
+        } else {
+          throw new Error(
+            `Download failed with status code: ${result.statusCode}`,
+          );
+        }
+      } else {
+        showMessage({
+          message: 'No PDF Data',
+          description: 'No PDF data available for download.',
+          type: 'warning',
+          icon: 'auto',
+        });
+      }
+    } catch (error) {
+      console.error('Download failed:', error);
+      showMessage({
+        message: 'Download Failed',
+        description:
+          error.message || 'An unexpected error occurred during download.',
+        type: 'danger',
+        icon: 'auto',
+      });
+    } finally {
+      setDownloadingPdf(false);
+    }
+  };
 
   useEffect(() => {
     fetchSponsors();
@@ -69,38 +169,38 @@ const Sponsors = () => {
   };
 
   // PDF viewing logic similar to Gallery component
- const handleViewSponsorPDF = async () => {
-  try {
-    setPdfLoading(true);
-    const response = await sponsorpdf();
-    
-    if (response && Array.isArray(response) && response.length > 0) {
-      const pdfData = response[0];
-      
-      if (!pdfData.pdf) {
-        showPdfNotAvailableMessage();
-        return;
-      }
+  const handleViewSponsorPDF = async () => {
+    try {
+      setPdfLoading(true);
+      const response = await sponsorpdf();
 
-      navigation.navigate('PdfViewer', {
-        pdfUrl: pdfData.pdf,
-        title: pdfData.description || 'Champion Series Prize Distribution',
-      });
-    } else {
-      showNoPdfDataMessage();
+      if (response && Array.isArray(response) && response.length > 0) {
+        const pdfData = response[0];
+
+        if (!pdfData.pdf) {
+          showPdfNotAvailableMessage();
+          return;
+        }
+
+        navigation.navigate('PdfViewer', {
+          pdfUrl: pdfData.pdf,
+          title: pdfData.description || 'Champion Series Prize Distribution',
+        });
+      } else {
+        showNoPdfDataMessage();
+      }
+    } catch (error) {
+      console.error('Error fetching PDF:', error);
+      showPdfLoadFailedMessage();
+    } finally {
+      setPdfLoading(false);
     }
-  } catch (error) {
-    console.error('Error fetching PDF:', error);
-    showPdfLoadFailedMessage();
-  } finally {
-    setPdfLoading(false);
-  }
-};
+  };
 
   // Improved onSnapToItem handler for better synchronization
-  const handleSnapToItem = (index) => {
+  const handleSnapToItem = index => {
     if (sponsors.length === 0) return;
-    
+
     // Handle looping properly
     let normalizedIndex = index;
     if (index < 0) {
@@ -110,28 +210,28 @@ const Sponsors = () => {
     } else {
       normalizedIndex = index % sponsors.length;
     }
-    
+
     setCurrentIndex(normalizedIndex);
-    
+
     setTimeout(() => {
       isManualNavigation.current = false;
     }, 50);
   };
 
-  const handleDotPress = (index) => {
+  const handleDotPress = index => {
     if (carouselRef.current && sponsors.length > 0 && index !== currentIndex) {
       isManualNavigation.current = true;
       setCurrentIndex(index);
-      carouselRef.current.scrollTo({ index, animated: true });
+      carouselRef.current.scrollTo({index, animated: true});
     }
   };
 
-  const renderSponsorCard = ({ item, index }) => (
+  const renderSponsorCard = ({item, index}) => (
     <View style={styles.cardContainer}>
       <View style={styles.card}>
         <View style={styles.imageContainer}>
           <Image
-            source={{ uri: item.image }}
+            source={{uri: item.image}}
             style={styles.sponsorImage}
             resizeMode="contain"
           />
@@ -157,7 +257,7 @@ const Sponsors = () => {
           key={index}
           style={[
             styles.dot,
-            index === currentIndex ? styles.activeDot : styles.inactiveDot
+            index === currentIndex ? styles.activeDot : styles.inactiveDot,
           ]}
           onPress={() => handleDotPress(index)}
           activeOpacity={0.7}
@@ -188,10 +288,12 @@ const Sponsors = () => {
         </View>
         <View style={styles.errorContainer}>
           <Text style={styles.errorText}>{error}</Text>
-          <TouchableOpacity style={styles.retryButton} onPress={() => {
-            fetchSponsors();
-            fetchTitle();
-          }}>
+          <TouchableOpacity
+            style={styles.retryButton}
+            onPress={() => {
+              fetchSponsors();
+              fetchTitle();
+            }}>
             <Text style={styles.retryButtonText}>Retry</Text>
           </TouchableOpacity>
         </View>
@@ -218,16 +320,15 @@ const Sponsors = () => {
   return (
     <View style={styles.container}>
       <Header />
-      <ScrollView 
+      <ScrollView
         style={styles.scrollContainer}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
-        bounces={true}
-      >
+        bounces={true}>
         <View style={styles.headerContainer}>
           <Text style={styles.headerText}>{title}</Text>
         </View>
-        
+
         <View style={styles.carouselContainer}>
           <Carousel
             ref={carouselRef}
@@ -246,7 +347,7 @@ const Sponsors = () => {
               parallaxScrollingOffset: 60,
               parallaxAdjacentItemScale: 0.75,
             }}
-            customConfig={() => ({ type: 'positive', viewCount: 1 })}
+            customConfig={() => ({type: 'positive', viewCount: 1})}
             withAnimation={{
               type: 'spring',
               config: {
@@ -263,27 +364,44 @@ const Sponsors = () => {
             defaultIndex={0}
             windowSize={3}
           />
-          
+
           {/* Dots container */}
           {sponsors.length > 1 && renderDots()}
         </View>
 
         <View style={styles.pdfSection}>
-          <Text style={styles.pdfSectionTitle}>Prize Distribution PDF Gallery</Text>
-          <TouchableOpacity
-            style={styles.pdfButton}
-            onPress={handleViewSponsorPDF}
-            disabled={pdfLoading}
-          >
-            {pdfLoading ? (
-              <ActivityIndicator size="small" color="#fff" />
-            ) : (
-              <Icon name="picture-as-pdf" size={18} color="#fff" />
-            )}
-            <Text style={styles.pdfButtonText}>
-              {pdfLoading ? 'Loading...' : 'VIEW'}
-            </Text>
-          </TouchableOpacity>
+          <Text style={styles.pdfSectionTitle}>
+            Prize Distribution PDF Gallery
+          </Text>
+          <View style={styles.pdfButtonsContainer}>
+            <TouchableOpacity
+              style={styles.pdfButton}
+              onPress={handleViewSponsorPDF}
+              disabled={pdfLoading || downloadingPdf}>
+              {pdfLoading ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <Icon name="picture-as-pdf" size={18} color="#fff" />
+              )}
+              <Text style={styles.pdfButtonText}>
+                {pdfLoading ? 'Loading...' : 'VIEW'}
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.pdfButton, styles.downloadButton]}
+              onPress={handleDownloadSponsorPDF}
+              disabled={pdfLoading || downloadingPdf}>
+              {downloadingPdf ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <Icon name="file-download" size={18} color="#fff" />
+              )}
+              <Text style={styles.pdfButtonText}>
+                {downloadingPdf ? 'Downloading...' : 'DOWNLOAD'}
+              </Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* Add some extra padding at the bottom for better scrolling */}
@@ -335,10 +453,10 @@ const styles = StyleSheet.create({
   card: {
     backgroundColor: 'white',
     borderRadius: 15,
-    width: windowWidth * 0.90, 
-    height: windowHeight * 0.49, 
+    width: windowWidth * 0.9,
+    height: windowHeight * 0.49,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
+    shadowOffset: {width: 0, height: 4},
     shadowOpacity: 0.1,
     shadowRadius: 8,
     elevation: 5,
@@ -346,9 +464,9 @@ const styles = StyleSheet.create({
   },
   imageContainer: {
     width: '100%',
-    height: windowHeight * 0.35, 
+    height: windowHeight * 0.35,
     backgroundColor: '#fff',
-    padding: 8, 
+    padding: 8,
   },
   sponsorImage: {
     width: '100%',
@@ -356,14 +474,14 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   detailsContainer: {
-    padding: 12, 
+    padding: 12,
     alignItems: 'center',
     flex: 1,
     justifyContent: 'center',
     backgroundColor: '#fafafa',
   },
   sponsorName: {
-    fontSize: 13, 
+    fontSize: 13,
     fontWeight: 'bold',
     color: '#2c3e50',
     textAlign: 'center',
@@ -383,32 +501,29 @@ const styles = StyleSheet.create({
     paddingVertical: 15,
     backgroundColor: 'transparent',
     position: 'absolute',
-    bottom:-5, // Adjusted position
+    bottom: -5, // Adjusted position
     left: 0,
     right: 0,
     zIndex: 10,
   },
   dot: {
-    marginHorizontal: 4, 
+    marginHorizontal: 4,
     borderRadius: 50,
   },
   activeDot: {
-    width: 8, 
+    width: 8,
     height: 8,
     backgroundColor: '#0288D1',
-    transform: [{ scale: 1.2 }], 
+    transform: [{scale: 1.2}],
   },
   inactiveDot: {
-    width: 6, 
+    width: 6,
     height: 6,
     backgroundColor: '#bdc3c7',
     opacity: 0.6,
   },
   // PDF Section Styles - Row Layout
   pdfSection: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
     paddingVertical: 15,
     paddingHorizontal: 20,
     backgroundColor: '#f8f9fa',
@@ -422,17 +537,26 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     color: '#495057',
-    flex: 1,
+    marginBottom: 12,
+    textAlign: 'center',
+  },
+  pdfButtonsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 10,
   },
   pdfButton: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#0288D1',
-    paddingVertical: 8,
+    paddingVertical: 10,
     paddingHorizontal: 15,
     borderRadius: 6,
-    minWidth: 80,
+    flex: 1,
     justifyContent: 'center',
+  },
+  downloadButton: {
+  backgroundColor: '#28a745', 
   },
   pdfButtonText: {
     color: '#fff',
@@ -441,7 +565,7 @@ const styles = StyleSheet.create({
     marginLeft: 5,
   },
   bottomPadding: {
-    height: 50, // Extra padding for better scrolling experience
+    height: 50, 
   },
   loadingContainer: {
     flex: 1,
@@ -471,7 +595,7 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     fontWeight: '600',
   },
- 
+
   retryButton: {
     backgroundColor: '#3498db',
     paddingVertical: 12,

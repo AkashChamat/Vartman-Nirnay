@@ -270,7 +270,6 @@ const ChampionSeries = ({navigation}) => {
   };
 
   const handleViewAllResult = testPaper => {
-    console.log('Navigating with pdfUrl:', testPaper.allResultPdf);
     navigation.navigate('AllResult', {
       testId: testPaper.id,
       testTitle: testPaper.testTitle,
@@ -321,12 +320,23 @@ const ChampionSeries = ({navigation}) => {
   };
 
   const handleDownloadTestPaper = async testPaper => {
+    // Add this check at the beginning
+    if (!testPaper.downloadTestPaper) {
+      showMessage({
+        message: 'Download Not Available',
+        description: 'Download is not available for this test paper.',
+        type: 'warning',
+        icon: 'auto',
+      });
+      return;
+    }
+
     if (!testPaper) {
       showMessage({
         message: 'Error',
         description: 'Test paper data not available.',
         type: 'danger',
-      }); 
+      });
       return;
     }
 
@@ -447,9 +457,7 @@ const ChampionSeries = ({navigation}) => {
                   styles.downloadIconButton,
                   !item.downloadTestPaper && styles.disabledButton,
                 ]}
-                onPress={() =>
-                  item.downloadTestPaper ? handleDownloadTestPaper(item) : null
-                }
+                onPress={() => handleDownloadTestPaper(item)} // Remove the conditional check here
                 disabled={
                   !item.downloadTestPaper || downloadingPapers[item.id]
                 }>

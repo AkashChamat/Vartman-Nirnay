@@ -57,13 +57,6 @@ const AuthNavigator = () => {
   // FIX: Change 'loading' to 'isLoading' to match AuthContext
   const {isAuthenticated, isLoading, token} = useAuth();
 
-  useEffect(() => {
-    console.log('[NAVIGATION] Auth state:', {
-      isAuthenticated,
-      isLoading,
-      hasToken: !!token
-    });
-  }, [isAuthenticated, isLoading, token]);
 
   // Show loading screen while checking authentication
   if (isLoading) {

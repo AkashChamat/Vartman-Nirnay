@@ -2,8 +2,6 @@
  * @format
  */
 
-// Aggressive polyfill for Hermes engine compatibility
-console.log('[POLYFILL] Setting up base64 polyfills for Hermes release build...');
 
 const setupBase64Polyfills = () => {
   const base64 = require('base-64');
@@ -28,7 +26,6 @@ const setupBase64Polyfills = () => {
     console.warn('[POLYFILL] Direct assignment failed:', e);
   }
   
-  console.log('[POLYFILL] Base64 polyfills installed successfully for Hermes');
 };
 
 // Execute immediately before anything else

@@ -637,7 +637,7 @@ const ProfilePage = () => {
       <View style={styles.container}>
         <Header />
         <View style={styles.centerContainer}>
-          <ActivityIndicator size="large" color="#4f46e5" />
+          <ActivityIndicator size="large" color="#0288D1" />
           <Text style={styles.loadingText}>Loading profile...</Text>
         </View>
         <Footer />
@@ -1013,7 +1013,7 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: 12,
     fontSize: 16,
-    color: '#4f46e5',
+    color: '#0288D1',
     textAlign: 'center',
   },
   errorText: {

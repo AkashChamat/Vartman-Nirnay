@@ -188,87 +188,92 @@ const EPapers = () => {
   };
 
   const handleDownloadPDF = async paper => {
-    if (!paper.pdfUrl) {
-showErrorMessage('Error', 'PDF not available for this paper');
-      return;
+  if (!paper.pdfUrl) {
+    showErrorMessage('Error', 'PDF not available for this paper');
+    return;
+  }
+
+  try {
+    setDownloadProgress(prev => ({
+      ...prev,
+      [paper.id]: {
+        isDownloading: true,
+        progress: 0,
+      },
+    }));
+
+    const fileName = `${paper.paperName.replace(
+      /[^a-zA-Z0-9]/g,
+      '_',
+    )}_${Date.now()}.pdf`;
+
+    let downloadDest;
+    if (Platform.OS === 'android') {
+      downloadDest = `${RNFS.DownloadDirectoryPath}/${fileName}`;
+    } else {
+      downloadDest = `${RNFS.DocumentDirectoryPath}/${fileName}`;
     }
 
-    try {
-      setDownloadProgress(prev => ({
-        ...prev,
-        [paper.id]: {
-          isDownloading: true,
-          progress: 0,
-        },
-      }));
+    const downloadOptions = {
+      fromUrl: paper.pdfUrl,
+      toFile: downloadDest,
+      background: true,
+      progressDivider: 2,
+      begin: res => {},
+      progress: res => {
+        const progressPercent = (res.bytesWritten / res.contentLength) * 100;
+        setDownloadProgress(prev => ({
+          ...prev,
+          [paper.id]: {
+            isDownloading: true,
+            progress: progressPercent,
+          },
+        }));
+      },
+    };
 
-      const fileName = `${paper.paperName.replace(
-        /[^a-zA-Z0-9]/g,
-        '_',
-      )}_${Date.now()}.pdf`;
+    const downloadTask = RNFS.downloadFile(downloadOptions);
+    const result = await downloadTask.promise;
 
-      let downloadDest;
+    setDownloadProgress(prev => ({
+      ...prev,
+      [paper.id]: {
+        isDownloading: false,
+        progress: 100,
+      },
+    }));
+
+    if (result.statusCode === 200) {
       if (Platform.OS === 'android') {
-        downloadDest = `${RNFS.DownloadDirectoryPath}/${fileName}`;
-      } else {
-        downloadDest = `${RNFS.DocumentDirectoryPath}/${fileName}`;
-      }
-
-      const downloadOptions = {
-        fromUrl: paper.pdfUrl,
-        toFile: downloadDest,
-        background: true,
-        progressDivider: 2,
-        begin: res => {},
-        progress: res => {
-          const progressPercent = (res.bytesWritten / res.contentLength) * 100;
-          setDownloadProgress(prev => ({
-            ...prev,
-            [paper.id]: {
-              isDownloading: true,
-              progress: progressPercent,
-            },
-          }));
-        },
-      };
-
-      const downloadTask = RNFS.downloadFile(downloadOptions);
-      const result = await downloadTask.promise;
-
-      setDownloadProgress(prev => ({
-        ...prev,
-        [paper.id]: {
-          isDownloading: false,
-          progress: 100,
-        },
-      }));
-
-      if (result.statusCode === 200) {
-        if (Platform.OS === 'android') {
-          try {
-            await RNFS.scanFile(downloadDest);
-          } catch (err) {
-            console.error('Error scanning file:', err);
-          }
+        try {
+          await RNFS.scanFile(downloadDest);
+        } catch (err) {
+          console.error('Error scanning file:', err);
         }
-        showErrorMessage('Error', 'PDF not available for this paper');
-      } else {
-        throw new Error(
-          `Download failed with status code: ${result.statusCode}`,
-        );
       }
-    } catch (error) {
-      setDownloadProgress(prev => ({
-        ...prev,
-        [paper.id]: {
-          isDownloading: false,
-          progress: 0,
-        },
-      }));
-
-     showErrorMessage('Error', 'Could not open WhatsApp. Please make sure WhatsApp is installed on your device.');
+      
+      // ✅ Show SUCCESS message when download completes successfully
+      showSuccessMessage('Download Complete', `${paper.paperName} has been downloaded successfully!`);
+      
+    } else {
+      throw new Error(
+        `Download failed with status code: ${result.statusCode}`,
+      );
     }
-  };
+  } catch (error) {
+    setDownloadProgress(prev => ({
+      ...prev,
+      [paper.id]: {
+        isDownloading: false,
+        progress: 0,
+      },
+    }));
+
+    // ✅ Show proper DOWNLOAD error message
+    showErrorMessage('Download Failed', 'Failed to download the PDF. Please check your internet connection and try again.');
+    console.error('Download error:', error);
+  }
+};
 
   // Function to handle WhatsApp sharing
   const handleWhatsAppShare = async paper => {
