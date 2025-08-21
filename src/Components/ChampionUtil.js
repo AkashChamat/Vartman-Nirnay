@@ -98,13 +98,34 @@ export const submitTest = async (
   timeTaken,
 ) => {
   try {
+    console.log('🚀 [SUBMIT TEST] Starting submitTest function');
+    console.log('📋 [SUBMIT TEST] Input parameters:');
+    console.log('📋 [SUBMIT TEST] - paperId:', paperId);
+    console.log('📋 [SUBMIT TEST] - userId:', userId);
+    console.log('📋 [SUBMIT TEST] - startTime:', startTime);
+    console.log('📋 [SUBMIT TEST] - endTime:', endTime);
+    console.log('📋 [SUBMIT TEST] - timeTaken:', timeTaken);
+    console.log(
+      '📋 [SUBMIT TEST] - selectedAnswers count:',
+      Object.keys(selectedAnswers).length,
+    );
+    console.log(
+      '📋 [SUBMIT TEST] - selectedAnswers:',
+      JSON.stringify(selectedAnswers, null, 2),
+    );
     if (!userId) {
       throw new Error('User not logged in.');
     }
 
+    console.log('✅ [SUBMIT TEST] User ID validation passed');
+
     // Format answers similar to your web implementation
+    console.log('🔄 [SUBMIT TEST] Formatting answers...');
     const formattedAnswers = {};
     Object.entries(selectedAnswers).forEach(([qid, val]) => {
+      console.log(
+        `🔄 [SUBMIT TEST] Processing answer - Question ID: ${qid}, Value: ${val}`,
+      );
       if (typeof val === 'string' && val.startsWith('option')) {
         formattedAnswers[qid] = val.replace('option', '');
       } else {
@@ -112,7 +133,24 @@ export const submitTest = async (
       }
     });
 
+    console.log(
+      '✅ [SUBMIT TEST] Formatted answers:',
+      JSON.stringify(formattedAnswers, null, 2),
+    );
+
     // Submit the test using the API function with time parameters
+    console.log('🌐 [SUBMIT TEST] Calling submitTestPaper API...');
+    console.log('🌐 [SUBMIT TEST] API call parameters:');
+    console.log('🌐 [SUBMIT TEST] - userId:', userId);
+    console.log('🌐 [SUBMIT TEST] - paperId:', paperId);
+    console.log(
+      '🌐 [SUBMIT TEST] - formattedAnswers:',
+      JSON.stringify(formattedAnswers, null, 2),
+    );
+    console.log('🌐 [SUBMIT TEST] - startTime:', startTime);
+    console.log('🌐 [SUBMIT TEST] - endTime:', endTime);
+    console.log('🌐 [SUBMIT TEST] - timeTaken:', timeTaken);
+
     const response = await submitTestPaper(
       userId,
       paperId,
@@ -122,9 +160,86 @@ export const submitTest = async (
       timeTaken,
     );
 
+    console.log('🎉 [SUBMIT TEST] API call completed successfully!');
+    console.log('📊 [SUBMIT TEST] Response received:');
+    console.log('📊 [SUBMIT TEST] - Response type:', typeof response);
+    console.log('📊 [SUBMIT TEST] - Response is null?', response === null);
+    console.log(
+      '📊 [SUBMIT TEST] - Response is undefined?',
+      response === undefined,
+    );
+    console.log(
+      '📊 [SUBMIT TEST] - Response keys:',
+      response ? Object.keys(response) : 'No keys (null/undefined)',
+    );
+    console.log(
+      '📊 [SUBMIT TEST] - Full response:',
+      JSON.stringify(response, null, 2),
+    );
+
+    if (response) {
+      console.log('🔍 [SUBMIT TEST] Response analysis:');
+      console.log(
+        '🔍 [SUBMIT TEST] - Has success property?',
+        'success' in response,
+      );
+      console.log('🔍 [SUBMIT TEST] - Has data property?', 'data' in response);
+      console.log(
+        '🔍 [SUBMIT TEST] - Has message property?',
+        'message' in response,
+      );
+      console.log(
+        '🔍 [SUBMIT TEST] - Has status property?',
+        'status' in response,
+      );
+      console.log(
+        '🔍 [SUBMIT TEST] - Has error property?',
+        'error' in response,
+      );
+
+      if (response.success !== undefined) {
+        console.log('🔍 [SUBMIT TEST] - Success value:', response.success);
+      }
+      if (response.data !== undefined) {
+        console.log(
+          '🔍 [SUBMIT TEST] - Data value:',
+          JSON.stringify(response.data, null, 2),
+        );
+      }
+      if (response.message !== undefined) {
+        console.log('🔍 [SUBMIT TEST] - Message value:', response.message);
+      }
+      if (response.status !== undefined) {
+        console.log('🔍 [SUBMIT TEST] - Status value:', response.status);
+      }
+      if (response.error !== undefined) {
+        console.log('🔍 [SUBMIT TEST] - Error value:', response.error);
+      }
+    }
+
+    console.log('✅ [SUBMIT TEST] Returning response to caller');
     return response;
   } catch (error) {
     console.error('❌ Submit test error:', error);
+    console.error('❌ [SUBMIT TEST] Error occurred in submitTest');
+    console.error('❌ [SUBMIT TEST] Error type:', typeof error);
+    console.error('❌ [SUBMIT TEST] Error name:', error.name);
+    console.error('❌ [SUBMIT TEST] Error message:', error.message);
+    console.error('❌ [SUBMIT TEST] Error stack:', error.stack);
+    console.error('❌ [SUBMIT TEST] Full error object:', error);
+
+    if (error.response) {
+      console.error('❌ [SUBMIT TEST] Error has response property');
+      console.error(
+        '❌ [SUBMIT TEST] Error response status:',
+        error.response.status,
+      );
+      console.error(
+        '❌ [SUBMIT TEST] Error response data:',
+        JSON.stringify(error.response.data, null, 2),
+      );
+    }
+    console.error('❌ [SUBMIT TEST] Re-throwing error');
     throw error;
   }
 };
@@ -140,11 +255,31 @@ export const handleTestSubmission = async (
   onError = null,
 ) => {
   try {
+    console.log('🎯 [HANDLE SUBMISSION] Starting handleTestSubmission');
+    console.log('🎯 [HANDLE SUBMISSION] Input parameters:');
+    console.log('🎯 [HANDLE SUBMISSION] - paperId:', paperId);
+    console.log('🎯 [HANDLE SUBMISSION] - userId:', userId);
+    console.log('🎯 [HANDLE SUBMISSION] - testStartTime:', testStartTime);
+    console.log(
+      '🎯 [HANDLE SUBMISSION] - selectedAnswers count:',
+      Object.keys(selectedAnswers).length,
+    );
+    console.log(
+      '🎯 [HANDLE SUBMISSION] - has onSuccess callback:',
+      !!onSuccess,
+    );
+    console.log('🎯 [HANDLE SUBMISSION] - has onError callback:', !!onError);
+
+    console.log('🔄 [HANDLE SUBMISSION] Setting isSubmitting to true');
     setIsSubmitting(true);
 
     // Calculate timing data
+    console.log('⏰ [HANDLE SUBMISSION] Calculating timing data...');
     const {endTime, timeTaken} = calculateTestDuration(testStartTime);
+    console.log('⏰ [HANDLE SUBMISSION] Calculated endTime:', endTime);
+    console.log('⏰ [HANDLE SUBMISSION] Calculated timeTaken:', timeTaken);
 
+    console.log('🚀 [HANDLE SUBMISSION] Calling submitTest...');
     const response = await submitTest(
       paperId,
       selectedAnswers,
@@ -154,25 +289,126 @@ export const handleTestSubmission = async (
       timeTaken,
     );
 
-    if (onSuccess) {
-      onSuccess(response);
+    console.log('🎉 [HANDLE SUBMISSION] submitTest completed successfully!');
+    console.log('📊 [HANDLE SUBMISSION] Response from submitTest:');
+    console.log('📊 [HANDLE SUBMISSION] - Response type:', typeof response);
+    console.log(
+      '📊 [HANDLE SUBMISSION] - Response content:',
+      JSON.stringify(response, null, 2),
+    );
+
+    if (response) {
+      console.log('🔍 [HANDLE SUBMISSION] Response analysis:');
+      console.log(
+        '🔍 [HANDLE SUBMISSION] - Response object keys:',
+        Object.keys(response),
+      );
+      console.log(
+        '🔍 [HANDLE SUBMISSION] - Response length (if array):',
+        Array.isArray(response) ? response.length : 'Not an array',
+      );
+
+      // Log each property of the response
+      Object.entries(response).forEach(([key, value]) => {
+        console.log(
+          `🔍 [HANDLE SUBMISSION] - ${key}:`,
+          typeof value === 'object' ? JSON.stringify(value, null, 2) : value,
+        );
+      });
     } else {
+      console.log('🔍 [HANDLE SUBMISSION] Response is null or undefined');
+    }
+
+    console.log('🔄 [HANDLE SUBMISSION] Checking for onSuccess callback...');
+
+    if (onSuccess) {
+      console.log(
+        '✅ [HANDLE SUBMISSION] onSuccess callback exists, calling it...',
+      );
+      console.log(
+        '✅ [HANDLE SUBMISSION] Passing response to onSuccess:',
+        JSON.stringify(response, null, 2),
+      );
+
+      try {
+        const callbackResult = onSuccess(response);
+        console.log('✅ [HANDLE SUBMISSION] onSuccess callback completed');
+        console.log('✅ [HANDLE SUBMISSION] Callback result:', callbackResult);
+      } catch (callbackError) {
+        console.error(
+          '❌ [HANDLE SUBMISSION] Error in onSuccess callback:',
+          callbackError,
+        );
+        throw callbackError;
+      }
+    } else {
+      console.log(
+        '✅ [HANDLE SUBMISSION] No onSuccess callback, showing default success message',
+      );
       showSuccessMessage('Success!', 'Test submitted successfully!');
     }
 
+    console.log(
+      '✅ [HANDLE SUBMISSION] handleTestSubmission completed successfully',
+    );
+    console.log(
+      '✅ [HANDLE SUBMISSION] Returning response:',
+      JSON.stringify(response, null, 2),
+    );
+
     return response;
   } catch (error) {
+    console.error(
+      '❌ [HANDLE SUBMISSION] Error occurred in handleTestSubmission',
+    );
+    console.error('❌ [HANDLE SUBMISSION] Error type:', typeof error);
+    console.error('❌ [HANDLE SUBMISSION] Error name:', error.name);
+    console.error('❌ [HANDLE SUBMISSION] Error message:', error.message);
+    console.error('❌ [HANDLE SUBMISSION] Error stack:', error.stack);
+    console.error('❌ [HANDLE SUBMISSION] Full error object:', error);
+
     const errorMessage = error.message || 'Failed to submit test';
+    console.error(
+      '❌ [HANDLE SUBMISSION] Processed error message:',
+      errorMessage,
+    );
     console.error('❌ Test submission error:', errorMessage);
+    console.log('🔄 [HANDLE SUBMISSION] Checking for onError callback...');
 
     if (onError) {
-      onError(errorMessage);
+      console.log(
+        '❌ [HANDLE SUBMISSION] onError callback exists, calling it...',
+      );
+      console.log(
+        '❌ [HANDLE SUBMISSION] Passing error message to onError:',
+        errorMessage,
+      );
+
+      try {
+        const errorCallbackResult = onError(errorMessage);
+        console.log('❌ [HANDLE SUBMISSION] onError callback completed');
+        console.log(
+          '❌ [HANDLE SUBMISSION] Error callback result:',
+          errorCallbackResult,
+        );
+      } catch (callbackError) {
+        console.error(
+          '❌ [HANDLE SUBMISSION] Error in onError callback:',
+          callbackError,
+        );
+      }
     } else {
+      console.log(
+        '❌ [HANDLE SUBMISSION] No onError callback, showing default error message',
+      );
       showErrorMessage('Submission Failed', errorMessage);
     }
 
     throw error;
   } finally {
+    console.log(
+      '🔄 [HANDLE SUBMISSION] Finally block - setting isSubmitting to false',
+    );
     setIsSubmitting(false);
   }
 };

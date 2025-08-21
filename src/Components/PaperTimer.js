@@ -1,40 +1,44 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import React, {useState, useEffect, useRef} from 'react';
+import {View, Text, StyleSheet} from 'react-native';
 
-const PaperTimer = ({ duration, onTimeUp, testStarted, isTestCompleted }) => {
+const PaperTimer = ({duration, onTimeUp, testStarted, isTestCompleted}) => {
   const [timeLeft, setTimeLeft] = useState(duration * 60); // Convert minutes to seconds
   const intervalRef = useRef(null);
 
   useEffect(() => {
-    if (testStarted && !isTestCompleted) {
-      intervalRef.current = setInterval(() => {
-        setTimeLeft((prevTime) => {
-          if (prevTime <= 1) {
-            clearInterval(intervalRef.current);
-            onTimeUp();
-            return 0;
-          }
-          return prevTime - 1;
-        });
-      }, 1000);
-    } else {
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
-        intervalRef.current = null;
-      }
+    if (!testStarted || isTestCompleted) {
+      console.log('⏰ [TIMER] Timer stopped - testStarted:', testStarted, 'isTestCompleted:', isTestCompleted);
+      return;
     }
 
+    const timer = setInterval(() => {
+      setTimeLeft(prev => {
+        const newTime = prev - 1;
+        console.log('⏰ [TIMER] Tick - Time left:', newTime);
+        
+        if (newTime <= 0) {
+          console.log('⏰ [TIMER] TIME UP! Calling onTimeUp callback');
+          console.log('⏰ [TIMER] - isTestCompleted at time up:', isTestCompleted);
+          clearInterval(timer);
+          onTimeUp();
+          return 0;
+        }
+        return newTime;
+      });
+    }, 1000);
+
     return () => {
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
-      }
+      console.log('⏰ [TIMER] Clearing timer interval');
+      clearInterval(timer);
     };
   }, [testStarted, isTestCompleted, onTimeUp]);
 
-  const formatTime = (seconds) => {
+  const formatTime = seconds => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
-    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    return `${mins.toString().padStart(2, '0')}:${secs
+      .toString()
+      .padStart(2, '0')}`;
   };
 
   const getTimerColor = () => {
@@ -46,10 +50,8 @@ const PaperTimer = ({ duration, onTimeUp, testStarted, isTestCompleted }) => {
 
   return (
     <View style={styles.timerContainer}>
-      <View style={[styles.timerBadge, { backgroundColor: getTimerColor() }]}>
-        <Text style={styles.timerText}>
-          {formatTime(timeLeft)}
-        </Text>
+      <View style={[styles.timerBadge, {backgroundColor: getTimerColor()}]}>
+        <Text style={styles.timerText}>{formatTime(timeLeft)}</Text>
       </View>
       {isTestCompleted && (
         <Text style={styles.completedText}>Test Completed</Text>
@@ -68,7 +70,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     elevation: 2,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: {width: 0, height: 2},
     shadowOpacity: 0.2,
     shadowRadius: 4,
   },

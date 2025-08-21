@@ -144,6 +144,7 @@ const ChampionSeries = ({navigation}) => {
       setLoading(true);
       setError(null);
       const response = await championpaper();
+      // console.log('response', response);
       const activePapers = (response.data || response)
         .filter(paper => paper.status === true)
         .sort((a, b) => b.id - a.id);
@@ -225,33 +226,44 @@ const ChampionSeries = ({navigation}) => {
   };
 
   const handleStartTest = testPaper => {
-    const timingCheck = checkTestTiming(testPaper);
-    if (!timingCheck.canStart) {
-      showMessage({
-        message:
-          timingCheck.reason === 'not_started'
-            ? 'Test Not Started'
-            : 'Test Completed',
-        description: timingCheck.message,
-        type: 'warning',
-        icon: 'auto',
-      });
-      return;
-    }
-
-    const attemptCount = getAttemptCountForPaper(testPaper.id);
-
-    // You can add attempt limits checks here if needed
-
-    navigation.navigate('ChampionTest', {
-      testId: testPaper.id,
-      testTitle: testPaper.testTitle || 'Champion Test',
-      currentAttempts: attemptCount,
-      source: 'ChampionSeries',
-      maxAttemptsAllowed: testPaper.maxAttemptsAllowed,
-      multipleAttemptsAllowed: testPaper.multipleAttemptsAllowed,
+  const timingCheck = checkTestTiming(testPaper);
+  if (!timingCheck.canStart) {
+    showMessage({
+      message:
+        timingCheck.reason === 'not_started'
+          ? 'Test Not Started'
+          : 'Test Completed',
+      description: timingCheck.message,
+      type: 'warning',
+      icon: 'auto',
     });
-  };
+    return;
+  }
+
+  const attemptCount = getAttemptCountForPaper(testPaper.id);
+  const maxAttemptsAllowed = testPaper.maxAttemptsAllowed;
+
+  // Only block entry and show warning if user exceeded attempts
+  if (typeof maxAttemptsAllowed === 'number' && attemptCount >= maxAttemptsAllowed) {
+    showMessage({
+      message: 'Maximum Attempts Reached',
+      description: `You have already used all your allowed attempts for this test.`,
+      type: 'danger',
+      icon: 'auto',
+    });
+    return;
+  }
+
+  // Go to test only if user has at least one attempt remaining
+  navigation.navigate('ChampionTest', {
+    testId: testPaper.id,
+    testTitle: testPaper.testTitle || 'Champion Test',
+    source: 'ChampionSeries',
+    // You can pass attempt info if you want to use on the next screen:
+    // currentAttempts: attemptCount, maxAttemptsAllowed,
+  });
+};
+
 
   const handleViewResult = testPaper => {
     if (!testPaper.showTestResult) {
@@ -274,9 +286,6 @@ const ChampionSeries = ({navigation}) => {
       testId: testPaper.id,
       testTitle: testPaper.testTitle,
       pdfUrl: testPaper.allResultPdf || null,
-      testStartDate: testPaper.testStartDate,
-      noOfQuestions: testPaper.noOfQuestions,
-      totalMarks: testPaper.totalMarks,
     });
   };
 
@@ -320,17 +329,6 @@ const ChampionSeries = ({navigation}) => {
   };
 
   const handleDownloadTestPaper = async testPaper => {
-    // Add this check at the beginning
-    if (!testPaper.downloadTestPaper) {
-      showMessage({
-        message: 'Download Not Available',
-        description: 'Download is not available for this test paper.',
-        type: 'warning',
-        icon: 'auto',
-      });
-      return;
-    }
-
     if (!testPaper) {
       showMessage({
         message: 'Error',
@@ -423,9 +421,7 @@ const ChampionSeries = ({navigation}) => {
                   styles.resultButtonCompact,
                   !item.showAllResult && styles.disabledButton,
                 ]}
-                onPress={() =>
-                  item.showAllResult ? handleViewAllResult(item) : null
-                }
+                onPress={() => handleViewAllResult(item)}
                 disabled={!item.showAllResult}>
                 <Text
                   style={[
@@ -435,14 +431,13 @@ const ChampionSeries = ({navigation}) => {
                   All Result
                 </Text>
               </TouchableOpacity>
+
               <TouchableOpacity
                 style={[
                   styles.resultButtonCompact,
                   !item.showTestResult && styles.disabledButton,
                 ]}
-                onPress={() =>
-                  item.showTestResult ? handleViewMyResult(item) : null
-                }
+                onPress={() => handleViewMyResult(item)}
                 disabled={!item.showTestResult}>
                 <Text
                   style={[
@@ -452,14 +447,15 @@ const ChampionSeries = ({navigation}) => {
                   My Result
                 </Text>
               </TouchableOpacity>
+
               <TouchableOpacity
                 style={[
                   styles.downloadIconButton,
                   !item.downloadTestPaper && styles.disabledButton,
                 ]}
-                onPress={() => handleDownloadTestPaper(item)} // Remove the conditional check here
+                onPress={() => handleDownloadTestPaper(item)}
                 disabled={
-                  !item.downloadTestPaper || downloadingPapers[item.id]
+                  downloadingPapers[item.id] || !item.downloadTestPaper
                 }>
                 {downloadingPapers[item.id] ? (
                   <ActivityIndicator size="small" color="#3182CE" />
@@ -467,7 +463,7 @@ const ChampionSeries = ({navigation}) => {
                   <Icon
                     name="file-download"
                     size={18}
-                    color={!item.downloadTestPaper ? '#B0BEC5' : '#3182CE'}
+                    color={item.downloadTestPaper ? '#3182CE' : '#A0AEC0'}
                   />
                 )}
               </TouchableOpacity>
@@ -671,6 +667,14 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#3182CE',
   },
+  disabledButton: {
+    backgroundColor: '#F7FAFC',
+    borderColor: '#E2E8F0',
+    opacity: 0.6,
+  },
+  disabledButtonText: {
+    color: '#A0AEC0',
+  },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -740,12 +744,5 @@ const styles = StyleSheet.create({
     fontSize: width * 0.035,
     letterSpacing: 0.5,
     transform: [{rotate: '0deg'}],
-  },
-  disabledButton: {
-    backgroundColor: '#E8EAF6',
-    borderColor: '#B0BEC5',
-  },
-  disabledButtonText: {
-    color: '#B0BEC5',
   },
 });

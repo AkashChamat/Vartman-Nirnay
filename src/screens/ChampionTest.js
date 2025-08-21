@@ -76,6 +76,9 @@ const ChampionTest = ({route, navigation}) => {
   const [testStarted, setTestStarted] = useState(false);
   const [isTestCompleted, setIsTestCompleted] = useState(false);
 
+  const [submissionInProgress, setSubmissionInProgress] = useState(false);
+  const [lastSubmissionTime, setLastSubmissionTime] = useState(null);
+
   // Unified function to fetch test data from either API
   const fetchTestData = async testId => {
     try {
@@ -210,21 +213,63 @@ const ChampionTest = ({route, navigation}) => {
     }
   };
 
-  // Handle time up - only if test is not completed
   const handleTimeUp = () => {
-    if (isTestCompleted) {
+    console.log('⏰ [TIME UP] handleTimeUp called');
+    console.log('⏰ [TIME UP] - isTestCompleted:', isTestCompleted);
+    console.log('⏰ [TIME UP] - testStarted:', testStarted);
+    console.log('⏰ [TIME UP] - isSubmitting:', isSubmitting);
+    console.log(
+      '⏰ [TIME UP] - selectedAnswers count:',
+      Object.keys(selectedAnswers).length,
+    );
+    if (isTestCompleted || isSubmitting) {
+      console.log('⏰ [TIME UP] Test already completed/submitting, returning');
       return;
     }
 
+    console.log('⏰ [TIME UP] Showing time up message');
     showTimeUpMessage(() => {
+      console.log(
+        '⏰ [TIME UP] User acknowledged time up message, hiding and submitting',
+      );
       hideMessage();
       submitTest();
     });
   };
 
+  useEffect(() => {
+    console.log(
+      '🔄 [STATE CHANGE] isTestCompleted changed to:',
+      isTestCompleted,
+    );
+  }, [isTestCompleted]);
+
+  useEffect(() => {
+    console.log('🔄 [STATE CHANGE] isSubmitting changed to:', isSubmitting);
+  }, [isSubmitting]);
+
+  useEffect(() => {
+    console.log('🔄 [STATE CHANGE] testStarted changed to:', testStarted);
+  }, [testStarted]);
+
+  useEffect(() => {
+    console.log('🔄 [STATE CHANGE] selectedAnswers changed:');
+    console.log(
+      '🔄 [STATE CHANGE] - Count:',
+      Object.keys(selectedAnswers).length,
+    );
+    console.log(
+      '🔄 [STATE CHANGE] - Answers:',
+      JSON.stringify(selectedAnswers, null, 2),
+    );
+  }, [selectedAnswers]);
+
   // Handle test submission when user wants to navigate away
   const submitTestAndNavigateBack = async () => {
+    console.log('🔄 [NAV SUBMIT] Starting submitTestAndNavigateBack');
+
     const userId = getUserId();
+    console.log('👤 [NAV SUBMIT] User ID:', userId);
 
     if (!userId) {
       showErrorMessage('Error', 'User not authenticated. Please login again.');
@@ -232,6 +277,7 @@ const ChampionTest = ({route, navigation}) => {
     }
 
     if (!testStartTime) {
+      console.log('❌ [NAV SUBMIT] testStartTime value:', testStartTime);
       showErrorMessage(
         'Error',
         'Test timing data is missing. Please try again.',
@@ -239,9 +285,24 @@ const ChampionTest = ({route, navigation}) => {
       return;
     }
 
+    console.log('🏁 [NAV SUBMIT] Setting test as completed');
     setIsTestCompleted(true);
 
+    console.log('📋 [NAV SUBMIT] Test submission parameters:');
+    console.log('📋 [NAV SUBMIT] - testId:', testId);
+    console.log('📋 [NAV SUBMIT] - userId:', userId);
+    console.log('📋 [NAV SUBMIT] - testStartTime:', testStartTime);
+    console.log(
+      '📋 [NAV SUBMIT] - selectedAnswers count:',
+      Object.keys(selectedAnswers).length,
+    );
+    console.log(
+      '📋 [NAV SUBMIT] - selectedAnswers:',
+      JSON.stringify(selectedAnswers, null, 2),
+    );
+
     try {
+      console.log('🚀 [NAV SUBMIT] Calling handleTestSubmission...');
       await handleTestSubmission(
         testId,
         selectedAnswers,
@@ -249,8 +310,14 @@ const ChampionTest = ({route, navigation}) => {
         userId,
         testStartTime,
         response => {
+          console.log('✅ [NAV SUBMIT] Success callback triggered');
+          console.log(
+            '✅ [NAV SUBMIT] Response:',
+            JSON.stringify(response, null, 2),
+          );
           // Success callback - navigate back without showing submission message
           hideMessage();
+          console.log('🏠 [NAV SUBMIT] Navigating back');
           navigation.goBack(); //Go back to previous screen
         },
         errorMessage => {
@@ -296,8 +363,19 @@ const ChampionTest = ({route, navigation}) => {
   };
 
   const handleSubmitTest = () => {
+    console.log('📝 [SUBMIT TEST] Starting handleSubmitTest');
+
     const answeredCount = Object.keys(selectedAnswers).length;
     const totalQuestions = testData?.questions?.length || 0;
+
+    console.log('📊 [SUBMIT TEST] Test statistics:');
+    console.log('📊 [SUBMIT TEST] - Answered questions:', answeredCount);
+    console.log('📊 [SUBMIT TEST] - Total questions:', totalQuestions);
+    console.log(
+      '📊 [SUBMIT TEST] - Selected answers:',
+      JSON.stringify(selectedAnswers, null, 2),
+    );
+    console.log('📊 [SUBMIT TEST] - Test data available:', !!testData);
 
     if (answeredCount < totalQuestions) {
       showIncompleteTestMessage(
@@ -324,9 +402,57 @@ const ChampionTest = ({route, navigation}) => {
     }
   };
 
+  // const submitTest = async () => {
+  //   const userId = getUserId();
+  //   if (!userId) {
+  //     showErrorMessage('Error', 'User not authenticated. Please login again.');
+  //     return;
+  //   }
+
+  //   if (!testStartTime) {
+  //     showErrorMessage(
+  //       'Error',
+  //       'Test timing data is missing. Please try again.',
+  //     );
+  //     return;
+  //   }
+
+  //   try {
+  //     await handleTestSubmission(
+  //       testId,
+  //       selectedAnswers,
+  //       setIsSubmitting,
+  //       userId,
+  //       testStartTime,
+  //       response => {
+  //         setIsTestCompleted(true);
+  //         console.log(
+  //           '✅ Test submitted successfully, navigating to ChampionSeries',
+  //         );
+
+  //         // ✅ Reset navigation stack - removes test from history
+  //         navigation.reset({
+  //           index: 0,
+  //           routes: [{name: 'ChampionSeries'}],
+  //         });
+  //       },
+  //       errorMessage => {
+  //         const errorText =
+  //           typeof errorMessage === 'string'
+  //             ? errorMessage
+  //             : 'Submission failed';
+  //         setIsTestCompleted(false);
+  //         showErrorMessage('Submission Failed', errorText);
+  //       },
+  //     );
+  //   } catch (error) {
+  //     console.error('❌ Test submission failed with error:', error);
+  //     setIsTestCompleted(false);
+  //   }
+  // };
+
   const submitTest = async () => {
     const userId = getUserId();
-
     if (!userId) {
       showErrorMessage('Error', 'User not authenticated. Please login again.');
       return;
@@ -340,8 +466,6 @@ const ChampionTest = ({route, navigation}) => {
       return;
     }
 
-    setIsTestCompleted(true);
-
     try {
       await handleTestSubmission(
         testId,
@@ -350,35 +474,38 @@ const ChampionTest = ({route, navigation}) => {
         userId,
         testStartTime,
         response => {
-          showSubmissionMessage(
-            () => {
-              hideMessage();
-              navigation.navigate('ChampionResult', {
-                userId: userId,
-                testPaperId: testId,
-                testTitle: testData.testTitle,
-                source: source,
-              });
-            },
-            () => {
-              hideMessage();
-              if (isFromTestPaper) {
-                navigation.navigate('Home');
-              } else {
-                navigation.navigate('ChampionSeries');
-              }
-            },
+          setIsTestCompleted(true);
+          console.log('✅ Test submitted successfully, showing alert');
+
+          // ✅ Show alert with navigation reset
+          Alert.alert(
+            'Success!',
+            'Test submitted successfully!',
+            [
+              {
+                text: 'OK',
+                onPress: () => {
+                  navigation.reset({
+                    index: 0,
+                    routes: [{name: 'ChampionSeries'}],
+                  });
+                },
+              },
+            ],
+            {cancelable: false},
           );
         },
         errorMessage => {
-          // Error callback - reset completion state on error
+          const errorText =
+            typeof errorMessage === 'string'
+              ? errorMessage
+              : 'Submission failed';
           setIsTestCompleted(false);
-          showErrorMessage('Submission Failed', errorMessage);
+          showErrorMessage('Submission Failed', errorText);
         },
       );
     } catch (error) {
       console.error('❌ Test submission failed with error:', error);
-      // Reset completion state on error
       setIsTestCompleted(false);
     }
   };
@@ -471,8 +598,16 @@ const ChampionTest = ({route, navigation}) => {
           {/* Submit Button in Header */}
           <TouchableOpacity
             style={styles.headerSubmitButton}
-            onPress={handleSubmitTest}
-            disabled={isSubmitting}>
+            onPress={() => {
+              if (!isSubmitting && !submissionInProgress) {
+                handleSubmitTest();
+              } else {
+                console.log(
+                  '⚠️ Submission already in progress, ignoring click',
+                );
+              }
+            }}
+            disabled={isSubmitting || submissionInProgress}>
             <Text style={styles.headerSubmitButtonText}>
               {isSubmitting ? 'Submitting...' : 'Submit'}
             </Text>
