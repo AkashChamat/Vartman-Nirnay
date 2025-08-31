@@ -918,14 +918,6 @@ export const createBookPaymentSession = async (bookId, userId, email, phone, add
     // Clean and prepare parameters
     const cleanEmail = email.trim()
     const cleanPhone = phone.toString().replace(/\s+/g, "")
-    
-    console.log('🚀 Sending payment request with params:', {
-      bookId,
-      userId, 
-      email: cleanEmail,
-      phone: cleanPhone,
-      addressId
-    })
 
     // Option 1: Try sending as URL query parameters
     const queryParams = new URLSearchParams({

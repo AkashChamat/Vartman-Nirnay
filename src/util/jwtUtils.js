@@ -27,14 +27,12 @@ const isJWTExpiredAsync = async token => {
   return new Promise(resolve => {
     try {
       if (!token) {
-        console.log('[JWT] No token provided');
         resolve(true);
         return;
       }
 
       const parts = token.split('.');
       if (parts.length !== 3) {
-        console.log('[JWT] Invalid token structure');
         resolve(true);
         return;
       }
@@ -43,11 +41,7 @@ const isJWTExpiredAsync = async token => {
       const payload = JSON.parse(decodedPayload);
       const currentTime = Math.floor(Date.now() / 1000);
 
-      console.log(
-        `[JWT] Token exp: ${
-          payload.exp
-        }, Current time: ${currentTime}, Expired: ${payload.exp < currentTime}`,
-      );
+     
 
       resolve(payload.exp < currentTime);
     } catch (error) {
@@ -69,11 +63,7 @@ const isJWTExpired = token => {
     const payload = JSON.parse(decodedPayload);
     const currentTime = Math.floor(Date.now() / 1000);
 
-    console.log(
-      `[JWT] Token exp: ${
-        payload.exp
-      }, Current time: ${currentTime}, Expired: ${payload.exp < currentTime}`,
-    );
+    
 
     return payload.exp < currentTime;
   } catch (error) {

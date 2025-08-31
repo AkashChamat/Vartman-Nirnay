@@ -9,7 +9,7 @@ import {
   safeValidateJWTAsync,
   // Keep sync versions as backup
   extractUserInfo,
-  isJWTExpired
+  isJWTExpired,
 } from '../util/jwtUtils';
 
 const AuthContext = createContext();

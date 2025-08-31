@@ -52,7 +52,7 @@ import {
 const {width} = Dimensions.get('window');
 
 const ChampionTest = ({route, navigation}) => {
-  const {testId, testTitle, source} = route.params || {};
+  const {testId, testTitle, source,effectiveTimeRemaining } = route.params || {};
   const [isNavigationWarningActive, setIsNavigationWarningActive] =
     useState(false);
   // Determine which API to use based on source or route name
@@ -76,10 +76,131 @@ const ChampionTest = ({route, navigation}) => {
   const [testStarted, setTestStarted] = useState(false);
   const [isTestCompleted, setIsTestCompleted] = useState(false);
 
+  const [actualElapsedTime, setActualElapsedTime] = useState(0);
+
   const [submissionInProgress, setSubmissionInProgress] = useState(false);
   const [lastSubmissionTime, setLastSubmissionTime] = useState(null);
 
-  // Unified function to fetch test data from either API
+  const [effectiveTestDuration, setEffectiveTestDuration] = useState(null);
+  const [timingWarning, setTimingWarning] = useState(null);
+
+  // ADD these new functions
+  const calculateEffectiveTestDuration = testData => {
+    console.log('🕐 Calculating effective test duration...');
+
+    if (
+      !testData.testStartDate ||
+      !testData.testEndDate ||
+      !testData.startTime ||
+      !testData.endTime
+    ) {
+      console.log('⚠️ Missing timing data, using original duration');
+      return testData.duration * 60; // Return original duration in seconds
+    }
+
+    const now = new Date();
+    const testEndDateTime = new Date(
+      `${testData.testEndDate}T${testData.endTime}`,
+    );
+
+    console.log('🕐 Current time:', now.toISOString());
+    console.log('🕐 Test end time:', testEndDateTime.toISOString());
+
+    // Calculate remaining time in the test active window (in seconds)
+    const remainingActiveTime = Math.floor((testEndDateTime - now) / 1000);
+
+    // Original test duration in seconds
+    const originalDuration = testData.duration * 60;
+
+    console.log('🕐 Remaining active time:', remainingActiveTime, 'seconds');
+    console.log('🕐 Original duration:', originalDuration, 'seconds');
+
+    // Return the minimum of remaining active time and original duration
+    const effectiveDuration = Math.min(remainingActiveTime, originalDuration);
+    console.log('🕐 Effective duration:', effectiveDuration, 'seconds');
+
+    return effectiveDuration;
+  };
+
+  const validateTestTiming = testData => {
+    console.log('✅ Validating test timing...');
+
+    if (
+      !testData.testStartDate ||
+      !testData.testEndDate ||
+      !testData.startTime ||
+      !testData.endTime
+    ) {
+      console.log('⚠️ Missing timing data, allowing test to start');
+      return {
+        canStart: true,
+        remainingTime: testData.duration * 60,
+        warning: null,
+      };
+    }
+
+    const now = new Date();
+    const testStartDateTime = new Date(
+      `${testData.testStartDate}T${testData.startTime}`,
+    );
+    const testEndDateTime = new Date(
+      `${testData.testEndDate}T${testData.endTime}`,
+    );
+
+    console.log('✅ Test start time:', testStartDateTime.toISOString());
+    console.log('✅ Test end time:', testEndDateTime.toISOString());
+    console.log('✅ Current time:', now.toISOString());
+
+    // Check if test hasn't started yet
+    if (now < testStartDateTime) {
+      return {
+        canStart: false,
+        reason: 'Test has not started yet',
+        remainingTime: 0,
+        warning: null,
+      };
+    }
+
+    // Check if test has ended
+    if (now >= testEndDateTime) {
+      return {
+        canStart: false,
+        reason: 'Test active time has ended',
+        remainingTime: 0,
+        warning: null,
+      };
+    }
+
+    // Calculate remaining time
+    const remainingTime = Math.floor((testEndDateTime - now) / 1000);
+    const originalDuration = testData.duration * 60;
+    const effectiveDuration = Math.min(remainingTime, originalDuration);
+
+    // Check if there's at least 1 minute remaining
+    if (remainingTime < 60) {
+      return {
+        canStart: false,
+        reason: 'Insufficient time remaining (less than 1 minute)',
+        remainingTime: remainingTime,
+        warning: null,
+      };
+    }
+
+    // Generate warning message if time is limited
+    let warning = null;
+    if (effectiveDuration < originalDuration) {
+      const effectiveMinutes = Math.floor(effectiveDuration / 60);
+      const originalMinutes = Math.floor(originalDuration / 60);
+      warning = `Due to the test active time window, you have ${effectiveMinutes} minutes available instead of the full ${originalMinutes} minutes.`;
+    }
+
+    return {
+      canStart: true,
+      remainingTime: effectiveDuration,
+      warning: warning,
+    };
+  };
+
   const fetchTestData = async testId => {
     try {
       setLoading(true);
@@ -178,10 +299,54 @@ const ChampionTest = ({route, navigation}) => {
     return unsubscribeBeforeRemove;
   }, [navigation, testStarted, isTestCompleted, showInstructions]);
 
-  // Event handlers using utility functions
   const onInstructionsAccept = () => {
+    console.log('📋 Instructions accepted, validating timing...');
+
+    if (effectiveTimeRemaining) {
+    console.log('🚀 Using effective time from route params:', effectiveTimeRemaining);
+    startTestWithEffectiveDuration(effectiveTimeRemaining);
+    return;
+  }
+
+    const timingValidation = validateTestTiming(testData);
+
+    if (!timingValidation.canStart) {
+      Alert.alert('Cannot Start Test', timingValidation.reason, [
+        {
+          text: 'OK',
+          onPress: () => navigation.goBack(),
+        },
+      ]);
+      return;
+    }
+
+    // Show warning if time is limited
+    if (timingValidation.warning) {
+      Alert.alert('Limited Time Available', timingValidation.warning, [
+        {
+          text: 'Continue',
+          onPress: () => {
+            startTestWithEffectiveDuration(timingValidation.remainingTime);
+          },
+        },
+        {
+          text: 'Go Back',
+          style: 'cancel',
+          onPress: () => navigation.goBack(),
+        },
+      ]);
+    } else {
+      startTestWithEffectiveDuration(timingValidation.remainingTime);
+    }
+  };
+
+  // ADD this new helper function
+  const startTestWithEffectiveDuration = effectiveDuration => {
+    console.log('🚀 Starting test with effective duration:', effectiveDuration);
+
     handleInstructionsAccept(setShowInstructions, setInstructionsAccepted);
     setTestStarted(true);
+    setEffectiveTestDuration(effectiveDuration);
 
     // Initialize test timer when instructions are accepted
     const startTime = initializeTestTimer();
@@ -213,71 +378,35 @@ const ChampionTest = ({route, navigation}) => {
     }
   };
 
-  const handleTimeUp = () => {
-    console.log('⏰ [TIME UP] handleTimeUp called');
-    console.log('⏰ [TIME UP] - isTestCompleted:', isTestCompleted);
-    console.log('⏰ [TIME UP] - testStarted:', testStarted);
-    console.log('⏰ [TIME UP] - isSubmitting:', isSubmitting);
-    console.log(
-      '⏰ [TIME UP] - selectedAnswers count:',
-      Object.keys(selectedAnswers).length,
-    );
+  const handleTimeUp = elapsedTimeInSeconds => {
     if (isTestCompleted || isSubmitting) {
-      console.log('⏰ [TIME UP] Test already completed/submitting, returning');
       return;
     }
 
-    console.log('⏰ [TIME UP] Showing time up message');
+    // IMMEDIATELY set test as completed to prevent multiple calls
+    setIsTestCompleted(true);
+    setActualElapsedTime(elapsedTimeInSeconds);
+
     showTimeUpMessage(() => {
-      console.log(
-        '⏰ [TIME UP] User acknowledged time up message, hiding and submitting',
-      );
       hideMessage();
-      submitTest();
+      submitTestWithElapsedTime(elapsedTimeInSeconds);
     });
   };
 
-  useEffect(() => {
-    console.log(
-      '🔄 [STATE CHANGE] isTestCompleted changed to:',
-      isTestCompleted,
-    );
-  }, [isTestCompleted]);
+  const handleTimeUpdate = elapsedTimeInSeconds => {
+    setActualElapsedTime(elapsedTimeInSeconds);
+  };
 
-  useEffect(() => {
-    console.log('🔄 [STATE CHANGE] isSubmitting changed to:', isSubmitting);
-  }, [isSubmitting]);
-
-  useEffect(() => {
-    console.log('🔄 [STATE CHANGE] testStarted changed to:', testStarted);
-  }, [testStarted]);
-
-  useEffect(() => {
-    console.log('🔄 [STATE CHANGE] selectedAnswers changed:');
-    console.log(
-      '🔄 [STATE CHANGE] - Count:',
-      Object.keys(selectedAnswers).length,
-    );
-    console.log(
-      '🔄 [STATE CHANGE] - Answers:',
-      JSON.stringify(selectedAnswers, null, 2),
-    );
-  }, [selectedAnswers]);
-
-  // Handle test submission when user wants to navigate away
-  const submitTestAndNavigateBack = async () => {
-    console.log('🔄 [NAV SUBMIT] Starting submitTestAndNavigateBack');
-
+  const submitTestWithElapsedTime = async (
+    elapsedTimeInSeconds = actualElapsedTime,
+  ) => {
     const userId = getUserId();
-    console.log('👤 [NAV SUBMIT] User ID:', userId);
-
     if (!userId) {
       showErrorMessage('Error', 'User not authenticated. Please login again.');
       return;
     }
 
     if (!testStartTime) {
-      console.log('❌ [NAV SUBMIT] testStartTime value:', testStartTime);
       showErrorMessage(
         'Error',
         'Test timing data is missing. Please try again.',
@@ -285,50 +414,104 @@ const ChampionTest = ({route, navigation}) => {
       return;
     }
 
-    console.log('🏁 [NAV SUBMIT] Setting test as completed');
+    try {
+      const formatTime = seconds => {
+        const mins = Math.floor(seconds / 60);
+        const secs = seconds % 60;
+        return `${mins.toString().padStart(2, '0')}:${secs
+          .toString()
+          .padStart(2, '0')}`;
+      };
+
+      const formattedTimeTaken = formatTime(elapsedTimeInSeconds);
+
+      // Create adjusted start time to match client elapsed time
+      const now = new Date();
+      const adjustedStartTime = new Date(
+        now.getTime() - elapsedTimeInSeconds * 1000,
+      );
+
+      await handleTestSubmission(
+        testId,
+        selectedAnswers,
+        setIsSubmitting,
+        userId,
+        adjustedStartTime.toISOString(), // Send adjusted start time
+        response => {
+          setIsTestCompleted(true);
+
+          Alert.alert(
+            'Success!',
+            `Test submitted successfully!\nTime taken: ${formattedTimeTaken}`,
+            [
+              {
+                text: 'OK',
+                onPress: () => {
+                  navigation.reset({
+                    index: 0,
+                    routes: [{name: 'ChampionSeries'}],
+                  });
+                },
+              },
+            ],
+            {cancelable: false},
+          );
+        },
+        errorMessage => {
+          const errorText =
+            typeof errorMessage === 'string'
+              ? errorMessage
+              : 'Submission failed';
+          setIsTestCompleted(false);
+          showErrorMessage('Submission Failed', errorText);
+        },
+      );
+    } catch (error) {
+      console.error('❌ Test submission with elapsed time failed:', error);
+      setIsTestCompleted(false);
+    }
+  };
+
+  // Handle test submission when user wants to navigate away
+  const submitTestAndNavigateBack = async () => {
+    const userId = getUserId();
+    if (!userId) {
+      showErrorMessage('Error', 'User not authenticated. Please login again.');
+      return;
+    }
+
+    if (!testStartTime) {
+      showErrorMessage(
+        'Error',
+        'Test timing data is missing. Please try again.',
+      );
+      return;
+    }
+
     setIsTestCompleted(true);
 
-    console.log('📋 [NAV SUBMIT] Test submission parameters:');
-    console.log('📋 [NAV SUBMIT] - testId:', testId);
-    console.log('📋 [NAV SUBMIT] - userId:', userId);
-    console.log('📋 [NAV SUBMIT] - testStartTime:', testStartTime);
-    console.log(
-      '📋 [NAV SUBMIT] - selectedAnswers count:',
-      Object.keys(selectedAnswers).length,
-    );
-    console.log(
-      '📋 [NAV SUBMIT] - selectedAnswers:',
-      JSON.stringify(selectedAnswers, null, 2),
-    );
-
     try {
-      console.log('🚀 [NAV SUBMIT] Calling handleTestSubmission...');
+      const endTime = new Date().toISOString();
+
       await handleTestSubmission(
         testId,
         selectedAnswers,
         setIsSubmitting,
         userId,
         testStartTime,
+        endTime,
+        actualElapsedTime, // Pass actual elapsed time
         response => {
-          console.log('✅ [NAV SUBMIT] Success callback triggered');
-          console.log(
-            '✅ [NAV SUBMIT] Response:',
-            JSON.stringify(response, null, 2),
-          );
-          // Success callback - navigate back without showing submission message
           hideMessage();
-          console.log('🏠 [NAV SUBMIT] Navigating back');
-          navigation.goBack(); //Go back to previous screen
+          navigation.goBack();
         },
         errorMessage => {
-          // Error callback - reset completion state on error
           setIsTestCompleted(false);
           showErrorMessage('Submission Failed', errorMessage);
         },
       );
     } catch (error) {
       console.error('❌ Test submission failed with error:', error);
-      // Reset completion state on error
       setIsTestCompleted(false);
     }
   };
@@ -363,19 +546,8 @@ const ChampionTest = ({route, navigation}) => {
   };
 
   const handleSubmitTest = () => {
-    console.log('📝 [SUBMIT TEST] Starting handleSubmitTest');
-
     const answeredCount = Object.keys(selectedAnswers).length;
     const totalQuestions = testData?.questions?.length || 0;
-
-    console.log('📊 [SUBMIT TEST] Test statistics:');
-    console.log('📊 [SUBMIT TEST] - Answered questions:', answeredCount);
-    console.log('📊 [SUBMIT TEST] - Total questions:', totalQuestions);
-    console.log(
-      '📊 [SUBMIT TEST] - Selected answers:',
-      JSON.stringify(selectedAnswers, null, 2),
-    );
-    console.log('📊 [SUBMIT TEST] - Test data available:', !!testData);
 
     if (answeredCount < totalQuestions) {
       showIncompleteTestMessage(
@@ -402,112 +574,8 @@ const ChampionTest = ({route, navigation}) => {
     }
   };
 
-  // const submitTest = async () => {
-  //   const userId = getUserId();
-  //   if (!userId) {
-  //     showErrorMessage('Error', 'User not authenticated. Please login again.');
-  //     return;
-  //   }
-
-  //   if (!testStartTime) {
-  //     showErrorMessage(
-  //       'Error',
-  //       'Test timing data is missing. Please try again.',
-  //     );
-  //     return;
-  //   }
-
-  //   try {
-  //     await handleTestSubmission(
-  //       testId,
-  //       selectedAnswers,
-  //       setIsSubmitting,
-  //       userId,
-  //       testStartTime,
-  //       response => {
-  //         setIsTestCompleted(true);
-  //         console.log(
-  //           '✅ Test submitted successfully, navigating to ChampionSeries',
-  //         );
-
-  //         // ✅ Reset navigation stack - removes test from history
-  //         navigation.reset({
-  //           index: 0,
-  //           routes: [{name: 'ChampionSeries'}],
-  //         });
-  //       },
-  //       errorMessage => {
-  //         const errorText =
-  //           typeof errorMessage === 'string'
-  //             ? errorMessage
-  //             : 'Submission failed';
-  //         setIsTestCompleted(false);
-  //         showErrorMessage('Submission Failed', errorText);
-  //       },
-  //     );
-  //   } catch (error) {
-  //     console.error('❌ Test submission failed with error:', error);
-  //     setIsTestCompleted(false);
-  //   }
-  // };
-
   const submitTest = async () => {
-    const userId = getUserId();
-    if (!userId) {
-      showErrorMessage('Error', 'User not authenticated. Please login again.');
-      return;
-    }
-
-    if (!testStartTime) {
-      showErrorMessage(
-        'Error',
-        'Test timing data is missing. Please try again.',
-      );
-      return;
-    }
-
-    try {
-      await handleTestSubmission(
-        testId,
-        selectedAnswers,
-        setIsSubmitting,
-        userId,
-        testStartTime,
-        response => {
-          setIsTestCompleted(true);
-          console.log('✅ Test submitted successfully, showing alert');
-
-          // ✅ Show alert with navigation reset
-          Alert.alert(
-            'Success!',
-            'Test submitted successfully!',
-            [
-              {
-                text: 'OK',
-                onPress: () => {
-                  navigation.reset({
-                    index: 0,
-                    routes: [{name: 'ChampionSeries'}],
-                  });
-                },
-              },
-            ],
-            {cancelable: false},
-          );
-        },
-        errorMessage => {
-          const errorText =
-            typeof errorMessage === 'string'
-              ? errorMessage
-              : 'Submission failed';
-          setIsTestCompleted(false);
-          showErrorMessage('Submission Failed', errorText);
-        },
-      );
-    } catch (error) {
-      console.error('❌ Test submission failed with error:', error);
-      setIsTestCompleted(false);
-    }
+    await submitTestWithElapsedTime(actualElapsedTime);
   };
 
   const onRetryFetch = () => {
@@ -588,11 +656,14 @@ const ChampionTest = ({route, navigation}) => {
             navigation={navigation}
             onQuestionSelect={handleQuestionSelect}
           />
+          {/* REPLACE the existing PaperTimer component */}
           <PaperTimer
-            duration={testData.duration}
+            duration={effectiveTestDuration || testData?.duration * 60}
             onTimeUp={handleTimeUp}
-            testStarted={testStarted}
-            isTestCompleted={isTestCompleted}
+            onTimeUpdate={handleTimeUpdate}
+            isActive={testStarted && !isTestCompleted}
+            testData={testData}
+            showRemainingTime={true}
           />
 
           {/* Submit Button in Header */}
@@ -601,10 +672,6 @@ const ChampionTest = ({route, navigation}) => {
             onPress={() => {
               if (!isSubmitting && !submissionInProgress) {
                 handleSubmitTest();
-              } else {
-                console.log(
-                  '⚠️ Submission already in progress, ignoring click',
-                );
               }
             }}
             disabled={isSubmitting || submissionInProgress}>

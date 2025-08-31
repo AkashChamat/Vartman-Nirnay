@@ -602,7 +602,6 @@ const ProfilePage = () => {
               }
 
               const result = await deleteAddress(addressId);
-              console.log('Delete result:', result); // This should log the response
 
               // Show success message - you can use result.message or a custom message
               showSuccessMessage(

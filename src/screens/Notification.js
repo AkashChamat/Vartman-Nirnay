@@ -14,8 +14,8 @@ import {useNavigation, useFocusEffect} from '@react-navigation/native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import LinearGradient from 'react-native-linear-gradient';
 import {getTodayNotifications, getAllNotifications} from '../util/apiCall';
-import { showInfoMessage } from '../Components/SubmissionMessage';
-
+import {showInfoMessage} from '../Components/SubmissionMessage';
+import NotificationHelper from '../Components/NotificationHelper';
 
 const Notification = () => {
   const navigation = useNavigation();
@@ -24,6 +24,36 @@ const Notification = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState('today'); // 'today' or 'all'
   const [error, setError] = useState(null);
+
+  const fetchNotificationsOnFocus = async () => {
+    try {
+      setError(null);
+      setLoading(false);
+
+      let response;
+      if (activeTab === 'today') {
+        response = await getTodayNotifications();
+      } else {
+        response = await getAllNotifications();
+      }
+
+      const filteredNotifications = Array.isArray(response)
+        ? response.filter(
+            notification =>
+              notification.channels &&
+              notification.channels.toUpperCase().includes('NOTIFICATION'),
+          )
+        : [];
+
+      setNotifications(filteredNotifications);
+    } catch (error) {
+      console.error('Error fetching notifications:', error);
+      setError(error.message || 'Failed to fetch notifications');
+      setNotifications([]);
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   // Fetch notifications based on active tab
   const fetchNotifications = async (showLoader = true) => {
@@ -41,10 +71,11 @@ const Notification = () => {
       }
 
       // Filter notifications to show only those with channels containing 'NOTIFICATION'
-      const filteredNotifications = Array.isArray(response) 
-        ? response.filter(notification => 
-            notification.channels && 
-            notification.channels.toUpperCase().includes('NOTIFICATION')
+      const filteredNotifications = Array.isArray(response)
+        ? response.filter(
+            notification =>
+              notification.channels &&
+              notification.channels.toUpperCase().includes('NOTIFICATION'),
           )
         : [];
 
@@ -64,28 +95,27 @@ const Notification = () => {
     fetchNotifications();
   }, [activeTab]);
 
-  // Refresh notifications when screen comes into focus
   useFocusEffect(
     React.useCallback(() => {
-      fetchNotifications(false);
-    }, [activeTab])
+      fetchNotificationsOnFocus();
+    }, [activeTab]),
   );
 
   // Pull to refresh handler
   const onRefresh = () => {
     setRefreshing(true);
-    fetchNotifications(false);
+    fetchNotificationsOnFocus(); 
   };
 
   // Handle tab change
-  const handleTabChange = (tab) => {
+  const handleTabChange = tab => {
     setActiveTab(tab);
   };
 
   // Format date for display
-  const formatDate = (dateString) => {
+  const formatDate = dateString => {
     if (!dateString) return 'No date';
-    
+
     try {
       const date = new Date(dateString);
       const now = new Date();
@@ -116,8 +146,10 @@ const Notification = () => {
       style={styles.notificationCard}
       onPress={() => {
         // Handle notification tap - you can navigate to detail screen or show alert
-       showInfoMessage(item.title || 'Notification', item.description || 'No description available');
-
+        showInfoMessage(
+          item.title || 'Notification',
+          item.description || 'No description available',
+        );
       }}
       activeOpacity={0.7}>
       <View style={styles.notificationContent}>
@@ -239,7 +271,7 @@ const Notification = () => {
           <FlatList
             data={notifications}
             renderItem={renderNotificationItem}
-            keyExtractor={(item, index) => 
+            keyExtractor={(item, index) =>
               item.id ? item.id.toString() : index.toString()
             }
             refreshControl={

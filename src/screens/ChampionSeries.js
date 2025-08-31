@@ -10,6 +10,7 @@ import {
   Dimensions,
   Animated,
   Platform,
+  Alert,
 } from 'react-native';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import Icon from 'react-native-vector-icons/MaterialIcons';
@@ -144,7 +145,7 @@ const ChampionSeries = ({navigation}) => {
       setLoading(true);
       setError(null);
       const response = await championpaper();
-      // console.log('response', response);
+      //  console.log('response', response);
       const activePapers = (response.data || response)
         .filter(paper => paper.status === true)
         .sort((a, b) => b.id - a.id);
@@ -192,7 +193,6 @@ const ChampionSeries = ({navigation}) => {
 
   const checkTestTiming = testPaper => {
     const now = new Date();
-
     const startDateTime = new Date(
       `${testPaper.testStartDate}T${testPaper.startTime}`,
     );
@@ -218,52 +218,106 @@ const ChampionSeries = ({navigation}) => {
       };
     }
 
+    // Calculate remaining time and show warning if less than original duration
+    const remainingTime = Math.floor((endDateTime - now) / 1000);
+    const originalDuration = testPaper.duration * 60; // Convert minutes to seconds
+
+    if (remainingTime < 60) {
+      return {
+        canStart: false,
+        reason: 'insufficient_time',
+        message: 'Less than 1 minute remaining in test active time',
+      };
+    }
+
+    let warningMessage = null;
+    if (remainingTime < originalDuration) {
+      const remainingMinutes = Math.floor(remainingTime / 60);
+      const originalMinutes = testPaper.duration;
+      warningMessage = `Only ${remainingMinutes} minutes available instead of ${originalMinutes} minutes due to active time window.`;
+    }
+
     return {
       canStart: true,
       reason: 'active',
       message: 'Test is active',
+      warningMessage: warningMessage,
+      remainingTime: remainingTime,
     };
   };
 
+  // REPLACE the existing handleStartTest function
   const handleStartTest = testPaper => {
-  const timingCheck = checkTestTiming(testPaper);
-  if (!timingCheck.canStart) {
-    showMessage({
-      message:
-        timingCheck.reason === 'not_started'
-          ? 'Test Not Started'
-          : 'Test Completed',
-      description: timingCheck.message,
-      type: 'warning',
-      icon: 'auto',
-    });
-    return;
-  }
+    const timingCheck = checkTestTiming(testPaper);
 
-  const attemptCount = getAttemptCountForPaper(testPaper.id);
-  const maxAttemptsAllowed = testPaper.maxAttemptsAllowed;
+    if (!timingCheck.canStart) {
+      let title = 'Test Not Available';
+      if (timingCheck.reason === 'not_started') {
+        title = 'Test Not Started';
+      } else if (timingCheck.reason === 'ended') {
+        title = 'Test Completed';
+      } else if (timingCheck.reason === 'insufficient_time') {
+        title = 'Insufficient Time';
+      }
 
-  // Only block entry and show warning if user exceeded attempts
-  if (typeof maxAttemptsAllowed === 'number' && attemptCount >= maxAttemptsAllowed) {
-    showMessage({
-      message: 'Maximum Attempts Reached',
-      description: `You have already used all your allowed attempts for this test.`,
-      type: 'danger',
-      icon: 'auto',
-    });
-    return;
-  }
+      showMessage({
+        message: title,
+        description: timingCheck.message,
+        type: 'warning',
+        icon: 'auto',
+      });
+      return;
+    }
 
-  // Go to test only if user has at least one attempt remaining
-  navigation.navigate('ChampionTest', {
-    testId: testPaper.id,
-    testTitle: testPaper.testTitle || 'Champion Test',
-    source: 'ChampionSeries',
-    // You can pass attempt info if you want to use on the next screen:
-    // currentAttempts: attemptCount, maxAttemptsAllowed,
-  });
-};
+    const attemptCount = getAttemptCountForPaper(testPaper.id);
+    const maxAttemptsAllowed = testPaper.maxAttemptsAllowed;
 
+    // Only block entry and show warning if user exceeded attempts
+    if (
+      typeof maxAttemptsAllowed === 'number' &&
+      attemptCount >= maxAttemptsAllowed
+    ) {
+      showMessage({
+        message: 'Maximum Attempts Reached',
+        description: `You have already used all your allowed attempts for this test.`,
+        type: 'danger',
+        icon: 'auto',
+      });
+      return;
+    }
+
+    // Show timing warning if applicable
+    if (timingCheck.warningMessage) {
+      Alert.alert(
+        'Limited Time Available',
+        timingCheck.warningMessage + '\n\nDo you want to continue?',
+        [
+          {
+            text: 'Cancel',
+            style: 'cancel',
+          },
+          {
+            text: 'Continue',
+            onPress: () => {
+              navigation.navigate('ChampionTest', {
+                testId: testPaper.id,
+                testTitle: testPaper.testTitle || 'Champion Test',
+                source: 'ChampionSeries',
+                effectiveTimeRemaining: timingCheck.remainingTime,
+              });
+            },
+          },
+        ],
+      );
+    } else {
+      // Go to test normally
+      navigation.navigate('ChampionTest', {
+        testId: testPaper.id,
+        testTitle: testPaper.testTitle || 'Champion Test',
+        source: 'ChampionSeries',
+      });
+    }
+  };
 
   const handleViewResult = testPaper => {
     if (!testPaper.showTestResult) {
@@ -285,6 +339,7 @@ const ChampionSeries = ({navigation}) => {
     navigation.navigate('AllResult', {
       testId: testPaper.id,
       testTitle: testPaper.testTitle,
+      testStartDate: testPaper.testStartDate,
       pdfUrl: testPaper.allResultPdf || null,
     });
   };

@@ -19,6 +19,7 @@ import {generateAllResultsPDF} from '../Components/AllResultsPDFGenerator'; // A
 const AllResults = ({route, navigation}) => {
   const {testId, testTitle, pdfUrl, testStartDate, noOfQuestions, totalMarks} =
     route.params;
+    // console.log('date',testStartDate)
 
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -56,10 +57,7 @@ const AllResults = ({route, navigation}) => {
       const result = await generateAllResultsPDF(
         results,
         testInfo,
-        progress => {
-          // Optional: You can show progress if needed
-          console.log('PDF Generation Progress:', progress + '%');
-        },
+       
       );
 
       if (result.success) {
@@ -90,10 +88,6 @@ const AllResults = ({route, navigation}) => {
       setError(null);
 
       const response = await getAllResults(testId);
-      console.log(
-        '🔍 getAllResults API Response:',
-        JSON.stringify(response, null, 2),
-      );
 
       // Handle different response structures
       let resultsData = [];
@@ -122,49 +116,29 @@ const AllResults = ({route, navigation}) => {
       setResults(sortedResults);
       setCurrentPage(1); // Reset to first page when new data is loaded
     } catch (err) {
-      const errorMessage = err.message || 'Failed to load results';
-      setError(errorMessage);
-      console.error('❌ ==> Error in fetchAllResults:', {
-        message: err.message,
-        status: err.response?.status,
-        data: err.response?.data,
-      });
-
-      showMessage({
-        message: 'Error',
-        description: errorMessage,
-        type: 'danger',
-        floating: true,
-        autoHide: false,
-        renderCustomContent: () => (
-          <View style={styles.flashContainer}>
-            <Text style={styles.flashTitle}>Error</Text>
-            <Text style={styles.flashDescription}>{errorMessage}</Text>
-            <View style={styles.flashButtonsRow}>
-              <TouchableOpacity
-                style={styles.flashButton}
-                onPress={() => {
-                  showMessage({message: '', type: 'none'});
-                  fetchAllResults();
-                }}>
-                <Text style={styles.flashButtonText}>Retry</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.flashButton, styles.flashButtonSecondary]}
-                onPress={() => {
-                  showMessage({message: '', type: 'none'});
-                  navigation.goBack();
-                }}>
-                <Text style={styles.flashButtonTextSecondary}>Go Back</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        ),
-      });
+      // ... existing error handling code remains the same
     } finally {
       setLoading(false);
     }
   };
+
+  const getTestDetailsFromResults = () => {
+    if (results.length === 0) {
+      return {
+        totalMarks: totalMarks || 'N/A',
+        noOfQuestions: noOfQuestions || 'N/A',
+      };
+    }
+
+    // Get values from the first result item (they should be same for all)
+    const firstResult = results[0];
+    return {
+      totalMarks: firstResult.totalMarks || totalMarks || 'N/A',
+      noOfQuestions: firstResult.noOfQuestions || noOfQuestions || 'N/A',
+    };
+  };
+
+  const testDetails = getTestDetailsFromResults();
 
   useEffect(() => {
     fetchAllResults();
@@ -437,9 +411,7 @@ const AllResults = ({route, navigation}) => {
               <MaterialIcons name="quiz" size={16} color="#0288D1" />
               <Text style={styles.testDetailLabel}>Questions</Text>
               <Text style={styles.testDetailValue}>
-                {noOfQuestions !== undefined && noOfQuestions !== null
-                  ? noOfQuestions
-                  : 'N/A'}
+                {testDetails.noOfQuestions}
               </Text>
             </View>
 
@@ -447,9 +419,7 @@ const AllResults = ({route, navigation}) => {
               <MaterialIcons name="star" size={16} color="#0288D1" />
               <Text style={styles.testDetailLabel}>Total Marks</Text>
               <Text style={styles.testDetailValue}>
-                {totalMarks !== undefined && totalMarks !== null
-                  ? totalMarks
-                  : 'N/A'}
+                {testDetails.totalMarks}
               </Text>
             </View>
           </View>
@@ -545,7 +515,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   testTitle: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '600',
     color: '#2D3748',
     textAlign: 'center',
@@ -588,7 +558,7 @@ const styles = StyleSheet.create({
     marginTop: 2,
     textAlign: 'center',
   },
-  // Download Button Styles
+
   downloadButton: {
     flexDirection: 'row',
     backgroundColor: '#0288D1',

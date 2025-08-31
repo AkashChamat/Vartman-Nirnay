@@ -757,7 +757,7 @@ const BookPaymentScreen = ({navigation}) => {
   // Loading state
   if (loading) {
     return (
-      <SafeAreaView style={[styles.container, {paddingTop: insets.top}]}>
+      <SafeAreaView style={[styles.container, {paddingTop: insets.top}]}  edges={['top', 'left', 'right']}>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#667eea" />
           <Text style={styles.loadingText}>Initializing Payment...</Text>
@@ -770,14 +770,14 @@ const BookPaymentScreen = ({navigation}) => {
   }
 
   return (
-    <SafeAreaView style={[styles.container, {paddingTop: insets.top}]}>
+    <SafeAreaView style={[styles.container, {paddingTop: insets.top}]}  edges={['top', 'left', 'right']}>
       {/* Payment WebView Modal */}
       <Modal
         visible={showWebView}
         animationType="slide"
         presentationStyle="fullScreen"
         onRequestClose={closeWebView}>
-        <SafeAreaView style={[styles.modalContainer, {paddingTop: insets.top}]}>
+        <SafeAreaView style={[styles.modalContainer, {paddingTop: insets.top}]}  edges={['top', 'left', 'right']}>
           <View style={styles.modalHeader}>
             <TouchableOpacity onPress={closeWebView} style={styles.closeButton}>
               <Text style={styles.closeButtonText}>✕ Close</Text>

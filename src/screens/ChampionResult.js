@@ -20,6 +20,82 @@ import {useAuth} from '../Auth/AuthContext';
 
 const {width, height} = Dimensions.get('window');
 
+// Simple Bar Chart Component
+const SimpleBarChart = ({
+  correctQuestions,
+  incorrectQuestions,
+  unsolvedQuestions,
+}) => {
+  const total = correctQuestions + incorrectQuestions + unsolvedQuestions;
+  const maxValue = Math.max(
+    correctQuestions,
+    incorrectQuestions,
+    unsolvedQuestions,
+  );
+  const maxHeight = 120; // Maximum height of bars
+
+  const getBarHeight = value => {
+    if (maxValue === 0) return 0;
+    return (value / maxValue) * maxHeight;
+  };
+
+  const chartData = [
+    {
+      label: 'Correct',
+      value: correctQuestions,
+      color: '#10B981',
+      icon: 'check-circle',
+    },
+    {
+      label: 'Incorrect',
+      value: incorrectQuestions,
+      color: '#EF4444',
+      icon: 'cancel',
+    },
+    {
+      label: 'Unanswered',
+      value: unsolvedQuestions,
+      color: '#6B7280',
+      icon: 'help-outline',
+    },
+  ];
+
+  return (
+    <View style={chartStyles.container}>
+      <Text style={chartStyles.title}>Test Results Overview</Text>
+      <View style={chartStyles.chartContainer}>
+        {chartData.map((item, index) => (
+          <View key={index} style={chartStyles.barContainer}>
+            <View style={chartStyles.barWrapper}>
+              <View
+                style={[
+                  chartStyles.bar,
+                  {
+                    height: getBarHeight(item.value),
+                    backgroundColor: item.color,
+                  },
+                ]}>
+                <Text style={chartStyles.barValue}>{item.value}</Text>
+              </View>
+            </View>
+            <View style={chartStyles.labelContainer}>
+              <MaterialIcons
+                name={item.icon}
+                size={16}
+                color={item.color}
+                style={chartStyles.labelIcon}
+              />
+              <Text style={[chartStyles.label, {color: item.color}]}>
+                {item.label}
+              </Text>
+            </View>
+          </View>
+        ))}
+      </View>
+    </View>
+  );
+};
+
 const ChampionResult = ({route, navigation}) => {
   const {userId, testPaperId, testTitle} = route.params || {};
   const {isAuthenticated} = useAuth();
@@ -72,6 +148,7 @@ const ChampionResult = ({route, navigation}) => {
       setError('');
 
       const response = await champresult({}, [userId, testPaperId]);
+      // console.log('response',response)
 
       setResult(response);
       setLoading(false);
@@ -173,13 +250,25 @@ const ChampionResult = ({route, navigation}) => {
     </View>
   );
 
-  const renderCompactResultCard = (title, value, icon, color = '#6366F1') => (
-    <View style={styles.compactResultCard}>
-      <View style={[styles.compactResultIcon, {backgroundColor: `${color}20`}]}>
-        <MaterialIcons name={icon} size={20} color={color} />
+  // Updated function for single column stats
+  const renderSingleColumnResultCard = (
+    title,
+    value,
+    icon,
+    color = '#6366F1',
+  ) => (
+    <View style={styles.singleColumnResultCard}>
+      <View
+        style={[
+          styles.singleColumnResultIcon,
+          {backgroundColor: `${color}20`},
+        ]}>
+        <MaterialIcons name={icon} size={24} color={color} />
       </View>
-      <Text style={styles.compactResultTitle}>{title}</Text>
-      <Text style={[styles.compactResultValue, {color}]}>{value}</Text>
+      <View style={styles.singleColumnResultContent}>
+        <Text style={styles.singleColumnResultTitle}>{title}</Text>
+        <Text style={[styles.singleColumnResultValue, {color}]}>{value}</Text>
+      </View>
     </View>
   );
 
@@ -426,85 +515,75 @@ const ChampionResult = ({route, navigation}) => {
           <Text style={styles.resultStatus}>Test Completed Successfully!</Text>
         </View>
 
-        {/* Compact Stats Container */}
+        
+
+        {/* Single Column Stats Container */}
         <View style={styles.statsContainer}>
           <Text style={styles.sectionTitle}>Test Results</Text>
 
-          {/* First Row: Total Score and Total Questions */}
-          <View style={styles.statsRow}>
-            {renderCompactResultCard(
-              'Total Score',
-              totalScore.toString(),
-              'stars',
-              '#F59E0B',
-            )}
-            {renderCompactResultCard(
-              'Total Questions',
-              totalQuestions.toString(),
-              'quiz',
-              '#6366F1',
-            )}
-          </View>
-
-          {/* Second Row: Correct Answers and Wrong Answers */}
-          <View style={styles.statsRow}>
-            {renderCompactResultCard(
-              'Correct',
-              correctQuestions.toString(),
-              'check-circle',
-              '#10B981',
-            )}
-            {renderCompactResultCard(
-              'Wrong',
-              incorrectQuestions.toString(),
-              'cancel',
-              '#EF4444',
-            )}
-          </View>
-
-          {/* Third Row: Unanswered and Time/Rank */}
-          <View style={styles.statsRow}>
-            {renderCompactResultCard(
-              'Unanswered',
-              unsolvedQuestions.toString(),
-              'help-outline',
-              '#6B7280',
-            )}
-            {/* Show either rank or time taken based on availability */}
-            {userRank
-              ? renderCompactResultCard(
-                  'Rank',
-                  userRank,
-                  'leaderboard',
-                  '#8B5CF6',
-                )
-              : timeTaken
-              ? renderCompactResultCard(
-                  'Time Taken',
-                  timeTaken,
-                  'access-time',
-                  '#8B5CF6',
-                )
-              : renderCompactResultCard(
-                  'Attempt',
-                  attemptNumber.toString(),
-                  'replay',
-                  '#8B5CF6',
-                )}
-          </View>
-
-          {/* Fourth Row: If both rank and time are available */}
-          {userRank && timeTaken && (
-            <View style={styles.statsRow}>
-              {renderCompactResultCard(
-                'Time Taken',
-                timeTaken,
-                'access-time',
-                '#8B5CF6',
-              )}
-              
-            </View>
+          {renderSingleColumnResultCard(
+            'Total Score',
+            totalScore.toString(),
+            'stars',
+            '#F59E0B',
           )}
+          {renderSingleColumnResultCard(
+            'Total Questions',
+            totalQuestions.toString(),
+            'quiz',
+            '#6366F1',
+          )}
+          {renderSingleColumnResultCard(
+            'Correct',
+            correctQuestions.toString(),
+            'check-circle',
+            '#10B981',
+          )}
+          {renderSingleColumnResultCard(
+            'Wrong',
+            incorrectQuestions.toString(),
+            'cancel',
+            '#EF4444',
+          )}
+          {renderSingleColumnResultCard(
+            'Unanswered',
+            unsolvedQuestions.toString(),
+            'help-outline',
+            '#6B7280',
+          )}
+
+          {/* Conditional rendering for rank/time */}
+          {userRank &&
+            renderSingleColumnResultCard(
+              'Rank',
+              userRank,
+              'leaderboard',
+              '#8B5CF6',
+            )}
+          {timeTaken &&
+            renderSingleColumnResultCard(
+              'Time Taken',
+              timeTaken,
+              'access-time',
+              '#8B5CF6',
+            )}
+          {!userRank &&
+            !timeTaken &&
+            renderSingleColumnResultCard(
+              'Attempt',
+              attemptNumber.toString(),
+              'replay',
+              '#8B5CF6',
+            )}
+        </View>
+
+        {/* Chart Component */}
+        <View style={styles.chartCard}>
+          <SimpleBarChart
+            correctQuestions={correctQuestions}
+            incorrectQuestions={incorrectQuestions}
+            unsolvedQuestions={unsolvedQuestions}
+          />
         </View>
 
         {/* Action Buttons */}
@@ -535,6 +614,70 @@ const ChampionResult = ({route, navigation}) => {
     </SafeAreaView>
   );
 };
+
+// Chart Styles
+const chartStyles = StyleSheet.create({
+  container: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 20,
+    marginVertical: 16,
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: {width: 0, height: 2},
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
+  title: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#1F2937',
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  chartContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    alignItems: 'flex-end',
+    height: 160,
+    paddingHorizontal: 10,
+  },
+  barContainer: {
+    alignItems: 'center',
+    flex: 1,
+  },
+  barWrapper: {
+    height: 120,
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  bar: {
+    width: 40,
+    borderRadius: 8,
+    justifyContent: 'flex-start',
+    alignItems: 'center',
+    paddingTop: 8,
+    minHeight: 30,
+  },
+  barValue: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  labelContainer: {
+    alignItems: 'center',
+    paddingTop: 5,
+  },
+  labelIcon: {
+    marginBottom: 4,
+  },
+  label: {
+    fontSize: 12,
+    fontWeight: '500',
+    textAlign: 'center',
+  },
+});
 
 const styles = StyleSheet.create({
   container: {
@@ -680,11 +823,16 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
 
+  // Chart Card Styles
+  chartCard: {
+    marginBottom: 16,
+  },
+
   // Compact Stats Container Styles
   statsContainer: {
     backgroundColor: '#FFFFFF',
     borderRadius: 16,
-    padding: 16,
+    padding: 8,
     marginBottom: 20,
     elevation: 3,
     shadowColor: '#000',
@@ -692,40 +840,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
   },
-  statsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 12,
-  },
-  compactResultCard: {
-    flex: 1,
-    alignItems: 'center',
-    padding: 16,
-    backgroundColor: '#F9FAFB',
-    borderRadius: 12,
-    marginHorizontal: 4,
-  },
-  compactResultIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  compactResultTitle: {
-    fontSize: 12,
-    color: '#6B7280',
-    fontWeight: '500',
-    textAlign: 'center',
-    marginBottom: 4,
-  },
-  compactResultValue: {
-    fontSize: 18,
-    fontWeight: '700',
-    textAlign: 'center',
-  },
-
+  
   // Action Buttons Styles
   actionButtons: {
     marginBottom: height * 0.03, // Add margin based on screen height
@@ -924,6 +1039,37 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 24,
   },
+  singleColumnResultCard: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  padding: 8,
+  backgroundColor: '#F9FAFB',
+  borderRadius: 12,
+  marginBottom: 12,
+  borderWidth: 1,
+  borderColor: '#E5E7EB',
+},
+singleColumnResultIcon: {
+  width: 20,
+  height: 20,
+  borderRadius: 20,
+  justifyContent: 'center',
+  alignItems: 'center',
+  marginRight: 16,
+},
+singleColumnResultContent: {
+  flex: 1,
+},
+singleColumnResultTitle: {
+  fontSize: 12,
+  color: '#6B7280',
+  fontWeight: '500',
+  marginBottom: 4,
+},
+singleColumnResultValue: {
+  fontSize: 12,
+  fontWeight: '700',
+},
 });
 
 export default ChampionResult;

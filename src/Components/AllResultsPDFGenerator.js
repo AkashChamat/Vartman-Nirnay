@@ -1,6 +1,6 @@
 // Components/AllResultsPDFGenerator.js
 import RNHTMLtoPDF from 'react-native-html-to-pdf';
-import { Platform, PermissionsAndroid } from 'react-native';
+import {Platform, PermissionsAndroid} from 'react-native';
 import RNFS from 'react-native-fs';
 import {
   showPermissionDeniedMessage,
@@ -93,7 +93,11 @@ const getLogoBase64 = async () => {
  * @param {string} logoBase64 - Base64 string of the logo
  * @returns {string} HTML content with watermark
  */
-const generateAllResultsHTMLWithWatermark = (resultsData, testInfo, logoBase64) => {
+const generateAllResultsHTMLWithWatermark = (
+  resultsData,
+  testInfo,
+  logoBase64,
+) => {
   const watermarkStyle = logoBase64
     ? `
     .watermark {
@@ -119,7 +123,7 @@ const generateAllResultsHTMLWithWatermark = (resultsData, testInfo, logoBase64) 
     ? `<img src="${logoBase64}" class="watermark" alt="Watermark" />`
     : '';
 
-  const formatDate = (dateString) => {
+  const formatDate = dateString => {
     if (!dateString) return 'N/A';
     try {
       const date = new Date(dateString);
@@ -133,23 +137,41 @@ const generateAllResultsHTMLWithWatermark = (resultsData, testInfo, logoBase64) 
     }
   };
 
-  const resultsRows = resultsData.map((result, index) => {
-    const serialNumber = index + 1;
-    
-    return `
+  const resultsRows = resultsData
+    .map((result, index) => {
+      const serialNumber = index + 1;
+
+      return `
       <tr style="border-bottom: 1px solid #dee2e6;">
         <td style="padding: 8px; text-align: center; font-weight: 600; border-right: 1px solid #dee2e6;">${serialNumber}</td>
-        <td style="padding: 8px; text-align: left; border-right: 1px solid #dee2e6;">${result.userName || 'Anonymous'}</td>
-        <td style="padding: 8px; text-align: center; border-right: 1px solid #dee2e6;">${testInfo.totalMarks || 100}</td>
-        <td style="padding: 8px; text-align: center; border-right: 1px solid #dee2e6;">${testInfo.noOfQuestions || 100}</td>
-        <td style="padding: 8px; text-align: center; font-weight: 600; color: #28a745; border-right: 1px solid #dee2e6;">${result.totalScore || 0}</td>
-        <td style="padding: 8px; text-align: center; color: #28a745; border-right: 1px solid #dee2e6;">${result.correctQuestions || 0}</td>
-        <td style="padding: 8px; text-align: center; color: #dc3545; border-right: 1px solid #dee2e6;">${result.incorrectQuestions || 0}</td>
-        <td style="padding: 8px; text-align: center; color: #6c757d; border-right: 1px solid #dee2e6;">${result.unsolvedQuestions || 0}</td>
-        <td style="padding: 8px; text-align: center; color: #17a2b8;">${result.totalTime || '00:00:00'}</td>
+        <td style="padding: 8px; text-align: left; border-right: 1px solid #dee2e6;">${
+          result.userName || 'Anonymous'
+        }</td>
+        <td style="padding: 8px; text-align: center; border-right: 1px solid #dee2e6;">${
+          testInfo.totalMarks || 100
+        }</td>
+        <td style="padding: 8px; text-align: center; border-right: 1px solid #dee2e6;">${
+          testInfo.noOfQuestions || 100
+        }</td>
+        <td style="padding: 8px; text-align: center; font-weight: 600; color: #28a745; border-right: 1px solid #dee2e6;">${
+          result.totalScore || 0
+        }</td>
+        <td style="padding: 8px; text-align: center; color: #28a745; border-right: 1px solid #dee2e6;">${
+          result.correctQuestions || 0
+        }</td>
+        <td style="padding: 8px; text-align: center; color: #dc3545; border-right: 1px solid #dee2e6;">${
+          result.incorrectQuestions || 0
+        }</td>
+        <td style="padding: 8px; text-align: center; color: #6c757d; border-right: 1px solid #dee2e6;">${
+          result.unsolvedQuestions || 0
+        }</td>
+        <td style="padding: 8px; text-align: center; color: #17a2b8;">${
+          result.totalTime || '00:00:00'
+        }</td>
       </tr>
     `;
-  }).join('');
+    })
+    .join('');
 
   return `
     <!DOCTYPE html>
@@ -230,6 +252,8 @@ const generateAllResultsHTMLWithWatermark = (resultsData, testInfo, logoBase64) 
         <div class="watermark-container">
             <div class="header">
                 <div class="title">Ranking Results</div>
+                <div class="title">Test Date: ${formatDate(testInfo.testStartDate)}</div>
+
             </div>
             
             <table class="results-table">
@@ -257,7 +281,7 @@ const generateAllResultsHTMLWithWatermark = (resultsData, testInfo, logoBase64) 
                   month: 'long',
                   year: 'numeric',
                   hour: '2-digit',
-                  minute: '2-digit'
+                  minute: '2-digit',
                 })}
             </div>
         </div>
@@ -282,7 +306,25 @@ const generateAllResultsPDFWithWatermark = async (resultsData, testInfo) => {
     const logoBase64 = await getLogoBase64();
 
     // Generate HTML content
-    const htmlContent = generateAllResultsHTMLWithWatermark(resultsData, testInfo, logoBase64);
+    const htmlContent = generateAllResultsHTMLWithWatermark(
+      resultsData,
+      testInfo,
+      logoBase64,
+    );
+
+    const formatDate = dateString => {
+      if (!dateString) return 'N/A';
+      try {
+        const date = new Date(dateString);
+        return date.toLocaleDateString('en-IN', {
+          day: '2-digit',
+          month: 'short',
+          year: 'numeric',
+        });
+      } catch (error) {
+        return 'N/A';
+      }
+    };
 
     // Clean filename
     const cleanTitle = (testInfo.testTitle || 'AllResults')
@@ -362,12 +404,16 @@ const generateAllResultsPDFWithWatermark = async (resultsData, testInfo) => {
  * @param {Function} onProgress - Progress callback function
  * @returns {Promise<string>} File path of generated PDF
  */
-export const generateAllResultsPDF = async (resultsData, testInfo, onProgress) => {
+export const generateAllResultsPDF = async (
+  resultsData,
+  testInfo,
+  onProgress,
+) => {
   try {
     // Permission request
     const hasPermission = await requestStoragePermission();
     if (!hasPermission) {
-      return { success: false, error: 'Storage permission denied' };
+      return {success: false, error: 'Storage permission denied'};
     }
     onProgress && onProgress(10);
 
@@ -375,18 +421,21 @@ export const generateAllResultsPDF = async (resultsData, testInfo, onProgress) =
     showPdfGeneratingMessage();
 
     // Generate PDF file
-    const filePath = await generateAllResultsPDFWithWatermark(resultsData, testInfo);
+    const filePath = await generateAllResultsPDFWithWatermark(
+      resultsData,
+      testInfo,
+    );
     onProgress && onProgress(80);
 
     showFileOpenFallbackMessage(filePath, () => hideMessage());
 
     onProgress && onProgress(100);
 
-    return { success: true, filePath, fileName: filePath.split('/').pop() };
+    return {success: true, filePath, fileName: filePath.split('/').pop()};
   } catch (error) {
     console.error('❌ Download Error:', error);
     showPdfGenerationFailedMessage(error.message);
-    return { success: false, error: error.message };
+    return {success: false, error: error.message};
   }
 };
 

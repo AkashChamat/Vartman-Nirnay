@@ -35,87 +35,176 @@ const Sponsors = () => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [autoPlay, setAutoPlay] = useState(true);
   const [pdfLoading, setPdfLoading] = useState(false);
-  const [title, setTitle] = useState('Champion Series Prize Distribution'); // Default title
+  const [title, setTitle] = useState('Champion Series Prize Distribution');
   const [titleLoading, setTitleLoading] = useState(true);
   const carouselRef = useRef(null);
   const [downloadingPdf, setDownloadingPdf] = useState(false);
+  
+  // Dynamic PDF options state
+  const [pdfOptions, setPdfOptions] = useState([]);
+  const [pdfOptionsLoading, setPdfOptionsLoading] = useState(true);
+  
+  // Loading states for each PDF option (using PDF ID as key)
+  const [pdfLoadingStates, setPdfLoadingStates] = useState({});
 
-  // Add this ref to track if we're manually navigating
   const isManualNavigation = useRef(false);
 
+  // Function to get appropriate icon for each PDF type
+  const getPdfIcon = (description) => {
+    const desc = description.toLowerCase();
+    if (desc.includes('ranking') || desc.includes('distribution')) {
+      return 'leaderboard';
+    } else if (desc.includes('claim') || desc.includes('process')) {
+      return 'assignment';
+    } else if (desc.includes('not received') || desc.includes('help')) {
+      return 'help-outline';
+    }
+    return 'picture-as-pdf';
+  };
+
+  // Function to get appropriate color for each PDF type
+  const getPdfButtonColor = (description) => {
+    const desc = description.toLowerCase();
+    if (desc.includes('ranking') || desc.includes('distribution')) {
+      return '#0288D1'; // Blue
+    } else if (desc.includes('claim') || desc.includes('process')) {
+      return '#0288D1'; // Green
+    } else if (desc.includes('not received') || desc.includes('help')) {
+      return '#ff6b35'; // Orange
+    }
+    return '#0288D1'; // Default blue
+  };
+
+  // Fetch PDF options
+  const fetchPdfOptions = async () => {
+    try {
+      setPdfOptionsLoading(true);
+      const response = await sponsorpdf();
+      
+      if (response && Array.isArray(response) && response.length > 0) {
+        // Sort PDFs by ID to maintain consistent order
+        const sortedPdfs = response.sort((a, b) => a.id - b.id);
+        setPdfOptions(sortedPdfs);
+        
+        // Initialize loading states for each PDF
+        const initialLoadingStates = {};
+        sortedPdfs.forEach(pdf => {
+          initialLoadingStates[pdf.id] = false;
+        });
+        setPdfLoadingStates(initialLoadingStates);
+      } else {
+        setPdfOptions([]);
+      }
+    } catch (error) {
+      console.error('Error fetching PDF options:', error);
+      setPdfOptions([]);
+    } finally {
+      setPdfOptionsLoading(false);
+    }
+  };
+
+  // Handle viewing specific PDF
+  const handleViewSpecificPDF = async (pdfOption) => {
+    try {
+      // Set loading state for this specific PDF
+      setPdfLoadingStates(prev => ({
+        ...prev,
+        [pdfOption.id]: true
+      }));
+
+      if (!pdfOption.pdf) {
+        showPdfNotAvailableMessage();
+        return;
+      }
+
+      navigation.navigate('PdfViewer', {
+        pdfUrl: pdfOption.pdf,
+        title: pdfOption.description || 'PDF Document',
+      });
+    } catch (error) {
+      console.error('Error viewing PDF:', error);
+      showPdfLoadFailedMessage();
+    } finally {
+      // Reset loading state for this specific PDF
+      setPdfLoadingStates(prev => ({
+        ...prev,
+        [pdfOption.id]: false
+      }));
+    }
+  };
+
+  // Handle downloading main sponsor PDF (first one in the list)
   const handleDownloadSponsorPDF = async () => {
     try {
       setDownloadingPdf(true);
-      const response = await sponsorpdf();
 
-      if (response && Array.isArray(response) && response.length > 0) {
-        const pdfData = response[0];
-
-        if (!pdfData.pdf) {
-          showMessage({
-            message: 'PDF Not Available',
-            description: 'PDF is not available for download.',
-            type: 'warning',
-            icon: 'auto',
-          });
-          return;
-        }
-
-        // Create filename from description or use default
-        const fileName = `${(
-          pdfData.description || 'Champion_Series_Prize_Distribution'
-        ).replace(/[^a-zA-Z0-9]/g, '_')}_${Date.now()}.pdf`;
-
-        let downloadDest;
-        if (Platform.OS === 'android') {
-          downloadDest = `${RNFS.DownloadDirectoryPath}/${fileName}`;
-        } else {
-          downloadDest = `${RNFS.DocumentDirectoryPath}/${fileName}`;
-        }
-
-        const downloadOptions = {
-          fromUrl: pdfData.pdf,
-          toFile: downloadDest,
-          background: true,
-          progressDivider: 2,
-          begin: res => {
-          },
-          progress: res => {
-            const progressPercent =
-              (res.bytesWritten / res.contentLength) * 100;
-          },
-        };
-
-        const downloadTask = RNFS.downloadFile(downloadOptions);
-        const result = await downloadTask.promise;
-
-        if (result.statusCode === 200) {
-          if (Platform.OS === 'android') {
-            try {
-              await RNFS.scanFile(downloadDest);
-            } catch (err) {
-              console.error('Error scanning file:', err);
-            }
-          }
-
-          showMessage({
-            message: 'Download Complete',
-            description: 'Your PDF has been saved successfully.',
-            type: 'success',
-            icon: 'auto',
-          });
-        } else {
-          throw new Error(
-            `Download failed with status code: ${result.statusCode}`,
-          );
-        }
-      } else {
+      if (pdfOptions.length === 0) {
         showMessage({
           message: 'No PDF Data',
           description: 'No PDF data available for download.',
           type: 'warning',
           icon: 'auto',
         });
+        return;
+      }
+
+      const pdfData = pdfOptions[0]; // Use first PDF for download
+
+      if (!pdfData.pdf) {
+        showMessage({
+          message: 'PDF Not Available',
+          description: 'PDF is not available for download.',
+          type: 'warning',
+          icon: 'auto',
+        });
+        return;
+      }
+
+      // Create filename from description or use default
+      const fileName = `${(
+        pdfData.description || 'Champion_Series_Prize_Distribution'
+      ).replace(/[^a-zA-Z0-9]/g, '_')}_${Date.now()}.pdf`;
+
+      let downloadDest;
+      if (Platform.OS === 'android') {
+        downloadDest = `${RNFS.DownloadDirectoryPath}/${fileName}`;
+      } else {
+        downloadDest = `${RNFS.DocumentDirectoryPath}/${fileName}`;
+      }
+
+      const downloadOptions = {
+        fromUrl: pdfData.pdf,
+        toFile: downloadDest,
+        background: true,
+        progressDivider: 2,
+        begin: res => {},
+        progress: res => {
+          const progressPercent = (res.bytesWritten / res.contentLength) * 100;
+        },
+      };
+
+      const downloadTask = RNFS.downloadFile(downloadOptions);
+      const result = await downloadTask.promise;
+
+      if (result.statusCode === 200) {
+        if (Platform.OS === 'android') {
+          try {
+            await RNFS.scanFile(downloadDest);
+          } catch (err) {
+            console.error('Error scanning file:', err);
+          }
+        }
+
+        showMessage({
+          message: 'Download Complete',
+          description: 'Your PDF has been saved successfully.',
+          type: 'success',
+          icon: 'auto',
+        });
+      } else {
+        throw new Error(
+          `Download failed with status code: ${result.statusCode}`,
+        );
       }
     } catch (error) {
       console.error('Download failed:', error);
@@ -134,6 +223,7 @@ const Sponsors = () => {
   useEffect(() => {
     fetchSponsors();
     fetchTitle();
+    fetchPdfOptions();
   }, []);
 
   const fetchTitle = async () => {
@@ -141,7 +231,6 @@ const Sponsors = () => {
       setTitleLoading(true);
       const response = await sponsortitle();
       if (response && response.length > 0) {
-        // Assuming the API returns an array with title object
         const titleData = response[0];
         if (titleData.title) {
           setTitle(titleData.title);
@@ -149,7 +238,6 @@ const Sponsors = () => {
       }
     } catch (err) {
       console.error('Error fetching title:', err);
-      // Keep default title if API fails
     } finally {
       setTitleLoading(false);
     }
@@ -168,40 +256,9 @@ const Sponsors = () => {
     }
   };
 
-  // PDF viewing logic similar to Gallery component
-  const handleViewSponsorPDF = async () => {
-    try {
-      setPdfLoading(true);
-      const response = await sponsorpdf();
-
-      if (response && Array.isArray(response) && response.length > 0) {
-        const pdfData = response[0];
-
-        if (!pdfData.pdf) {
-          showPdfNotAvailableMessage();
-          return;
-        }
-
-        navigation.navigate('PdfViewer', {
-          pdfUrl: pdfData.pdf,
-          title: pdfData.description || 'Champion Series Prize Distribution',
-        });
-      } else {
-        showNoPdfDataMessage();
-      }
-    } catch (error) {
-      console.error('Error fetching PDF:', error);
-      showPdfLoadFailedMessage();
-    } finally {
-      setPdfLoading(false);
-    }
-  };
-
-  // Improved onSnapToItem handler for better synchronization
   const handleSnapToItem = index => {
     if (sponsors.length === 0) return;
 
-    // Handle looping properly
     let normalizedIndex = index;
     if (index < 0) {
       normalizedIndex = sponsors.length - 1;
@@ -241,9 +298,7 @@ const Sponsors = () => {
             {item.sponsorName}
           </Text>
           {item.month && item.year && (
-            <Text style={styles.sponsorPeriod}>
-              {item.month} {item.year}
-            </Text>
+            <Text style={styles.sponsorPeriod}>{item.ankName}</Text>
           )}
         </View>
       </View>
@@ -266,7 +321,7 @@ const Sponsors = () => {
     </View>
   );
 
-  if (loading || titleLoading) {
+  if (loading || titleLoading || pdfOptionsLoading) {
     return (
       <View style={styles.container}>
         <Header />
@@ -293,6 +348,7 @@ const Sponsors = () => {
             onPress={() => {
               fetchSponsors();
               fetchTitle();
+              fetchPdfOptions();
             }}>
             <Text style={styles.retryButtonText}>Retry</Text>
           </TouchableOpacity>
@@ -333,7 +389,7 @@ const Sponsors = () => {
           <Carousel
             ref={carouselRef}
             width={windowWidth}
-            height={windowHeight * 0.5} // Reduced from 0.7 to 0.5
+            height={windowHeight * 0.5}
             data={sponsors}
             renderItem={renderSponsorCard}
             autoPlay={autoPlay}
@@ -365,7 +421,6 @@ const Sponsors = () => {
             windowSize={3}
           />
 
-          {/* Dots container */}
           {sponsors.length > 1 && renderDots()}
         </View>
 
@@ -373,38 +428,65 @@ const Sponsors = () => {
           <Text style={styles.pdfSectionTitle}>
             Prize Distribution PDF Gallery
           </Text>
-          <View style={styles.pdfButtonsContainer}>
-            <TouchableOpacity
-              style={styles.pdfButton}
-              onPress={handleViewSponsorPDF}
-              disabled={pdfLoading || downloadingPdf}>
-              {pdfLoading ? (
-                <ActivityIndicator size="small" color="#fff" />
-              ) : (
-                <Icon name="picture-as-pdf" size={18} color="#fff" />
-              )}
-              <Text style={styles.pdfButtonText}>
-                {pdfLoading ? 'Loading...' : 'VIEW'}
-              </Text>
-            </TouchableOpacity>
+          
+          {/* Download button for the first PDF */}
+          {pdfOptions.length > 0 && (
+            <View style={styles.downloadButtonContainer}>
+              <TouchableOpacity
+                style={[styles.pdfButton, styles.downloadButton]}
+                onPress={handleDownloadSponsorPDF}
+                disabled={downloadingPdf || Object.values(pdfLoadingStates).some(loading => loading)}>
+                {downloadingPdf ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <Icon name="file-download" size={18} color="#fff" />
+                )}
+                <Text style={styles.pdfButtonText}>
+                  {downloadingPdf ? 'Downloading...' : 'DOWNLOAD PDF'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          )}
 
-            <TouchableOpacity
-              style={[styles.pdfButton, styles.downloadButton]}
-              onPress={handleDownloadSponsorPDF}
-              disabled={pdfLoading || downloadingPdf}>
-              {downloadingPdf ? (
-                <ActivityIndicator size="small" color="#fff" />
-              ) : (
-                <Icon name="file-download" size={18} color="#fff" />
-              )}
-              <Text style={styles.pdfButtonText}>
-                {downloadingPdf ? 'Downloading...' : 'DOWNLOAD'}
-              </Text>
-            </TouchableOpacity>
+          {/* Dynamic PDF View Buttons */}
+          <View style={styles.pdfViewButtonsContainer}>
+            {pdfOptions.map((pdfOption, index) => (
+              <TouchableOpacity
+                key={pdfOption.id}
+                style={[
+                  styles.pdfButton,
+                  styles.viewButton,
+                  { backgroundColor: getPdfButtonColor(pdfOption.description) }
+                ]}
+                onPress={() => handleViewSpecificPDF(pdfOption)}
+                disabled={pdfLoadingStates[pdfOption.id] || downloadingPdf}>
+                {pdfLoadingStates[pdfOption.id] ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <Icon 
+                    name={getPdfIcon(pdfOption.description)} 
+                    size={18} 
+                    color="#fff" 
+                  />
+                )}
+                <Text style={styles.pdfButtonText} numberOfLines={2}>
+                  {pdfLoadingStates[pdfOption.id] 
+                    ? 'Loading...' 
+                    : `VIEW ${pdfOption.description.toUpperCase()}`
+                  }
+                </Text>
+              </TouchableOpacity>
+            ))}
           </View>
+
+          {/* Show message if no PDF options available */}
+          {pdfOptions.length === 0 && (
+            <View style={styles.noPdfContainer}>
+              <Text style={styles.noPdfText}>No PDF documents available</Text>
+            </View>
+          )}
         </View>
 
-        {/* Add some extra padding at the bottom for better scrolling */}
         <View style={styles.bottomPadding} />
       </ScrollView>
       <Footer />
@@ -443,7 +525,7 @@ const styles = StyleSheet.create({
   },
   carouselContainer: {
     position: 'relative',
-    marginBottom: 20, // Add margin to separate from PDF section
+    marginBottom: 20,
   },
   cardContainer: {
     justifyContent: 'center',
@@ -486,10 +568,10 @@ const styles = StyleSheet.create({
     color: '#2c3e50',
     textAlign: 'center',
     lineHeight: 18,
-    marginBottom: 4, // Reduced from 5 to 4
+    marginBottom: 4,
   },
   sponsorPeriod: {
-    fontSize: 11, // Reduced from 12 to 11
+    fontSize: 11,
     color: '#7f8c8d',
     textAlign: 'center',
     fontWeight: '500',
@@ -501,7 +583,7 @@ const styles = StyleSheet.create({
     paddingVertical: 15,
     backgroundColor: 'transparent',
     position: 'absolute',
-    bottom: -5, // Adjusted position
+    bottom: -5,
     left: 0,
     right: 0,
     zIndex: 10,
@@ -522,7 +604,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#bdc3c7',
     opacity: 0.6,
   },
-  // PDF Section Styles - Row Layout
   pdfSection: {
     paddingVertical: 15,
     paddingHorizontal: 20,
@@ -540,32 +621,47 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     textAlign: 'center',
   },
-  pdfButtonsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: 10,
+  downloadButtonContainer: {
+    marginBottom: 10,
+  },
+  pdfViewButtonsContainer: {
+    gap: 8,
   },
   pdfButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#0288D1',
     paddingVertical: 10,
     paddingHorizontal: 15,
     borderRadius: 6,
-    flex: 1,
     justifyContent: 'center',
+    minHeight: 45,
+  },
+  viewButton: {
+    width: '100%',
   },
   downloadButton: {
-  backgroundColor: '#28a745', 
+    backgroundColor: '#28a745',
+    width: '100%',
   },
   pdfButtonText: {
     color: '#fff',
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: '600',
     marginLeft: 5,
+    textAlign: 'center',
+    flex: 1,
+  },
+  noPdfContainer: {
+    padding: 20,
+    alignItems: 'center',
+  },
+  noPdfText: {
+    color: '#6c757d',
+    fontSize: 14,
+    fontStyle: 'italic',
   },
   bottomPadding: {
-    height: 50, 
+    height: 50,
   },
   loadingContainer: {
     flex: 1,
@@ -595,7 +691,6 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     fontWeight: '600',
   },
-
   retryButton: {
     backgroundColor: '#3498db',
     paddingVertical: 12,

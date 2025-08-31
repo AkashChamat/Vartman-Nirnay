@@ -3,11 +3,9 @@ import { CFEnvironment } from "react-native-cashfree-pg-sdk"
 
 // FIXED: Comprehensive environment detection and fallback
 export const getCashfreeEnvironment = () => {
-  console.log("🔍 Detecting Cashfree environment configuration...")
 
   // Method 1: Check if CFEnvironment is properly imported
   if (CFEnvironment && typeof CFEnvironment === "object") {
-    console.log("✅ CFEnvironment object found:", CFEnvironment)
 
     // Try different possible property names
     const possibleProdNames = ["PRODUCTION", "production", "PROD", "prod"]
@@ -20,7 +18,6 @@ export const getCashfreeEnvironment = () => {
     for (const name of possibleProdNames) {
       if (CFEnvironment[name] !== undefined) {
         productionEnv = CFEnvironment[name]
-        console.log(`✅ Found production environment: ${name} = ${productionEnv}`)
         break
       }
     }
@@ -29,7 +26,6 @@ export const getCashfreeEnvironment = () => {
     for (const name of possibleSandboxNames) {
       if (CFEnvironment[name] !== undefined) {
         sandboxEnv = CFEnvironment[name]
-        console.log(`✅ Found sandbox environment: ${name} = ${sandboxEnv}`)
         break
       }
     }
@@ -47,7 +43,6 @@ export const getCashfreeEnvironment = () => {
   try {
     const { PRODUCTION, SANDBOX } = CFEnvironment || {}
     if (PRODUCTION !== undefined && SANDBOX !== undefined) {
-      console.log("✅ Using destructured environment constants")
       return {
         production: PRODUCTION,
         sandbox: SANDBOX,
@@ -85,13 +80,11 @@ export const createCashfreeSession = (sessionId, orderId, isProduction = true) =
     session.environment = isProduction ? "PRODUCTION" : "SANDBOX"
   }
 
-  console.log("🔧 Created Cashfree session:", session)
   return session
 }
 
 // FIXED: Enhanced SDK method detection and execution with proper UI handling
 export const executeCashfreePayment = async (CFPaymentGatewayService, session) => {
-  console.log("🚀 Executing Cashfree payment with session:", session)
 
   if (!CFPaymentGatewayService) {
     throw new Error("CFPaymentGatewayService is not available")
@@ -110,16 +103,13 @@ export const executeCashfreePayment = async (CFPaymentGatewayService, session) =
 
   for (const methodName of paymentMethods) {
     if (typeof CFPaymentGatewayService[methodName] === "function") {
-      console.log(`🔄 Trying payment method: ${methodName}`)
       try {
         // FIXED: Handle different return types
         const result = await CFPaymentGatewayService[methodName](session)
-        console.log(`✅ Payment method ${methodName} executed:`, result)
 
         // For UI-based payments, undefined result might be normal
         // The UI should open and callbacks will handle the result
         if (methodName === "doWebCheckoutPayment" || methodName === "doPayment") {
-          console.log(`ℹ️ ${methodName} called - UI should be opening...`)
           return result // Return even if undefined - UI should open
         }
 
@@ -131,7 +121,6 @@ export const executeCashfreePayment = async (CFPaymentGatewayService, session) =
         continue
       }
     } else {
-      console.log(`⚠️ Payment method ${methodName} not available`)
     }
   }
 

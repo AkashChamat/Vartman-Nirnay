@@ -463,27 +463,20 @@ const Purchase = () => {
   };
 
   const handlePrintBill = async () => {
-    console.log('Print button pressed - Android CLI');
 
     if (!selectedBillItem) {
-      console.log('No selected bill item');
       showErrorMessage('Error', 'No bill data available');
       return;
     }
 
     try {
-      console.log('Generating HTML content...');
       const htmlContent = generateBillHTML(selectedBillItem);
-      console.log('HTML generated, length:', htmlContent.length);
 
       // Check if RNPrint is available
       if (!RNPrint || !RNPrint.print) {
-        console.log('RNPrint not available');
         showErrorMessage('Print Error', 'Print service is not available');
         return;
       }
-
-      console.log('RNPrint available, calling print...');
 
       // Simplified Android print options
       const printOptions = {
@@ -491,9 +484,7 @@ const Purchase = () => {
         jobName: `VartmanNirnay_Bill_${selectedBillItem.orderId || Date.now()}`,
       };
 
-      console.log('Calling RNPrint.print with options:', printOptions);
       const result = await RNPrint.print(printOptions);
-      console.log('Print result:', result);
 
       showSuccessMessage('Success', 'Print dialog opened successfully');
     } catch (error) {
@@ -506,14 +497,6 @@ const Purchase = () => {
       );
     }
   };
-
-  useEffect(() => {
-    console.log('=== Print Service Debug ===');
-    console.log('Platform:', Platform.OS);
-    console.log('RNPrint exists:', !!RNPrint);
-    console.log('RNPrint.print exists:', !!RNPrint?.print);
-    console.log('RNPrint methods:', Object.keys(RNPrint || {}));
-  }, []);
 
   const closePdfViewer = () => {
     setViewingPdf(null);
