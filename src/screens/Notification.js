@@ -16,46 +16,62 @@ import LinearGradient from 'react-native-linear-gradient';
 import {getTodayNotifications, getAllNotifications} from '../util/apiCall';
 import {showInfoMessage} from '../Components/SubmissionMessage';
 import NotificationHelper from '../Components/NotificationHelper';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const Notification = () => {
   const navigation = useNavigation();
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [activeTab, setActiveTab] = useState('today'); // 'today' or 'all'
+  const [activeTab, setActiveTab] = useState('today');
   const [error, setError] = useState(null);
+  const [readNotifications, setReadNotifications] = useState(new Set());
 
-  const fetchNotificationsOnFocus = async () => {
+  // Load read notifications from AsyncStorage - FIXED: Now properly called
+  const loadReadNotifications = async () => {
     try {
-      setError(null);
-      setLoading(false);
-
-      let response;
-      if (activeTab === 'today') {
-        response = await getTodayNotifications();
+      const stored = await AsyncStorage.getItem('readNotifications');
+      if (stored) {
+        const readIds = JSON.parse(stored);
+        setReadNotifications(new Set(readIds));
       } else {
-        response = await getAllNotifications();
+        setReadNotifications(new Set());
       }
-
-      const filteredNotifications = Array.isArray(response)
-        ? response.filter(
-            notification =>
-              notification.channels &&
-              notification.channels.toUpperCase().includes('NOTIFICATION'),
-          )
-        : [];
-
-      setNotifications(filteredNotifications);
     } catch (error) {
-      console.error('Error fetching notifications:', error);
-      setError(error.message || 'Failed to fetch notifications');
-      setNotifications([]);
-    } finally {
-      setRefreshing(false);
+      console.error('Error loading read notifications:', error);
+      setReadNotifications(new Set());
     }
   };
 
-  // Fetch notifications based on active tab
+  const saveReadNotifications = async readSet => {
+    try {
+      const readArray = [...readSet];
+      await AsyncStorage.setItem(
+        'readNotifications',
+        JSON.stringify(readArray),
+      );
+    } catch (error) {
+      console.error('Error saving read notifications:', error);
+    }
+  };
+
+  const markAsRead = async notificationId => {
+    if (!readNotifications.has(notificationId)) {
+      const newReadSet = new Set([...readNotifications, notificationId]);
+      setReadNotifications(newReadSet);
+      await saveReadNotifications(newReadSet);
+    }
+  };
+
+  const markAllAsRead = async () => {
+    const allIds = notifications.map(n => n.id).filter(id => id);
+    if (allIds.length > 0) {
+      const newReadSet = new Set([...readNotifications, ...allIds]);
+      setReadNotifications(newReadSet);
+      await saveReadNotifications(newReadSet);
+    }
+  };
+
   const fetchNotifications = async (showLoader = true) => {
     try {
       if (showLoader) {
@@ -70,7 +86,6 @@ const Notification = () => {
         response = await getAllNotifications();
       }
 
-      // Filter notifications to show only those with channels containing 'NOTIFICATION'
       const filteredNotifications = Array.isArray(response)
         ? response.filter(
             notification =>
@@ -90,29 +105,50 @@ const Notification = () => {
     }
   };
 
-  // Fetch notifications when component mounts or tab changes
+  // FIXED: Load read notifications on component mount
   useEffect(() => {
-    fetchNotifications();
+    const initializeScreen = async () => {
+      await loadReadNotifications();
+      await fetchNotifications();
+    };
+    initializeScreen();
+  }, []);
+
+  // Fetch notifications when tab changes
+  useEffect(() => {
+    if (readNotifications.size >= 0) {
+      // Only fetch after read notifications are loaded
+      fetchNotifications();
+    }
   }, [activeTab]);
 
+  // Refresh when screen comes into focus
   useFocusEffect(
     React.useCallback(() => {
-      fetchNotificationsOnFocus();
+      const refreshScreen = async () => {
+        await loadReadNotifications(); // Always reload read state
+        await fetchNotifications(false);
+      };
+      refreshScreen();
     }, [activeTab]),
   );
 
-  // Pull to refresh handler
-  const onRefresh = () => {
+  const onRefresh = async () => {
     setRefreshing(true);
-    fetchNotificationsOnFocus(); 
+    await loadReadNotifications();
+    await fetchNotifications(false);
   };
 
-  // Handle tab change
   const handleTabChange = tab => {
     setActiveTab(tab);
   };
 
-  // Format date for display
+  const handleNotificationPress = async item => {
+    if (item.id && !readNotifications.has(item.id)) {
+      await markAsRead(item.id);
+    }
+  };
+
   const formatDate = dateString => {
     if (!dateString) return 'No date';
 
@@ -140,51 +176,83 @@ const Notification = () => {
     }
   };
 
-  // Render individual notification item
-  const renderNotificationItem = ({item, index}) => (
-    <TouchableOpacity
-      style={styles.notificationCard}
-      onPress={() => {
-        // Handle notification tap - you can navigate to detail screen or show alert
-        showInfoMessage(
-          item.title || 'Notification',
-          item.description || 'No description available',
-        );
-      }}
-      activeOpacity={0.7}>
-      <View style={styles.notificationContent}>
-        {item.image && (
-          <Image source={{uri: item.image}} style={styles.notificationImage} />
-        )}
-        <View style={styles.notificationTextContainer}>
-          <Text style={styles.notificationTitle} numberOfLines={2}>
-            {item.title || 'No Title'}
-          </Text>
-          <Text style={styles.notificationDescription} numberOfLines={3}>
-            {item.description || 'No description available'}
-          </Text>
-          <View style={styles.notificationFooter}>
-            <Text style={styles.notificationDate}>
-              {formatDate(item.createdDate)}
-            </Text>
-            <View style={styles.channelBadge}>
-              <Text style={styles.channelText}>
-                {item.channels || 'NOTIFICATION'}
+  const getUnreadCount = () => {
+    return notifications.filter(n => n.id && !readNotifications.has(n.id))
+      .length;
+  };
+
+  const renderNotificationItem = ({item, index}) => {
+    const isRead = item.id ? readNotifications.has(item.id) : false;
+
+    return (
+      <TouchableOpacity
+        onPress={() => handleNotificationPress(item)}
+        activeOpacity={0.7}
+        style={styles.notificationTouchable}>
+        <View
+          style={[
+            styles.notificationCard,
+            !isRead && styles.unreadNotificationCard,
+          ]}>
+          {/* Unread indicator dot - IMPROVED POSITION */}
+          {!isRead && <View style={styles.unreadIndicator} />}
+
+          <View style={styles.notificationContent}>
+            {item.image ? (
+              <Image
+                source={{uri: item.image}}
+                style={styles.notificationImage}
+              />
+            ) : (
+              <View style={styles.notificationImagePlaceholder}>
+                <Ionicons name="image-outline" size={24} color="#ccc" />
+              </View>
+            )}
+            <View style={styles.notificationTextContainer}>
+              <Text
+                style={[
+                  styles.notificationTitle,
+                  !isRead && styles.unreadNotificationTitle,
+                ]}>
+                {item.title || 'No Title'}
               </Text>
+              <Text
+                style={[
+                  styles.notificationDescription,
+                  !isRead && styles.unreadNotificationDescription,
+                ]}
+                numberOfLines={3}>
+                {item.description || 'No description available'}
+              </Text>
+              <View style={styles.notificationFooter}>
+                <Text style={styles.notificationDate}>
+                  {formatDate(item.createdDate)}
+                </Text>
+                <View
+                  style={[
+                    styles.channelBadge,
+                    !isRead && styles.unreadChannelBadge,
+                  ]}>
+                  <Text style={styles.channelText}>
+                    {item.channels || 'NOTIFICATION'}
+                  </Text>
+                </View>
+              </View>
             </View>
           </View>
+          <View style={styles.chevronContainer}>
+            <Ionicons
+              name="chevron-forward"
+              size={20}
+              color={isRead ? '#ccc' : '#0288D1'}
+              style={styles.chevronIcon}
+            />
+          </View>
         </View>
-      </View>
-      <Ionicons
-        name="chevron-forward"
-        size={20}
-        color="#666"
-        style={styles.chevronIcon}
-      />
-    </TouchableOpacity>
-  );
+      </TouchableOpacity>
+    );
+  };
 
-  // Render empty state
   const renderEmptyState = () => (
     <View style={styles.emptyContainer}>
       <Ionicons name="notifications-outline" size={80} color="#ccc" />
@@ -197,13 +265,14 @@ const Notification = () => {
     </View>
   );
 
-  // Render error state
   const renderErrorState = () => (
     <View style={styles.errorContainer}>
       <Ionicons name="alert-circle-outline" size={80} color="#ff6b6b" />
       <Text style={styles.errorTitle}>Something went wrong</Text>
       <Text style={styles.errorDescription}>{error}</Text>
-      <TouchableOpacity style={styles.retryButton} onPress={fetchNotifications}>
+      <TouchableOpacity
+        style={styles.retryButton}
+        onPress={() => fetchNotifications()}>
         <Text style={styles.retryButtonText}>Try Again</Text>
       </TouchableOpacity>
     </View>
@@ -218,9 +287,20 @@ const Notification = () => {
           onPress={() => navigation.goBack()}>
           <Ionicons name="arrow-back" size={24} color="#fff" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Notifications</Text>
-        <TouchableOpacity style={styles.refreshButton} onPress={onRefresh}>
-          <Ionicons name="refresh" size={24} color="#fff" />
+        <Text style={styles.headerTitle}>
+          Notifications {getUnreadCount() > 0 && `(${getUnreadCount()})`}
+        </Text>
+        <TouchableOpacity
+          style={styles.markAllButton}
+          onPress={markAllAsRead}
+          disabled={getUnreadCount() === 0}>
+          <Text
+            style={[
+              styles.markAllReadText,
+              getUnreadCount() === 0 && styles.markAllReadTextDisabled,
+            ]}>
+            Mark All Read
+          </Text>
         </TouchableOpacity>
       </LinearGradient>
 
@@ -239,6 +319,11 @@ const Notification = () => {
             ]}>
             Today
           </Text>
+          {activeTab === 'today' && getUnreadCount() > 0 && (
+            <View style={styles.tabBadge}>
+              <Text style={styles.tabBadgeText}>{getUnreadCount()}</Text>
+            </View>
+          )}
         </TouchableOpacity>
         <TouchableOpacity
           style={[
@@ -253,6 +338,11 @@ const Notification = () => {
             ]}>
             All
           </Text>
+          {activeTab === 'all' && getUnreadCount() > 0 && (
+            <View style={styles.tabBadge}>
+              <Text style={styles.tabBadgeText}>{getUnreadCount()}</Text>
+            </View>
+          )}
         </TouchableOpacity>
       </View>
 
@@ -272,7 +362,7 @@ const Notification = () => {
             data={notifications}
             renderItem={renderNotificationItem}
             keyExtractor={(item, index) =>
-              item.id ? item.id.toString() : index.toString()
+              item.id ? item.id.toString() : `notification-${index}`
             }
             refreshControl={
               <RefreshControl
@@ -285,6 +375,9 @@ const Notification = () => {
             showsVerticalScrollIndicator={false}
             contentContainerStyle={styles.listContainer}
             ItemSeparatorComponent={() => <View style={styles.separator} />}
+            removeClippedSubviews={true}
+            maxToRenderPerBatch={10}
+            windowSize={10}
           />
         )}
       </View>
@@ -297,7 +390,109 @@ export default Notification;
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#f8f9fa',
+  },
+  notificationTouchable: {
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  notificationCard: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 16,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: {width: 0, height: 1},
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    position: 'relative',
+  },
+  unreadNotificationCard: {
+    backgroundColor: '#f8f9ff',
+    borderLeftWidth: 4,
+    borderLeftColor: '#0288D1',
+    elevation: 3,
+  },
+  unreadIndicator: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: '#ff4444',
+    position: 'absolute',
+    top: 12,
+    right: 12,
+    zIndex: 2,
+    elevation: 5,
+  },
+  notificationContent: {
+    flex: 1,
+    flexDirection: 'row',
+  },
+  notificationImage: {
+    width: 48,
+    height: 48,
+    borderRadius: 8,
+    marginRight: 12,
+    backgroundColor: '#f0f0f0',
+  },
+  notificationTextContainer: {
+    flex: 1,
+    paddingRight: 8,
+  },
+  notificationTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 4,
+    lineHeight: 22,
+  },
+  unreadNotificationTitle: {
+    fontWeight: '700',
+    color: '#000',
+  },
+  notificationDescription: {
+    fontSize: 14,
+    color: '#666',
+    lineHeight: 20,
+    marginBottom: 8,
+  },
+  unreadNotificationDescription: {
+    color: '#333',
+    fontWeight: '500',
+  },
+  notificationFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  notificationDate: {
+    fontSize: 12,
+    color: '#999',
+    fontWeight: '400',
+  },
+  channelBadge: {
+    backgroundColor: '#e3f2fd',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 10,
+  },
+  unreadChannelBadge: {
+    backgroundColor: '#0288D1',
+  },
+  channelText: {
+    fontSize: 10,
+    color: '#0288D1',
+    fontWeight: '600',
+  },
+  chevronContainer: {
+    justifyContent: 'center',
+    paddingLeft: 8,
+  },
+  chevronIcon: {
+    opacity: 0.6,
   },
   header: {
     flexDirection: 'row',
@@ -305,7 +500,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingVertical: 12,
-    paddingTop: 50, // Account for status bar
+    paddingTop: 50,
     elevation: 4,
     shadowColor: '#000',
     shadowOffset: {width: 0, height: 2},
@@ -314,16 +509,26 @@ const styles = StyleSheet.create({
   },
   backButton: {
     padding: 8,
+    marginRight: 8,
   },
   headerTitle: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: 'bold',
     color: '#fff',
     flex: 1,
     textAlign: 'center',
   },
-  refreshButton: {
+  markAllButton: {
     padding: 8,
+    marginLeft: 8,
+  },
+  markAllReadText: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  markAllReadTextDisabled: {
+    opacity: 0.5,
   },
   tabContainer: {
     flexDirection: 'row',
@@ -331,8 +536,8 @@ const styles = StyleSheet.create({
     elevation: 2,
     shadowColor: '#000',
     shadowOffset: {width: 0, height: 1},
-    shadowOpacity: 0.22,
-    shadowRadius: 2.22,
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
   },
   tabButton: {
     flex: 1,
@@ -340,6 +545,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderBottomWidth: 2,
     borderBottomColor: 'transparent',
+    flexDirection: 'row',
+    justifyContent: 'center',
+    position: 'relative',
   },
   activeTabButton: {
     borderBottomColor: '#0288D1',
@@ -351,6 +559,20 @@ const styles = StyleSheet.create({
   },
   activeTabButtonText: {
     color: '#0288D1',
+    fontWeight: '700',
+  },
+  tabBadge: {
+    backgroundColor: '#ff4444',
+    borderRadius: 10,
+    minWidth: 18,
+    height: 18,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: 6,
+  },
+  tabBadgeText: {
+    color: '#fff',
+    fontSize: 10,
     fontWeight: 'bold',
   },
   content: {
@@ -368,69 +590,10 @@ const styles = StyleSheet.create({
   },
   listContainer: {
     padding: 16,
-  },
-  notificationCard: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: {width: 0, height: 1},
-    shadowOpacity: 0.22,
-    shadowRadius: 2.22,
-  },
-  notificationContent: {
-    flex: 1,
-    flexDirection: 'row',
-  },
-  notificationImage: {
-    width: 50,
-    height: 50,
-    borderRadius: 8,
-    marginRight: 12,
-  },
-  notificationTextContainer: {
-    flex: 1,
-  },
-  notificationTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 4,
-  },
-  notificationDescription: {
-    fontSize: 14,
-    color: '#666',
-    lineHeight: 20,
-    marginBottom: 8,
-  },
-  notificationFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  notificationDate: {
-    fontSize: 12,
-    color: '#999',
-  },
-  channelBadge: {
-    backgroundColor: '#e3f2fd',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  channelText: {
-    fontSize: 10,
-    color: '#0288D1',
-    fontWeight: '500',
-  },
-  chevronIcon: {
-    marginLeft: 8,
+    paddingBottom: 32,
   },
   separator: {
-    height: 12,
+    height: 8,
   },
   emptyContainer: {
     flex: 1,
@@ -439,7 +602,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 32,
   },
   emptyTitle: {
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: 'bold',
     color: '#333',
     marginTop: 16,
@@ -458,7 +621,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 32,
   },
   errorTitle: {
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: 'bold',
     color: '#ff6b6b',
     marginTop: 16,
@@ -481,5 +644,16 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: 'bold',
+  },
+  notificationImagePlaceholder: {
+    width: 48,
+    height: 48,
+    borderRadius: 8,
+    marginRight: 12,
+    backgroundColor: '#f5f5f5',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
   },
 });

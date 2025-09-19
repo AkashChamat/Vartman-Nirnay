@@ -17,6 +17,7 @@ import PaperTimer from '../Components/PaperTimer';
 import TestMenu from '../Components/TestMenu';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {useAuth} from '../Auth/AuthContext';
+import {showMessage} from 'react-native-flash-message';
 
 import {getAPI} from '../util/apiCall';
 import {TestPaperByIdUrl} from '../util/Url';
@@ -52,7 +53,8 @@ import {
 const {width} = Dimensions.get('window');
 
 const ChampionTest = ({route, navigation}) => {
-  const {testId, testTitle, source,effectiveTimeRemaining } = route.params || {};
+  const {testId, testTitle, source, effectiveTimeRemaining} =
+    route.params || {};
   const [isNavigationWarningActive, setIsNavigationWarningActive] =
     useState(false);
   // Determine which API to use based on source or route name
@@ -84,42 +86,81 @@ const ChampionTest = ({route, navigation}) => {
   const [effectiveTestDuration, setEffectiveTestDuration] = useState(null);
   const [timingWarning, setTimingWarning] = useState(null);
 
-  // ADD these new functions
   const calculateEffectiveTestDuration = testData => {
-    console.log('🕐 Calculating effective test duration...');
+    console.log(
+      '🕐 Calculating effective test duration with proper validation...',
+    );
 
+    // If no timing constraints, return original duration
     if (
       !testData.testStartDate ||
       !testData.testEndDate ||
       !testData.startTime ||
       !testData.endTime
     ) {
-      console.log('⚠️ Missing timing data, using original duration');
-      return testData.duration * 60; // Return original duration in seconds
+      console.log('⚠️ No timing constraints, using original duration');
+      return testData.duration * 60;
     }
 
     const now = new Date();
-    const testEndDateTime = new Date(
-      `${testData.testEndDate}T${testData.endTime}`,
-    );
+    const currentDate = now.toISOString().split('T')[0]; // YYYY-MM-DD
+    const currentTime = now.toTimeString().split(' ')[0]; // HH:MM:SS
 
-    console.log('🕐 Current time:', now.toISOString());
-    console.log('🕐 Test end time:', testEndDateTime.toISOString());
+    console.log('📊 Timing check:', {
+      currentDate,
+      currentTime,
+      testStartDate: testData.testStartDate,
+      testEndDate: testData.testEndDate,
+      startTime: testData.startTime,
+      endTime: testData.endTime,
+    });
 
-    // Calculate remaining time in the test active window (in seconds)
-    const remainingActiveTime = Math.floor((testEndDateTime - now) / 1000);
+    // Step 1: Check date availability
+    if (currentDate < testData.testStartDate) {
+      console.log('❌ Test not available yet (before start date)');
+      return 0;
+    }
 
-    // Original test duration in seconds
+    if (currentDate > testData.testEndDate) {
+      console.log('❌ Test no longer available (after end date)');
+      return 0;
+    }
+
+    // Step 2: Check daily time window
+    if (currentTime < testData.startTime) {
+      console.log('❌ Outside daily time window (before start time)');
+      return 0;
+    }
+
+    if (currentTime > testData.endTime) {
+      console.log('❌ Outside daily time window (after end time)');
+      return 0;
+    }
+
+    // Step 3: Calculate remaining time in today's window
+    const todayEndDateTime = new Date(`${currentDate}T${testData.endTime}`);
+    const remainingTimeInWindow = Math.floor((todayEndDateTime - now) / 1000);
     const originalDuration = testData.duration * 60;
 
-    console.log('🕐 Remaining active time:', remainingActiveTime, 'seconds');
-    console.log('🕐 Original duration:', originalDuration, 'seconds');
+    // Return the minimum of remaining time in today's window or original test duration
+    const effectiveDuration = Math.min(remainingTimeInWindow, originalDuration);
 
-    // Return the minimum of remaining active time and original duration
-    const effectiveDuration = Math.min(remainingActiveTime, originalDuration);
-    console.log('🕐 Effective duration:', effectiveDuration, 'seconds');
+    console.log(`🎯 TIMING CALCULATION RESULT:`);
+    console.log(
+      `   Original test duration: ${testData.duration} minutes (${originalDuration} seconds)`,
+    );
+    console.log(
+      `   Remaining in today's window: ${Math.floor(
+        remainingTimeInWindow / 60,
+      )} minutes (${remainingTimeInWindow} seconds)`,
+    );
+    console.log(
+      `   Effective duration: ${Math.floor(
+        effectiveDuration / 60,
+      )} minutes (${effectiveDuration} seconds)`,
+    );
 
-    return effectiveDuration;
+    return Math.max(effectiveDuration, 0);
   };
 
   const validateTestTiming = testData => {
@@ -140,48 +181,69 @@ const ChampionTest = ({route, navigation}) => {
     }
 
     const now = new Date();
-    const testStartDateTime = new Date(
-      `${testData.testStartDate}T${testData.startTime}`,
-    );
-    const testEndDateTime = new Date(
-      `${testData.testEndDate}T${testData.endTime}`,
-    );
+    const currentDate = now.toISOString().split('T')[0];
+    const currentTime = now.toTimeString().split(' ')[0];
 
-    console.log('✅ Test start time:', testStartDateTime.toISOString());
-    console.log('✅ Test end time:', testEndDateTime.toISOString());
-    console.log('✅ Current time:', now.toISOString());
+    console.log('✅ Current date:', currentDate);
+    console.log('✅ Current time:', currentTime);
+    console.log(
+      '✅ Test available:',
+      testData.testStartDate,
+      'to',
+      testData.testEndDate,
+    );
+    console.log('✅ Daily window:', testData.startTime, 'to', testData.endTime);
 
-    // Check if test hasn't started yet
-    if (now < testStartDateTime) {
+    // Check date availability
+    if (currentDate < testData.testStartDate) {
       return {
         canStart: false,
-        reason: 'Test has not started yet',
+        reason: 'Test not available yet',
         remainingTime: 0,
         warning: null,
       };
     }
 
-    // Check if test has ended
-    if (now >= testEndDateTime) {
+    if (currentDate > testData.testEndDate) {
       return {
         canStart: false,
-        reason: 'Test active time has ended',
+        reason: 'Test no longer available',
         remainingTime: 0,
         warning: null,
       };
     }
 
-    // Calculate remaining time
-    const remainingTime = Math.floor((testEndDateTime - now) / 1000);
+    // Check daily time window
+    if (currentTime < testData.startTime) {
+      return {
+        canStart: false,
+        reason: 'Outside daily time window (too early)',
+        remainingTime: 0,
+        warning: null,
+      };
+    }
+
+    if (currentTime > testData.endTime) {
+      return {
+        canStart: false,
+        reason: 'Outside daily time window (too late)',
+        remainingTime: 0,
+        warning: null,
+      };
+    }
+
+    // Calculate remaining time in today's window
+    const todayEndDateTime = new Date(`${currentDate}T${testData.endTime}`);
+    const remainingTimeInWindow = Math.floor((todayEndDateTime - now) / 1000);
     const originalDuration = testData.duration * 60;
-    const effectiveDuration = Math.min(remainingTime, originalDuration);
+    const effectiveDuration = Math.min(remainingTimeInWindow, originalDuration);
 
     // Check if there's at least 1 minute remaining
-    if (remainingTime < 60) {
+    if (remainingTimeInWindow < 60) {
       return {
         canStart: false,
-        reason: 'Insufficient time remaining (less than 1 minute)',
-        remainingTime: remainingTime,
+        reason: "Insufficient time remaining in today's window",
+        remainingTime: remainingTimeInWindow,
         warning: null,
       };
     }
@@ -191,7 +253,7 @@ const ChampionTest = ({route, navigation}) => {
     if (effectiveDuration < originalDuration) {
       const effectiveMinutes = Math.floor(effectiveDuration / 60);
       const originalMinutes = Math.floor(originalDuration / 60);
-      warning = `Due to the test active time window, you have ${effectiveMinutes} minutes available instead of the full ${originalMinutes} minutes.`;
+      warning = `Due to today's time window, you have ${effectiveMinutes} minutes available instead of the full ${originalMinutes} minutes.`;
     }
 
     return {
@@ -300,50 +362,61 @@ const ChampionTest = ({route, navigation}) => {
   }, [navigation, testStarted, isTestCompleted, showInstructions]);
 
   const onInstructionsAccept = () => {
-    console.log('📋 Instructions accepted, validating timing...');
+    console.log('📋 Instructions accepted, calculating effective time...');
 
-    if (effectiveTimeRemaining) {
-    console.log('🚀 Using effective time from route params:', effectiveTimeRemaining);
-    startTestWithEffectiveDuration(effectiveTimeRemaining);
-    return;
-  }
+    // Calculate effective duration BEFORE starting test
+    const effectiveDuration = calculateEffectiveTestDuration(testData);
 
-    const timingValidation = validateTestTiming(testData);
+    if (effectiveDuration <= 0) {
+      Alert.alert(
+        'Cannot Start Test',
+        'No time remaining in test active period',
+        [{text: 'OK', onPress: () => navigation.goBack()}],
+      );
+      return;
+    }
 
-    if (!timingValidation.canStart) {
-      Alert.alert('Cannot Start Test', timingValidation.reason, [
-        {
-          text: 'OK',
-          onPress: () => navigation.goBack(),
-        },
+    if (effectiveDuration < 60) {
+      Alert.alert('Insufficient Time', 'Less than 1 minute remaining', [
+        {text: 'OK', onPress: () => navigation.goBack()},
       ]);
       return;
     }
 
-    // Show warning if time is limited
-    if (timingValidation.warning) {
-      Alert.alert('Limited Time Available', timingValidation.warning, [
-        {
-          text: 'Continue',
-          onPress: () => {
-            startTestWithEffectiveDuration(timingValidation.remainingTime);
+    // Show timing information if limited
+    const effectiveMinutes = Math.floor(effectiveDuration / 60);
+    const originalMinutes = testData.duration;
+
+    if (effectiveDuration < testData.duration * 60) {
+      Alert.alert(
+        'Limited Time Available',
+        `Due to the test active time window, you have ${effectiveMinutes} minutes available instead of the full ${originalMinutes} minutes. Continue?`,
+        [
+          {text: 'Cancel', style: 'cancel'},
+          {
+            text: 'Start Test',
+            onPress: () => startTestWithEffectiveDuration(effectiveDuration),
           },
-        },
-        {
-          text: 'Go Back',
-          style: 'cancel',
-          onPress: () => navigation.goBack(),
-        },
-      ]);
+        ],
+      );
     } else {
-      startTestWithEffectiveDuration(timingValidation.remainingTime);
+      Alert.alert(
+        'Test Time Information',
+        `You have ${effectiveMinutes} minutes to complete this test. Continue?`,
+        [
+          {text: 'Cancel', style: 'cancel'},
+          {
+            text: 'Start Test',
+            onPress: () => startTestWithEffectiveDuration(effectiveDuration),
+          },
+        ],
+      );
     }
   };
 
   // ADD this new helper function
   const startTestWithEffectiveDuration = effectiveDuration => {
     console.log('🚀 Starting test with effective duration:', effectiveDuration);
-
     handleInstructionsAccept(setShowInstructions, setInstructionsAccepted);
     setTestStarted(true);
     setEffectiveTestDuration(effectiveDuration);
@@ -379,18 +452,27 @@ const ChampionTest = ({route, navigation}) => {
   };
 
   const handleTimeUp = elapsedTimeInSeconds => {
-    if (isTestCompleted || isSubmitting) {
-      return;
-    }
+    if (isTestCompleted || isSubmitting) return;
 
     // IMMEDIATELY set test as completed to prevent multiple calls
     setIsTestCompleted(true);
     setActualElapsedTime(elapsedTimeInSeconds);
 
-    showTimeUpMessage(() => {
-      hideMessage();
-      submitTestWithElapsedTime(elapsedTimeInSeconds);
+    // Show auto-hide message for 3 seconds
+    showMessage({
+      message: "Time's Up!",
+      description:
+        'Your test time has ended. Test has been automatically submitted.',
+      type: 'warning',
+      floating: true,
+      autoHide: true,
+      duration: 3000,
     });
+
+    // Auto submit after a brief delay
+    setTimeout(() => {
+      submitTestWithElapsedTime(elapsedTimeInSeconds);
+    }, 500);
   };
 
   const handleTimeUpdate = elapsedTimeInSeconds => {
@@ -436,39 +518,48 @@ const ChampionTest = ({route, navigation}) => {
         selectedAnswers,
         setIsSubmitting,
         userId,
-        adjustedStartTime.toISOString(), // Send adjusted start time
+        adjustedStartTime.toISOString(),
+        // Success callback
         response => {
           setIsTestCompleted(true);
 
-          Alert.alert(
-            'Success!',
-            `Test submitted successfully!\nTime taken: ${formattedTimeTaken}`,
-            [
-              {
-                text: 'OK',
-                onPress: () => {
-                  navigation.reset({
-                    index: 0,
-                    routes: [{name: 'ChampionSeries'}],
-                  });
-                },
-              },
-            ],
-            {cancelable: false},
-          );
+          // Show success message and navigate
+          showMessage({
+            message: 'Success!',
+            description: `Test submitted successfully! Time taken: ${formattedTimeTaken}`,
+            type: 'success',
+            floating: true,
+            autoHide: true,
+            duration: 2000,
+          });
+
+          // Navigate back after showing success message
+          setTimeout(() => {
+            navigation.reset({
+              index: 0,
+              routes: [{name: 'ChampionSeries'}],
+            });
+          }, 2500);
         },
+        // Error callback
         errorMessage => {
+          console.error(
+            '❌ Test submission with elapsed time failed:',
+            errorMessage,
+          );
+          setIsTestCompleted(false);
           const errorText =
             typeof errorMessage === 'string'
               ? errorMessage
               : 'Submission failed';
-          setIsTestCompleted(false);
           showErrorMessage('Submission Failed', errorText);
         },
       );
     } catch (error) {
       console.error('❌ Test submission with elapsed time failed:', error);
       setIsTestCompleted(false);
+      const errorText = typeof error === 'string' ? error : 'Submission failed';
+      showErrorMessage('Submission Failed', errorText);
     }
   };
 
@@ -491,20 +582,18 @@ const ChampionTest = ({route, navigation}) => {
     setIsTestCompleted(true);
 
     try {
-      const endTime = new Date().toISOString();
-
       await handleTestSubmission(
         testId,
         selectedAnswers,
         setIsSubmitting,
         userId,
         testStartTime,
-        endTime,
-        actualElapsedTime, // Pass actual elapsed time
+        // Success callback
         response => {
           hideMessage();
           navigation.goBack();
         },
+        // Error callback
         errorMessage => {
           setIsTestCompleted(false);
           showErrorMessage('Submission Failed', errorMessage);
@@ -656,13 +745,12 @@ const ChampionTest = ({route, navigation}) => {
             navigation={navigation}
             onQuestionSelect={handleQuestionSelect}
           />
-          {/* REPLACE the existing PaperTimer component */}
           <PaperTimer
-            duration={effectiveTestDuration || testData?.duration * 60}
+            testData={testData}
             onTimeUp={handleTimeUp}
             onTimeUpdate={handleTimeUpdate}
             isActive={testStarted && !isTestCompleted}
-            testData={testData}
+            isTestCompleted={isTestCompleted}
             showRemainingTime={true}
           />
 

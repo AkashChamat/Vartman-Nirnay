@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "563157816483",
+    "project_id": "vartmannirnay-6b453",
+    "storage_bucket": "vartmannirnay-6b453.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:563157816483:android:c54ca64d658ca6bc1c9b16",
+        "android_client_info": {
+          "package_name": "com.vartmannew"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCpTS_b9VXEf9NWohy6i4Ouj66rRDDjLXs"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

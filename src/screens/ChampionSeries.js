@@ -193,14 +193,11 @@ const ChampionSeries = ({navigation}) => {
 
   const checkTestTiming = testPaper => {
     const now = new Date();
-    const startDateTime = new Date(
-      `${testPaper.testStartDate}T${testPaper.startTime}`,
-    );
-    const endDateTime = new Date(
-      `${testPaper.testEndDate}T${testPaper.endTime}`,
-    );
+    const currentDate = now.toISOString().split('T')[0]; // YYYY-MM-DD
+    const currentTime = now.toTimeString().split(' ')[0]; // HH:MM:SS
 
-    if (now < startDateTime) {
+    // Check date availability
+    if (currentDate < testPaper.testStartDate) {
       return {
         canStart: false,
         reason: 'not_started',
@@ -210,7 +207,7 @@ const ChampionSeries = ({navigation}) => {
       };
     }
 
-    if (now > endDateTime) {
+    if (currentDate > testPaper.testEndDate) {
       return {
         canStart: false,
         reason: 'ended',
@@ -218,23 +215,47 @@ const ChampionSeries = ({navigation}) => {
       };
     }
 
-    // Calculate remaining time and show warning if less than original duration
-    const remainingTime = Math.floor((endDateTime - now) / 1000);
-    const originalDuration = testPaper.duration * 60; // Convert minutes to seconds
-
-    if (remainingTime < 60) {
+    // Check daily time window
+    if (currentTime < testPaper.startTime) {
       return {
         canStart: false,
-        reason: 'insufficient_time',
-        message: 'Less than 1 minute remaining in test active time',
+        reason: 'time_not_started',
+        message: `Today's test window starts at ${formatTime(
+          testPaper.startTime,
+        )}`,
       };
     }
 
+    if (currentTime > testPaper.endTime) {
+      return {
+        canStart: false,
+        reason: 'time_ended',
+        message: `Today's test window ended at ${formatTime(
+          testPaper.endTime,
+        )}`,
+      };
+    }
+
+    // Calculate remaining time in TODAY'S window
+    const todayEndDateTime = new Date(`${currentDate}T${testPaper.endTime}`);
+    const remainingActiveTime = Math.floor((todayEndDateTime - now) / 1000);
+    const originalDuration = testPaper.duration * 60;
+
+    if (remainingActiveTime < 60) {
+      return {
+        canStart: false,
+        reason: 'insufficient_time',
+        message: "Less than 1 minute remaining in today's time window",
+      };
+    }
+
+    // User gets minimum of remaining active time or original test duration
+    const effectiveTime = Math.min(remainingActiveTime, originalDuration);
+    const effectiveMinutes = Math.floor(effectiveTime / 60);
+
     let warningMessage = null;
-    if (remainingTime < originalDuration) {
-      const remainingMinutes = Math.floor(remainingTime / 60);
-      const originalMinutes = testPaper.duration;
-      warningMessage = `Only ${remainingMinutes} minutes available instead of ${originalMinutes} minutes due to active time window.`;
+    if (effectiveTime < originalDuration) {
+      warningMessage = `Warning, You will get ${effectiveMinutes} minutes instead of ${testPaper.duration} minutes.`;
     }
 
     return {
@@ -242,7 +263,8 @@ const ChampionSeries = ({navigation}) => {
       reason: 'active',
       message: 'Test is active',
       warningMessage: warningMessage,
-      remainingTime: remainingTime,
+      remainingTime: effectiveTime,
+      effectiveMinutes: effectiveMinutes,
     };
   };
 
@@ -272,7 +294,6 @@ const ChampionSeries = ({navigation}) => {
     const attemptCount = getAttemptCountForPaper(testPaper.id);
     const maxAttemptsAllowed = testPaper.maxAttemptsAllowed;
 
-    // Only block entry and show warning if user exceeded attempts
     if (
       typeof maxAttemptsAllowed === 'number' &&
       attemptCount >= maxAttemptsAllowed
@@ -286,37 +307,33 @@ const ChampionSeries = ({navigation}) => {
       return;
     }
 
-    // Show timing warning if applicable
-    if (timingCheck.warningMessage) {
-      Alert.alert(
-        'Limited Time Available',
-        timingCheck.warningMessage + '\n\nDo you want to continue?',
-        [
-          {
-            text: 'Cancel',
-            style: 'cancel',
-          },
-          {
-            text: 'Continue',
-            onPress: () => {
-              navigation.navigate('ChampionTest', {
-                testId: testPaper.id,
-                testTitle: testPaper.testTitle || 'Champion Test',
-                source: 'ChampionSeries',
-                effectiveTimeRemaining: timingCheck.remainingTime,
-              });
-            },
-          },
-        ],
-      );
-    } else {
-      // Go to test normally
-      navigation.navigate('ChampionTest', {
-        testId: testPaper.id,
-        testTitle: testPaper.testTitle || 'Champion Test',
-        source: 'ChampionSeries',
-      });
-    }
+    // Show timing alert - ALWAYS show this before starting
+    const alertTitle = timingCheck.warningMessage
+      ? 'Limited Time Available'
+      : 'Test Time Information';
+    const alertMessage =
+      timingCheck.warningMessage ||
+      `You will get ${
+        timingCheck.effectiveMinutes || testPaper.duration
+      } minutes to complete this test.`;
+
+    Alert.alert(alertTitle, alertMessage + '\n\nDo you want to continue?', [
+      {
+        text: 'Cancel',
+        style: 'cancel',
+      },
+      {
+        text: 'Start Test',
+        onPress: () => {
+          navigation.navigate('ChampionTest', {
+            testId: testPaper.id,
+            testTitle: testPaper.testTitle || 'Champion Test',
+            source: 'ChampionSeries',
+            effectiveTimeRemaining: timingCheck.remainingTime, // Pass the effective time
+          });
+        },
+      },
+    ]);
   };
 
   const handleViewResult = testPaper => {

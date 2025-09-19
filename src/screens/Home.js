@@ -1,4 +1,5 @@
 import React, {useState, useEffect} from 'react';
+
 import {
   StyleSheet,
   Text,
@@ -12,7 +13,10 @@ import {
   Modal,
   Animated,
   Platform,
+  Alert,
+  Clipboard,
 } from 'react-native';
+
 import {useNavigation} from '@react-navigation/native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import MarqueeText from 'react-native-marquee';
@@ -20,13 +24,13 @@ import {slider, marquee} from '../util/apiCall';
 import Header from '../Components/Header';
 import Footer from '../Components/Footer';
 import ImageSlider from '../Components/ImageSlider';
-import TestTimer from '../Components/TestTimer'; 
+import TestTimer from '../Components/TestTimer';
+import {getPersonalChatMobile, getGroupLinks} from '../util/apiCall';
 
 const {width, height} = Dimensions.get('window');
 
 const Home = () => {
   const navigation = useNavigation();
-  
   const [sliderImages, setSliderImages] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [marqueeText, setMarqueeText] = useState(
@@ -37,11 +41,16 @@ const Home = () => {
   const [scaleAnim] = useState(new Animated.Value(0));
 
   // Calculate dynamic bottom padding for ScrollView
-  // For devices with button navigation, we need more padding
   const isLargeScreen = height > 700;
-  const hasHomeButton = Platform.OS === 'android' && height < 750; // Likely has home button
-  const scrollBottomPadding = hasHomeButton ? 100 : (isLargeScreen ? 90 : 80);
+  const hasHomeButton = Platform.OS === 'android' && height < 750;
+  const scrollBottomPadding = hasHomeButton ? 100 : isLargeScreen ? 90 : 80;
   const footerHeight = hasHomeButton ? 70 : 60;
+
+  const [isWhatsAppPopupVisible, setIsWhatsAppPopupVisible] = useState(false);
+  const [whatsappScaleAnim] = useState(new Animated.Value(0));
+  const [personalChatNumber, setPersonalChatNumber] = useState('');
+  const [groupLinks, setGroupLinks] = useState([]);
+  const [isLoadingWhatsAppData, setIsLoadingWhatsAppData] = useState(false);
 
   useEffect(() => {
     const getSliderImages = async () => {
@@ -84,8 +93,6 @@ const Home = () => {
     getSliderImages();
     getMarqueeText();
   }, []);
-
-  const whatsappNumber = '9028596157';
 
   const socialLinks = {
     instagram:
@@ -165,24 +172,204 @@ const Home = () => {
       screen: 'Books',
       color: '#E8F5E9',
     },
+    {
+      id: '13',
+      title: 'Packages',
+      image: require('../assets/packages.png'),
+      screen: 'Packages',
+      color: '#F0E6FF'
+    },
   ];
 
-  const openWhatsApp = () => {
+  // IMPROVED fetchWhatsAppData with proper logging
+  const fetchWhatsAppData = async () => {
+    try {
+      setIsLoadingWhatsAppData(true);
+      console.log('🔄 Starting WhatsApp data fetch...');
+      
+      const [personalChatResponse, groupLinksResponse] = await Promise.all([
+        getPersonalChatMobile(),
+        getGroupLinks(),
+      ]);
+
+      // Log personal chat data
+      console.log('📱 Personal Chat API Response:', personalChatResponse);
+      
+      // FIXED: Handle array response for personal chat
+      if (Array.isArray(personalChatResponse) && personalChatResponse.length > 0) {
+        const personalChatData = personalChatResponse[0];
+        console.log('📱 Personal Chat Data (first item):', personalChatData);
+        
+        if (personalChatData && personalChatData.mobileNo) {
+          console.log('✅ Personal Chat Mobile Number Found:', personalChatData.mobileNo);
+          setPersonalChatNumber(personalChatData.mobileNo);
+        } else {
+          console.log('❌ No mobileNo found in personal chat data');
+          setPersonalChatNumber('');
+        }
+      } else if (personalChatResponse && personalChatResponse.mobileNo) {
+        // Fallback for direct object response
+        console.log('✅ Personal Chat Mobile Number Found (direct):', personalChatResponse.mobileNo);
+        setPersonalChatNumber(personalChatResponse.mobileNo);
+      } else {
+        console.log('❌ Invalid personal chat response format');
+        setPersonalChatNumber('');
+      }
+
+      // Log group links data
+      console.log('👥 Group Links API Response:', groupLinksResponse);
+      if (Array.isArray(groupLinksResponse)) {
+        setGroupLinks(groupLinksResponse);
+        console.log('✅ Group Links set:', groupLinksResponse.length, 'groups');
+      } else if (
+        groupLinksResponse &&
+        groupLinksResponse.data &&
+        Array.isArray(groupLinksResponse.data)
+      ) {
+        setGroupLinks(groupLinksResponse.data);
+        console.log('✅ Group Links set from data property:', groupLinksResponse.data.length, 'groups');
+      } else {
+        setGroupLinks([]);
+        console.log('⚠️ No valid group links found');
+      }
+    } catch (error) {
+      console.error('❌ Error fetching WhatsApp data:', error);
+    } finally {
+      setIsLoadingWhatsAppData(false);
+    }
+  };
+
+  const showWhatsAppPopup = () => {
+    setIsWhatsAppPopupVisible(true);
+    fetchWhatsAppData();
+    Animated.spring(whatsappScaleAnim, {
+      toValue: 1,
+      useNativeDriver: true,
+      tension: 50,
+      friction: 8,
+    }).start();
+  };
+
+  const hideWhatsAppPopup = () => {
+    Animated.spring(whatsappScaleAnim, {
+      toValue: 0,
+      useNativeDriver: true,
+      tension: 50,
+      friction: 8,
+    }).start(() => {
+      setIsWhatsAppPopupVisible(false);
+    });
+  };
+
+  const openPersonalChat = () => {
+    console.log('📱 Opening Personal Chat...');
+    console.log('📱 Personal Chat Number:', personalChatNumber);
+    
+    if (!personalChatNumber) {
+      console.log('❌ No personal chat number available');
+      return;
+    }
+
     const message = encodeURIComponent(
       'स्पर्धा परीक्षा माहितीसाठी मला साप्ताहिक वर्तमान निर्णय व्हाट्सअप ग्रुप ला ॲड करा',
     );
-    const whatsappUrl = `whatsapp://send?phone=${whatsappNumber}&text=${message}`;
+    const whatsappUrl = `whatsapp://send?phone=${personalChatNumber}&text=${message}`;
+    
+    console.log('📱 WhatsApp URL:', whatsappUrl);
 
     Linking.canOpenURL(whatsappUrl)
       .then(supported => {
+        console.log('📱 WhatsApp URL supported:', supported);
         if (supported) {
+          console.log('📱 Opening WhatsApp app...');
           return Linking.openURL(whatsappUrl);
         } else {
-          const browserUrl = `https://wa.me/${whatsappNumber}?text=${message}`;
+          const browserUrl = `https://wa.me/${personalChatNumber}?text=${message}`;
+          console.log('📱 Fallback to browser URL:', browserUrl);
           return Linking.openURL(browserUrl);
         }
       })
-      .catch(err => console.error('An error occurred', err));
+      .catch(err => {
+        console.error('❌ Error opening personal chat:', err);
+      });
+
+    hideWhatsAppPopup();
+  };
+
+  // IMPROVED openGroupLink with multiple format attempts
+  const openGroupLink = (link) => {
+    console.log('👥 Opening Group Link...');
+    console.log('👥 Original Link:', link);
+    
+    if (!link) {
+      console.log('❌ No group link provided');
+      return;
+    }
+
+    const attemptOpenLink = async () => {
+      // Extract group ID from different link formats
+      let groupId = '';
+      
+      if (link.includes('chat.whatsapp.com/')) {
+        groupId = link.split('chat.whatsapp.com/')[1];
+      } else if (link.includes('whatsapp.com/')) {
+        groupId = link.split('whatsapp.com/')[1];
+      } else {
+        groupId = link; // Assume it's just the ID
+      }
+      
+      console.log('👥 Extracted Group ID:', groupId);
+
+      // DIFFERENT URL FORMATS TO TRY (in order of compatibility)
+      const urlFormats = [
+        `whatsapp://chat.whatsapp.com/${groupId}`, // Native app format
+        `https://chat.whatsapp.com/${groupId}`,    // Standard web format
+        `https://api.whatsapp.com/send/?text=Join%20group&app_absent=0&chat=${groupId}`, // Alternative format
+        `https://wa.me/join/${groupId}` // Newer format
+      ];
+
+      // Try each format until one works
+      for (let i = 0; i < urlFormats.length; i++) {
+        const currentUrl = urlFormats[i];
+        console.log(`👥 Trying URL format ${i + 1}:`, currentUrl);
+
+        try {
+          const supported = await Linking.canOpenURL(currentUrl);
+          console.log(`👥 Format ${i + 1} supported:`, supported);
+          
+          if (supported) {
+            await Linking.openURL(currentUrl);
+            console.log(`✅ Successfully opened group with format ${i + 1}`);
+            hideWhatsAppPopup();
+            return true; // Success
+          }
+        } catch (error) {
+          console.log(`❌ Format ${i + 1} failed:`, error.message);
+          continue; // Try next format
+        }
+      }
+
+      // If all formats fail, show user feedback
+      console.log('❌ All group link formats failed');
+      Alert.alert(
+        'Group Link Issue', 
+        'Unable to open WhatsApp group. Please try copying the link and opening it manually in WhatsApp.',
+        [
+          {
+            text: 'Copy Link',
+            onPress: () => {
+              Clipboard.setString(link);
+              console.log('📋 Group link copied to clipboard');
+            }
+          },
+          { text: 'OK' }
+        ]
+      );
+      return false;
+    };
+
+    attemptOpenLink();
+    hideWhatsAppPopup();
   };
 
   const showFollowUsPopup = () => {
@@ -217,13 +404,12 @@ const Home = () => {
         }
       })
       .catch(err => console.error('An error occurred', err));
-
     hideFollowUsPopup();
   };
 
   const handleMenuItemPress = item => {
     if (item.action === 'whatsapp') {
-      openWhatsApp();
+      showWhatsAppPopup();
     } else if (item.action === 'followUs') {
       showFollowUsPopup();
     } else if (item.screen) {
@@ -236,64 +422,62 @@ const Home = () => {
       <Header />
 
       {/* Body Scroll with proper clipping */}
-      <View style={[styles.scrollContainer, {marginBottom: footerHeight}]}>
+      <View style={styles.scrollContainer}>
         <ScrollView
+          style={styles.scrollView}
           contentContainerStyle={{paddingBottom: scrollBottomPadding}}
-          showsVerticalScrollIndicator={false}
-          style={styles.scrollView}>
-        {/* Image Slider */}
-        <ImageSlider images={sliderImages} isLoading={isLoading} />
+          showsVerticalScrollIndicator={false}>
+          
+          {/* Image Slider */}
+          <ImageSlider images={sliderImages} isLoading={isLoading} />
 
-        {/* Marquee Section */}
-        <View style={styles.timer}>
-          <View style={styles.timerBadge}>
-            <Ionicons name="time-outline" size={16} color="#00695C" />
-            <Text style={styles.timerLabel}>UPDATES!</Text>
+          {/* Marquee Section */}
+          <View style={styles.timer}>
+            <View style={styles.timerBadge}>
+              <Ionicons name="megaphone" size={16} color="#00695C" />
+              <Text style={styles.timerLabel}>UPDATES!</Text>
+            </View>
+            <View style={styles.timerTextContainer}>
+              {isMarqueeLoading ? (
+                <ActivityIndicator size="small" color="#FF6B6B" />
+              ) : (
+                <MarqueeText
+                  style={styles.timertext}
+                  speed={100}
+                  marqueeOnStart={true}
+                  loop={true}
+                  delay={1000}>
+                  {marqueeText}
+                </MarqueeText>
+              )}
+            </View>
           </View>
-          <View style={styles.timerTextContainer}>
-            {isMarqueeLoading ? (
-              <ActivityIndicator size="small" color="#0288D1" />
-            ) : (
-              <MarqueeText
-                style={styles.timertext}
-                speed={0.5}
-                marqueeOnStart={true}
-                loop={true}
-                delay={1000}>
-                {marqueeText}
-              </MarqueeText>
-            )}
+
+          {/* Reusable Timer Component */}
+          <TestTimer />
+
+          {/* Menu Grid */}
+          <View style={styles.gridContainer}>
+            {Array(Math.ceil(menuItems.length / 3))
+              .fill()
+              .map((_, rowIndex) => (
+                <View key={rowIndex} style={styles.row}>
+                  {menuItems.slice(rowIndex * 3, rowIndex * 3 + 3).map(item => (
+                    <TouchableOpacity
+                      key={item.id}
+                      style={[styles.menuItem, {backgroundColor: item.color}]}
+                      onPress={() => handleMenuItemPress(item)}>
+                      <Image source={item.image} style={styles.menuImage} />
+                      <Text style={styles.menuTitle}>{item.title}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              ))}
           </View>
-        </View>
-
-        {/* Reusable Timer Component */}
-        <TestTimer navigation={navigation} />
-
-        {/* Menu Grid */}
-        <View style={styles.gridContainer}>
-          {Array(Math.ceil(menuItems.length / 3))
-            .fill()
-            .map((_, rowIndex) => (
-              <View key={rowIndex} style={styles.row}>
-                {menuItems.slice(rowIndex * 3, rowIndex * 3 + 3).map(item => (
-                  <TouchableOpacity
-                    key={item.id}
-                    style={[styles.menuItem, {backgroundColor: item.color}]}
-                    onPress={() => handleMenuItemPress(item)}>
-                    <Image
-                      source={item.image}
-                      style={styles.menuImage}
-                      resizeMode="contain"
-                    />
-                    <Text style={styles.menuTitle}>{item.title}</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            ))}
-        </View>
         </ScrollView>
       </View>
 
+      {/* Follow Us Modal */}
       <Modal
         visible={showFollowPopup}
         transparent={true}
@@ -303,14 +487,12 @@ const Home = () => {
           <Animated.View
             style={[
               styles.popupContainer,
-              {
-                transform: [{scale: scaleAnim}],
-              },
+              {transform: [{scale: scaleAnim}]},
             ]}>
             {/* Header */}
             <View style={styles.popupHeader}>
               <View style={styles.headerIconContainer}>
-                <Ionicons name="heart" size={24} color="#FF6B6B" />
+                <Ionicons name="share-social" size={24} color="#FF6B6B" />
               </View>
               <Text style={styles.popupTitle}>Follow Us</Text>
               <Text style={styles.popupSubtitle}>
@@ -352,16 +534,93 @@ const Home = () => {
             </View>
 
             {/* Close Button */}
-            <TouchableOpacity
-              style={styles.closeButton}
-              onPress={hideFollowUsPopup}>
+            <TouchableOpacity style={styles.closeButton} onPress={hideFollowUsPopup}>
               <Text style={styles.closeButtonText}>Close</Text>
             </TouchableOpacity>
           </Animated.View>
         </View>
       </Modal>
 
-      <Footer />
+      {/* WhatsApp Options Modal - REPOSITIONED ORDER */}
+      <Modal
+        visible={isWhatsAppPopupVisible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={hideWhatsAppPopup}>
+        <View style={styles.modalOverlay}>
+          <Animated.View
+            style={[
+              styles.popupContainer,
+              {transform: [{scale: whatsappScaleAnim}]},
+            ]}>
+            {/* Header */}
+            <View style={styles.popupHeader}>
+              <View style={[styles.headerIconContainer, {backgroundColor: '#E8F5E9'}]}>
+                <Ionicons name="logo-whatsapp" size={24} color="#25D366" />
+              </View>
+              <Text style={styles.popupTitle}>WhatsApp Options</Text>
+              <Text style={styles.popupSubtitle}>
+                Choose how you'd like to connect with us
+              </Text>
+            </View>
+
+            {/* WhatsApp Options - GROUP LINKS FIRST, PERSONAL CHAT SECOND */}
+            <View style={styles.socialButtonsContainer}>
+              {isLoadingWhatsAppData ? (
+                <ActivityIndicator size="large" color="#25D366" />
+              ) : (
+                <>
+                  {/* Group Links FIRST (moved above) */}
+                  {groupLinks.map((group, index) => {
+                    console.log('👥 Rendering Group Link:', group);
+                    return (
+                      <TouchableOpacity
+                        key={group.id || index}
+                        style={[styles.socialButton, styles.whatsappGroupButton]}
+                        onPress={() => openGroupLink(group.link)}>
+                        <View style={styles.socialIconContainer}>
+                          <Ionicons name="people-outline" size={28} color="#FFFFFF" />
+                        </View>
+                        <View style={styles.socialTextContainer}>
+                          <Text style={styles.socialButtonText}>Join Group</Text>
+                          <Text style={styles.socialButtonSubtext}>
+                            {group.groupName}
+                          </Text>
+                        </View>
+                        <Ionicons name="chevron-forward" size={20} color="#FFFFFF" />
+                      </TouchableOpacity>
+                    );
+                  })}
+
+                  {/* Personal Chat Option SECOND (moved below) */}
+                  <TouchableOpacity
+                    style={[styles.socialButton, styles.whatsappPersonalButton]}
+                    onPress={openPersonalChat}
+                    disabled={!personalChatNumber}>
+                    <View style={styles.socialIconContainer}>
+                      <Ionicons name="chatbubble-outline" size={28} color="#FFFFFF" />
+                    </View>
+                    <View style={styles.socialTextContainer}>
+                      <Text style={styles.socialButtonText}>Personal Chat</Text>
+                      <Text style={styles.socialButtonSubtext}>
+                        Direct message for queries
+                      </Text>
+                    </View>
+                    <Ionicons name="chevron-forward" size={20} color="#FFFFFF" />
+                  </TouchableOpacity>
+                </>
+              )}
+            </View>
+
+            {/* Close Button */}
+            <TouchableOpacity style={styles.closeButton} onPress={hideWhatsAppPopup}>
+              <Text style={styles.closeButtonText}>Close</Text>
+            </TouchableOpacity>
+          </Animated.View>
+        </View>
+      </Modal>
+
+      <Footer height={footerHeight} />
     </View>
   );
 };
@@ -524,6 +783,12 @@ const styles = StyleSheet.create({
   },
   facebookButton: {
     backgroundColor: '#1877F2',
+  },
+  whatsappPersonalButton: {
+    backgroundColor: '#128C7E',
+  },
+  whatsappGroupButton: {
+    backgroundColor: '#25D366',
   },
   socialIconContainer: {
     width: 48,

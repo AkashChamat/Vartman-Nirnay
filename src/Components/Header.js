@@ -5,20 +5,29 @@ import Menu from '../Components/Menu';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import LinearGradient from 'react-native-linear-gradient';
 import {useNavigation} from '@react-navigation/native';
-import {getTodayNotifications} from '../util/apiCall'; // Update the import path
+import {getTodayNotifications} from '../util/apiCall';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const Header = () => {
   const navigation = useNavigation();
   const [notificationCount, setNotificationCount] = useState(0);
   const [loading, setLoading] = useState(false);
 
-  // Fetch today's notification count
+  const loadReadNotifications = async () => {
+    try {
+      const stored = await AsyncStorage.getItem('readNotifications');
+      return stored ? new Set(JSON.parse(stored)) : new Set();
+    } catch (error) {
+      console.error('Error loading read notifications:', error);
+      return new Set();
+    }
+  };
+
   const fetchNotificationCount = async () => {
     try {
       setLoading(true);
       const response = await getTodayNotifications();
       
-      // Filter notifications to show only those with channels containing 'NOTIFICATION'
       const filteredNotifications = Array.isArray(response) 
         ? response.filter(notification => 
             notification.channels && 
@@ -26,7 +35,12 @@ const Header = () => {
           )
         : [];
 
-      setNotificationCount(filteredNotifications.length);
+      const readNotifications = await loadReadNotifications();
+      const unreadCount = filteredNotifications.filter(notification => 
+        notification.id && !readNotifications.has(notification.id)
+      ).length;
+
+      setNotificationCount(unreadCount);
     } catch (error) {
       console.error('Error fetching notification count:', error);
       setNotificationCount(0);
@@ -35,12 +49,14 @@ const Header = () => {
     }
   };
 
-  // Fetch notification count when component mounts
+  const handleNotificationPress = () => {
+    navigation.navigate('Notification');
+  };
+
   useEffect(() => {
     fetchNotificationCount();
   }, []);
 
-  // Refresh notification count when screen comes into focus
   useFocusEffect(
     React.useCallback(() => {
       fetchNotificationCount();
@@ -61,7 +77,7 @@ const Header = () => {
         </View>
         <TouchableOpacity
           style={styles.notifications}
-          onPress={() => navigation.navigate('Notification')}>
+          onPress={handleNotificationPress}>
           <Ionicons name="notifications" size={28} color="#0288D1" />
           {notificationCount > 0 && (
             <View style={styles.notificationBadge}>
@@ -89,7 +105,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
-    
     paddingVertical: 12,
     elevation: 2,
   },

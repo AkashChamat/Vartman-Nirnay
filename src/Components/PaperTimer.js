@@ -1,24 +1,26 @@
 import React, {useState, useEffect, useRef, useCallback} from 'react';
-import {View, Text, StyleSheet} from 'react-native';
+import {View, Text, StyleSheet, AppState} from 'react-native';
 
 const PaperTimer = ({
-  duration, // This will now be the effective duration in seconds
+  testData,
   onTimeUp,
   onTimeUpdate,
-  isActive, // Changed from testStarted to isActive for better control
+  isActive,
   isTestCompleted,
-  testData,
   showRemainingTime = true,
 }) => {
-  const [timeLeft, setTimeLeft] = useState(duration || 0);
+  const [timeLeft, setTimeLeft] = useState(0);
   const [elapsedTime, setElapsedTime] = useState(0);
+  const [effectiveDuration, setEffectiveDuration] = useState(0);
+  const [timingInfo, setTimingInfo] = useState(null);
+
+  // Use refs to prevent stale closures and maintain timer independence
   const startTimeRef = useRef(null);
   const intervalRef = useRef(null);
   const isTimerActiveRef = useRef(false);
-
-  // Add refs to prevent calling callbacks during render
   const onTimeUpRef = useRef(onTimeUp);
   const onTimeUpdateRef = useRef(onTimeUpdate);
+  const appStateRef = useRef(AppState.currentState);
 
   // Update refs when callbacks change
   useEffect(() => {
@@ -29,26 +31,145 @@ const PaperTimer = ({
     onTimeUpdateRef.current = onTimeUpdate;
   }, [onTimeUpdate]);
 
-  // Initialize timer when duration changes
-  useEffect(() => {
-    console.log('⏱️ PaperTimer: Duration changed to', duration);
-    if (duration && duration > 0) {
-      setTimeLeft(duration);
-      setElapsedTime(0);
-      // Reset start time reference
-      startTimeRef.current = null;
+  // In PaperTimer.js, update the calculateEffectiveDuration function:
+  const calculateEffectiveDuration = useCallback(testData => {
+    if (
+      !testData?.testStartDate ||
+      !testData?.testEndDate ||
+      !testData?.startTime ||
+      !testData?.endTime
+    ) {
+      const originalDuration = (testData?.duration || 60) * 60;
+      setTimingInfo({
+        originalMinutes: testData?.duration || 60,
+        effectiveMinutes: Math.floor(originalDuration / 60),
+        isLimited: false,
+        reason: 'No active time window defined',
+      });
+      return originalDuration;
     }
-  }, [duration]);
 
-  // Main timer effect with improved performance
-  useEffect(() => {
-    console.log('⏱️ PaperTimer: Timer effect triggered', {
-      isActive,
-      isTestCompleted,
-      duration,
-      currentTimeLeft: timeLeft,
+    const now = new Date();
+    const currentDate = now.toISOString().split('T')[0];
+    const currentTime = now.toTimeString().split(' ')[0];
+
+    // Check date availability
+    if (
+      currentDate < testData.testStartDate ||
+      currentDate > testData.testEndDate
+    ) {
+      setTimingInfo({
+        originalMinutes: testData.duration,
+        effectiveMinutes: 0,
+        isLimited: true,
+        reason:
+          currentDate < testData.testStartDate
+            ? 'Test not started'
+            : 'Test ended',
+      });
+      return 0;
+    }
+
+    // Check daily time window
+    if (currentTime < testData.startTime || currentTime > testData.endTime) {
+      setTimingInfo({
+        originalMinutes: testData.duration,
+        effectiveMinutes: 0,
+        isLimited: true,
+        reason:
+          currentTime < testData.startTime
+            ? 'Daily window not started'
+            : 'Daily window ended',
+      });
+      return 0;
+    }
+
+    // Calculate remaining time in today's window
+    const todayEndDateTime = new Date(`${currentDate}T${testData.endTime}`);
+    const remainingTimeInWindow = Math.floor((todayEndDateTime - now) / 1000);
+    const originalDuration = testData.duration * 60;
+
+    // User gets minimum of remaining time in today's window or original test duration
+    const effectiveDuration = Math.min(remainingTimeInWindow, originalDuration);
+    const effectiveMinutes = Math.floor(effectiveDuration / 60);
+    const originalMinutes = Math.floor(originalDuration / 60);
+
+    setTimingInfo({
+      originalMinutes,
+      effectiveMinutes,
+      isLimited: effectiveDuration < originalDuration,
+      reason:
+        effectiveDuration < originalDuration
+          ? "Limited by today's time window"
+          : 'Full duration available',
     });
 
+    return Math.max(effectiveDuration, 0);
+  }, []);
+
+  // Initialize timer when testData changes
+  useEffect(() => {
+    if (testData) {
+      const duration = calculateEffectiveDuration(testData);
+      setEffectiveDuration(duration);
+      setTimeLeft(duration);
+      setElapsedTime(0);
+      startTimeRef.current = null; // Reset start time
+    }
+  }, [testData, calculateEffectiveDuration]);
+
+  // Handle app state changes to maintain timer accuracy
+  useEffect(() => {
+    const handleAppStateChange = nextAppState => {
+      appStateRef.current = nextAppState;
+
+      // Recalculate time when app comes to foreground to maintain accuracy
+      if (
+        nextAppState === 'active' &&
+        isTimerActiveRef.current &&
+        startTimeRef.current
+      ) {
+        const now = Date.now();
+        const actualElapsed = Math.floor((now - startTimeRef.current) / 1000);
+        const newTimeLeft = Math.max(0, effectiveDuration - actualElapsed);
+
+        setElapsedTime(actualElapsed);
+        setTimeLeft(newTimeLeft);
+
+        // Call update callback
+        if (
+          onTimeUpdateRef.current &&
+          typeof onTimeUpdateRef.current === 'function'
+        ) {
+          setTimeout(() => onTimeUpdateRef.current(actualElapsed), 0);
+        }
+
+        // Check for time up
+        if (newTimeLeft <= 0 && isTimerActiveRef.current) {
+          isTimerActiveRef.current = false;
+          if (intervalRef.current) {
+            clearInterval(intervalRef.current);
+            intervalRef.current = null;
+          }
+          if (
+            onTimeUpRef.current &&
+            typeof onTimeUpRef.current === 'function'
+          ) {
+            setTimeout(() => onTimeUpRef.current(actualElapsed), 0);
+          }
+        }
+      }
+    };
+
+    const subscription = AppState.addEventListener(
+      'change',
+      handleAppStateChange,
+    );
+    return () => subscription?.remove();
+  }, [effectiveDuration]);
+
+  // Main timer effect - USES DATE.NOW() FOR ACCURACY
+  useEffect(() => {
     // Clear existing interval
     if (intervalRef.current) {
       clearInterval(intervalRef.current);
@@ -56,24 +177,24 @@ const PaperTimer = ({
     }
 
     // Don't start timer if conditions aren't met
-    if (!isActive || isTestCompleted || !duration || duration <= 0) {
+    if (
+      !isActive ||
+      isTestCompleted ||
+      !effectiveDuration ||
+      effectiveDuration <= 0
+    ) {
       isTimerActiveRef.current = false;
-      console.log('⏱️ PaperTimer: Timer not started - conditions not met');
       return;
     }
 
     // Set start time only once when timer actually starts
     if (!startTimeRef.current) {
       startTimeRef.current = Date.now();
-      console.log(
-        '⏱️ PaperTimer: Timer started at',
-        new Date(startTimeRef.current).toISOString(),
-      );
     }
 
     isTimerActiveRef.current = true;
 
-    // ENHANCE the timer interval in PaperTimer.js
+    // Use high-frequency interval but calculate time based on actual elapsed time
     intervalRef.current = setInterval(() => {
       try {
         if (!isTimerActiveRef.current || !startTimeRef.current) {
@@ -82,41 +203,27 @@ const PaperTimer = ({
 
         const now = Date.now();
         const actualElapsed = Math.floor((now - startTimeRef.current) / 1000);
-        const newTimeLeft = Math.max(0, duration - actualElapsed);
+        const newTimeLeft = Math.max(0, effectiveDuration - actualElapsed);
 
         // Validate timing data
-        if (actualElapsed < 0 || newTimeLeft < 0) {
-          console.warn('⚠️ PaperTimer: Invalid timing detected', {
-            actualElapsed,
-            newTimeLeft,
-          });
+        if (actualElapsed < 0) {
           return;
         }
 
-        // Update state in batch
+        // Update state (this won't block timer due to Date.now() calculations)
         setElapsedTime(actualElapsed);
         setTimeLeft(newTimeLeft);
 
-        // Use setTimeout to call callbacks AFTER render is complete
-        setTimeout(() => {
-          if (
-            onTimeUpdateRef.current &&
-            typeof onTimeUpdateRef.current === 'function'
-          ) {
-            try {
-              onTimeUpdateRef.current(actualElapsed);
-            } catch (error) {
-              console.error(
-                '⚠️ PaperTimer: Error in onTimeUpdate callback:',
-                error,
-              );
-            }
-          }
-        }, 0);
+        // Call update callback (use setTimeout to prevent blocking)
+        if (
+          onTimeUpdateRef.current &&
+          typeof onTimeUpdateRef.current === 'function'
+        ) {
+          setTimeout(() => onTimeUpdateRef.current(actualElapsed), 0);
+        }
 
         // Check for time up condition
         if (newTimeLeft <= 0 && isTimerActiveRef.current) {
-          console.log('⏱️ PaperTimer: Time up! Elapsed:', actualElapsed);
           isTimerActiveRef.current = false;
 
           if (intervalRef.current) {
@@ -124,30 +231,18 @@ const PaperTimer = ({
             intervalRef.current = null;
           }
 
-          // Use setTimeout to prevent calling during render
-          setTimeout(() => {
-            if (
-              onTimeUpRef.current &&
-              typeof onTimeUpRef.current === 'function'
-            ) {
-              try {
-                onTimeUpRef.current(actualElapsed);
-              } catch (error) {
-                console.error(
-                  '⚠️ PaperTimer: Error in onTimeUp callback:',
-                  error,
-                );
-              }
-            }
-          }, 0);
+          // Call time up callback (use setTimeout to prevent blocking)
+          if (
+            onTimeUpRef.current &&
+            typeof onTimeUpRef.current === 'function'
+          ) {
+            setTimeout(() => onTimeUpRef.current(actualElapsed), 0);
+          }
         }
       } catch (error) {
-        console.error(
-          '⚠️ PaperTimer: Critical error in timer interval:',
-          error,
-        );
+        // Handle error silently
       }
-    }, 1000);
+    }, 100); // Update every 100ms for smooth UI, but calculations are based on actual time
 
     // Cleanup function
     return () => {
@@ -157,7 +252,7 @@ const PaperTimer = ({
       }
       isTimerActiveRef.current = false;
     };
-  }, [isActive, isTestCompleted, duration]);
+  }, [isActive, isTestCompleted, effectiveDuration]);
 
   // Format time display
   const formatTime = useCallback(seconds => {
@@ -176,28 +271,19 @@ const PaperTimer = ({
     return '#3B82F6'; // Blue for normal time
   }, [timeLeft, isTestCompleted]);
 
-  // Show warning for limited time
-  const isLimitedTime = useCallback(() => {
-    if (!testData?.duration || !duration) return false;
-    const originalDuration = testData.duration * 60;
-    return duration < originalDuration;
-  }, [testData?.duration, duration]);
-
-  // Calculate original vs effective time
-  const getTimeInfo = useCallback(() => {
-    if (!testData?.duration) return null;
-
-    const originalMinutes = testData.duration;
-    const effectiveMinutes = Math.floor(duration / 60);
-
-    return {
-      originalMinutes,
-      effectiveMinutes,
-      isLimited: effectiveMinutes < originalMinutes,
-    };
-  }, [testData?.duration, duration]);
-
-  const timeInfo = getTimeInfo();
+  // Don't render if no effective duration
+  if (effectiveDuration <= 0 && !isTestCompleted) {
+    return (
+      <View style={styles.timerContainer}>
+        <View style={[styles.timerBadge, {backgroundColor: '#EF4444'}]}>
+          <Text style={styles.timerText}>No Time Available</Text>
+        </View>
+        {timingInfo && (
+          <Text style={styles.warningText}>{timingInfo.reason}</Text>
+        )}
+      </View>
+    );
+  }
 
   return (
     <View style={styles.timerContainer}>
@@ -206,10 +292,10 @@ const PaperTimer = ({
       </View>
 
       {/* Show limited time warning */}
-      {timeInfo?.isLimited && !isTestCompleted && (
+      {timingInfo?.isLimited && !isTestCompleted && (
         <Text style={styles.warningText}>
-          Limited: {timeInfo.effectiveMinutes}min (Original:{' '}
-          {timeInfo.originalMinutes}min)
+          Limited: {timingInfo.effectiveMinutes}min (Original:{' '}
+          {timingInfo.originalMinutes}min)
         </Text>
       )}
 
@@ -219,9 +305,9 @@ const PaperTimer = ({
           <Text style={styles.completedText}>
             Time taken: {formatTime(elapsedTime)}
           </Text>
-          {timeInfo?.isLimited && (
+          {timingInfo?.isLimited && (
             <Text style={styles.limitedCompletedText}>
-              Available: {timeInfo.effectiveMinutes}min
+              Available: {timingInfo.effectiveMinutes}min
             </Text>
           )}
         </View>

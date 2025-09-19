@@ -1,12 +1,8 @@
-/**
- * @format
- */
-
+globalThis.RNFB_SILENCE_MODULAR_DEPRECATION_WARNINGS = true; // Optional: silence warnings
 
 const setupBase64Polyfills = () => {
   const base64 = require('base-64');
   
-  // Multiple assignment approaches for maximum Hermes compatibility
   if (typeof global !== 'undefined') {
     global.atob = base64.decode;
     global.btoa = base64.encode;
@@ -16,23 +12,27 @@ const setupBase64Polyfills = () => {
     globalThis.atob = base64.decode;
     globalThis.btoa = base64.encode;
   }
-  
-  // Force assignment for Hermes engine
-  try {
-    // Direct global assignment
-    this.atob = base64.decode;
-    this.btoa = base64.encode;
-  } catch (e) {
-    console.warn('[POLYFILL] Direct assignment failed:', e);
-  }
-  
 };
 
-// Execute immediately before anything else
 setupBase64Polyfills();
 
-import {AppRegistry} from 'react-native';
+// ✅ v22 Modular API
+import { getApp } from '@react-native-firebase/app';
+import { getMessaging, setBackgroundMessageHandler } from '@react-native-firebase/messaging';
+
+const app = getApp();
+const messaging = getMessaging(app);
+
+setBackgroundMessageHandler(messaging, async remoteMessage => {
+  console.log('📱 Background message received:', remoteMessage);
+  
+  if (remoteMessage.data) {
+    console.log('📋 Background notification data:', remoteMessage.data);
+  }
+});
+
+import { AppRegistry } from 'react-native';
 import App from './App';
-import {name as appName} from './app.json';
+import { name as appName } from './app.json';
 
 AppRegistry.registerComponent(appName, () => App);

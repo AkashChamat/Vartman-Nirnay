@@ -1,145 +1,229 @@
-import React, {useEffect, useRef} from 'react';
+import React, {useEffect, useState} from 'react';
 import {
   StatusBar,
   SafeAreaView,
   StyleSheet,
   Platform,
   PermissionsAndroid,
-  AppState,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {AuthProvider} from './src/Auth/AuthContext';
 import AuthNavigator from './src/Auth/AuthNavigator';
-import NotificationHelper from './src/Components/NotificationHelper';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import {getTodayNotifications} from './src/util/apiCall';
+// ✅ v22 Modular API imports
+import {getToken} from '@react-native-firebase/messaging';
+import {getApp} from '@react-native-firebase/app';
+import {
+  getMessaging,
+  requestPermission,
+  AuthorizationStatus,
+  onMessage,
+  onNotificationOpenedApp,
+  getInitialNotification,
+} from '@react-native-firebase/messaging';
+import {navigateToNotifications} from './src/Components/NavigationService';
 
 const App = () => {
-  const intervalRef = useRef(null);
-  const appState = useRef(AppState.currentState);
+  const [notificationPermission, setNotificationPermission] = useState('unknown');
 
-  // Simple notification checker
-  const checkForNewNotifications = async () => {
+  // ⭐ DYNAMIC USER ID RETRIEVAL
+  const getCurrentUserId = async () => {
     try {
-      console.log('🔍 Checking for new notifications...');
+      const userDataStr = await AsyncStorage.getItem('userData');
+      if (userDataStr) {
+        const userData = JSON.parse(userDataStr);
+        return userData.id || userData.userId || null;
+      }
+      return null;
+    } catch (error) {
+      console.error('❌ Error getting user ID:', error);
+      return null;
+    }
+  };
+
+  // ⭐ ENHANCED PERMISSION REQUEST
+  async function requestUserPermission() {
+    const app = getApp();
+    const messaging = getMessaging(app);
+    const authStatus = await requestPermission(messaging);
+    const enabled =
+      authStatus === AuthorizationStatus.AUTHORIZED ||
+      authStatus === AuthorizationStatus.PROVISIONAL;
+
+    const status = enabled ? 'granted' : 'denied';
+    setNotificationPermission(status);
+    
+    if (enabled) {
+      console.log('✅ FCM Authorization status:', authStatus);
+    } else {
+      console.log('❌ FCM Authorization denied:', authStatus);
+    }
+    return enabled;
+  }
+
+  // ⭐ ENHANCED FCM TEST WITH DYNAMIC USER ID
+  const testFCMDirectly = async () => {
+    try {
+      console.log('🧪 Testing FCM setup...');
+
+      const app = getApp();
+      const messaging = getMessaging(app);
+      const currentToken = await getToken(messaging);
+
+      if (!currentToken) {
+        console.error('❌ No FCM token available!');
+        return;
+      }
+
+      console.log('📱 Current FCM Token:', currentToken);
+      console.log('🧪 Copy this token and test in Firebase Console:');
+      console.log('🧪', currentToken);
+
+      // ⭐ GET DYNAMIC USER ID
+      const userId = await getCurrentUserId();
+      if (userId) {
+        console.log(`🔍 Testing notification for user ID: ${userId}`);
+        console.log('✅ FCM token available for authenticated user');
+      } else {
+        console.log('⚠️  No user logged in - FCM token available but not linked to user');
+      }
+
+    } catch (error) {
+      console.error('❌ FCM Test Error:', error);
+    }
+  };
+
+  // ⭐ ENHANCED FOREGROUND MESSAGE HANDLER
+  const handleForegroundMessage = (remoteMessage) => {
+    console.log('📱 Foreground FCM message received:', remoteMessage);
+    
+    // Track notification received
+    if (remoteMessage.notification) {
+      console.log('🔔 Notification details:', {
+        title: remoteMessage.notification.title,
+        body: remoteMessage.notification.body
+      });
+    }
+    
+    // Let FCM handle the display automatically
+    // Or add custom in-app notification logic here if needed
+  };
+
+  // ⭐ ENHANCED BACKGROUND MESSAGE HANDLER
+  const handleBackgroundMessageOpen = (remoteMessage) => {
+    console.log('📱 App opened from background via notification:', remoteMessage);
+    
+    // Handle deep linking based on notification data
+    if (remoteMessage.data?.screen) {
+      setTimeout(() => {
+        navigateToNotifications();
+      }, 1000);
+    } else {
+      // Default action - open notifications screen
+      setTimeout(() => {
+        navigateToNotifications();
+      }, 1000);
+    }
+  };
+
+  // ⭐ TOKEN VALIDATION FUNCTION
+  const validateFCMSetup = async () => {
+    try {
+      const hasPermission = notificationPermission === 'granted';
+      const userId = await getCurrentUserId();
+      const app = getApp();
+      const messaging = getMessaging(app);
+      const token = await getToken(messaging);
+
+      console.log('🔍 FCM Setup Validation:');
+      console.log(`   - Permission: ${hasPermission ? '✅' : '❌'}`);
+      console.log(`   - User Logged In: ${userId ? '✅' : '❌'}`);
+      console.log(`   - FCM Token: ${token ? '✅' : '❌'}`);
       
-      const notifications = await getTodayNotifications();
-      const filteredNotifications = Array.isArray(notifications)
-        ? notifications.filter(
-            notification =>
-              notification.channels &&
-              notification.channels.toUpperCase().includes('NOTIFICATION'),
-          )
-        : [];
-
-      // Get previously shown notifications
-      const lastChecked = await AsyncStorage.getItem('lastNotificationIds');
-      const lastNotificationIds = lastChecked ? JSON.parse(lastChecked) : [];
-
-      // Find new notifications
-      const newNotifications = filteredNotifications.filter(
-        notification => !lastNotificationIds.includes(notification.id),
-      );
-
-      if (newNotifications.length > 0) {
-        console.log(`📱 Found ${newNotifications.length} new notifications`);
-        NotificationHelper.showMultipleNotifications(newNotifications);
-
-        // Update stored notification IDs
-        const currentIds = filteredNotifications.map(n => n.id);
-        await AsyncStorage.setItem(
-          'lastNotificationIds',
-          JSON.stringify(currentIds),
-        );
+      if (hasPermission && userId && token) {
+        console.log('🎉 FCM Setup is complete and ready!');
+      } else {
+        console.log('⚠️  FCM Setup incomplete - some features may not work');
       }
     } catch (error) {
-      console.error('❌ Error checking notifications:', error);
+      console.error('❌ FCM validation error:', error);
     }
-  };
-
-  // Start simple interval
-  const startNotificationChecker = () => {
-    if (intervalRef.current) {
-      clearInterval(intervalRef.current);
-    }
-    
-    intervalRef.current = setInterval(() => {
-      checkForNewNotifications();
-    }, 30000); // Check every 30 seconds
-    
-    console.log('✅ Notification checker started');
-  };
-
-  // Stop interval
-  const stopNotificationChecker = () => {
-    if (intervalRef.current) {
-      clearInterval(intervalRef.current);
-      intervalRef.current = null;
-    }
-    console.log('⏹️ Notification checker stopped');
   };
 
   useEffect(() => {
-    // Configure notifications
-    NotificationHelper.configure();
+    const initializeFCM = async () => {
+      // Request FCM permissions
+      const hasPermission = await requestUserPermission();
 
-    // Request permissions and start
-    const initializeApp = async () => {
-      let hasPermission = true;
-
-      // Request notification permission for Android 13+
+      // Request Android notification permission for API 33+
       if (Platform.OS === 'android' && Platform.Version >= 33) {
         try {
-          const result = await PermissionsAndroid.request(
-            PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS
+          const granted = await PermissionsAndroid.request(
+            PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS,
+            {
+              title: 'Notification Permission',
+              message: 'This app needs permission to show notifications',
+              buttonNeutral: 'Ask Me Later',
+              buttonNegative: 'Cancel',
+              buttonPositive: 'OK',
+            },
           );
-          hasPermission = result === 'granted';
-          console.log('🔔 Notification permission:', result);
+          console.log('🔔 Android notification permission result:', granted);
         } catch (error) {
-          console.log('❌ Permission error:', error);
-          hasPermission = false;
+          console.error('❌ Permission error:', error);
         }
       }
 
       if (hasPermission) {
-        // Start checking for notifications
-        startNotificationChecker();
+        console.log('🚀 FCM initialized successfully');
         
-        // Do initial check after 3 seconds
+        // Test FCM setup after initialization
         setTimeout(() => {
-          checkForNewNotifications();
+          testFCMDirectly();
         }, 3000);
+        
+        // Validate complete setup after user might be loaded
+        setTimeout(() => {
+          validateFCMSetup();
+        }, 5000);
       }
     };
 
-    // Handle app state changes
-    const handleAppStateChange = (nextAppState) => {
-      console.log('📱 App state:', appState.current, '→', nextAppState);
-      
-      if (appState.current.match(/inactive|background/) && nextAppState === 'active') {
-        // App came to foreground
-        console.log('🔄 App became active - restarting checker');
-        startNotificationChecker();
-        checkForNewNotifications();
-      } else if (nextAppState.match(/inactive|background/)) {
-        // App went to background - keep running (will work for a limited time)
-        console.log('🔄 App went to background - keeping checker active');
+    initializeFCM();
+
+    // ✅ FCM Message Listeners
+    const app = getApp();
+    const messaging = getMessaging(app);
+
+    // Enhanced message listeners
+    const unsubscribeForeground = onMessage(messaging, handleForegroundMessage);
+    const unsubscribeBackground = onNotificationOpenedApp(messaging, handleBackgroundMessageOpen);
+
+    // Handle app opened from quit state
+    getInitialNotification(messaging).then(remoteMessage => {
+      if (remoteMessage) {
+        console.log('📱 App opened from quit state via notification:', remoteMessage);
+        setTimeout(() => {
+          navigateToNotifications();
+        }, 2000);
       }
-      
-      appState.current = nextAppState;
-    };
+    });
 
-    // Initialize everything
-    initializeApp();
-    
-    // Listen for app state changes
-    const subscription = AppState.addEventListener('change', handleAppStateChange);
-
-    // Cleanup
     return () => {
-      subscription?.remove();
-      stopNotificationChecker();
+      unsubscribeForeground();
+      unsubscribeBackground();
     };
   }, []);
+
+  // ⭐ PERIODIC FCM HEALTH CHECK
+  useEffect(() => {
+    const healthCheckInterval = setInterval(() => {
+      if (notificationPermission === 'granted') {
+        validateFCMSetup();
+      }
+    }, 10 * 60 * 1000); // Every 10 minutes
+
+    return () => clearInterval(healthCheckInterval);
+  }, [notificationPermission]);
 
   return (
     <SafeAreaView style={styles.safeArea}>

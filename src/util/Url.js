@@ -47,8 +47,10 @@ export const bookpaymentUrl = `${baseUrl}/createBookPayment`;
 export const paidbooksUrl = `${baseUrl}/bookorders/user`;
 export const getAllBooksUrl = `${baseUrl}/getAllBooks`;
 export const saveAddressUrl = `${baseUrl}/saveAddress`;
-export const updateAddressUrl = `${baseUrl}/updateAddress`
-export const deleteAddressUrl = `${baseUrl}/deleteAddress`
-export const BookCategoryUrl = `${baseUrl}/getAllBkCategory`
-export const BookSubCategoryUrl = `${baseUrl}/getsubcategorybycategory`
-
+export const updateAddressUrl = `${baseUrl}/updateAddress`;
+export const deleteAddressUrl = `${baseUrl}/deleteAddress`;
+export const BookCategoryUrl = `${baseUrl}/getAllBkCategory`;
+export const BookSubCategoryUrl = `${baseUrl}/getsubcategorybycategory`;
+export const PersonalChatUrl = `${baseUrl}/getAllmobileNo`;
+export const GroupUrl = `${baseUrl}/getAllgroupLink`;
+export const PackagesUrl = `${baseUrl}/AllVPackages`;
