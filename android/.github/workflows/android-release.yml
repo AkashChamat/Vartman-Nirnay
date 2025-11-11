@@ -1,0 +1,61 @@
+name: Vartman Nirnay CI/CD release 
+
+on:
+  push:
+    branches:
+      - main   # Trigger on main branch push
+  workflow_dispatch: # Allows manual trigger
+
+jobs:
+  build-and-deploy:
+    name: Build & Deploy to Play Store
+    runs-on: ubuntu-latest
+
+    env:
+      PACKAGE_NAME: com.vartmannew
+      SERVICE_ACCOUNT_JSON: ${{ secrets.SERVICE_ACCOUNT_JSON }}
+
+    steps:
+      # 1. Checkout code
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      # 2. Setup JDK
+      - name: Setup JDK
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      # 3. Setup Android SDK
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v2
+
+      # 4. Cache Gradle dependencies
+      - name: Cache Gradle packages
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: |
+            gradle-
+
+      # 5. Build APK / AAB
+      - name: Build AAB
+        run: ./gradlew bundleRelease
+
+      # 6. Setup Fastlane
+      - name: Setup Fastlane
+        run: gem install fastlane
+
+      # 7. Upload to Google Play
+      - name: Upload to Google Play
+        run: |
+          echo "$SERVICE_ACCOUNT_JSON" > /tmp/service-account.json
+          fastlane supply \
+            --json_key /tmp/service-account.json \
+            --package_name $PACKAGE_NAME \
+            --skip_upload_images false \
+            --skip_upload_screenshots false
