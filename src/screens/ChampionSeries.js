@@ -140,24 +140,36 @@ const ChampionSeries = ({navigation}) => {
     return testPapers.length > 0 && testPapers[0].id === testPaper.id;
   };
 
-  const fetchTestPapers = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const response = await championpaper();
-      //  console.log('response', response);
-      const activePapers = (response.data || response)
-        .filter(paper => paper.status === true)
-        .sort((a, b) => b.id - a.id);
-      setTestPapers(activePapers);
-      await fetchAttemptCounts(activePapers);
-    } catch (err) {
-      setError('Failed to load test papers');
-      console.error('Error in fetchTestPapers:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
+const fetchTestPapers = async () => {
+  try {
+    setLoading(true);
+    setError(null);
+    const response = await championpaper();
+
+    // Filter only active papers
+    let activePapers = (response.data || response)
+      .filter(paper => paper.status === true)
+      .sort((a, b) => b.id - a.id);
+
+    // ✅ Remove only the "Marathi Grammar" type test
+    activePapers = activePapers.filter(
+      paper =>
+        !(
+          paper.testTitle?.includes('व्याकरण') ||
+          paper.testTitle?.toLowerCase().includes('marathi grammar')
+        )
+    );
+
+    setTestPapers(activePapers);
+    await fetchAttemptCounts(activePapers);
+  } catch (err) {
+    setError('Failed to load test papers');
+    console.error('Error in fetchTestPapers:', err);
+  } finally {
+    setLoading(false);
+  }
+};
+
 
   useEffect(() => {
     fetchTestPapers();

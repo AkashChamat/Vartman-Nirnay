@@ -37,8 +37,8 @@ android {
         applicationId "com.vartmannew"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 11 
-        versionName "1.1.0"  
+        versionCode 11
+        versionName "1.1.1"  
 
         ndk {
             // FIXED: Added x86_64 for 16KB page size support
@@ -85,13 +85,13 @@ android {
     }
     
     kotlinOptions {
-        jvmTarget = "21"
+        jvmTarget = "17"
     }
 
     // Add this for Android Gradle Plugin 8.x compatibility
     compileOptions {
-        sourceCompatibility JavaVersion.VERSION_21
-        targetCompatibility JavaVersion.VERSION_21
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
     }
 
     packaging {
