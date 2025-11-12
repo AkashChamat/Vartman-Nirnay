@@ -13,11 +13,11 @@ jobs:
       PACKAGE_NAME: com.vartmannew
 
     steps:
-      # 1. Checkout code
+      # 1️⃣ Checkout code
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # 2. Validate required secrets
+      # 2️⃣ Validate required secrets
       - name: Validate secrets
         run: |
           if [ -z "${{ secrets.SIGNING_KEY }}" ]; then
@@ -42,13 +42,13 @@ jobs:
           fi
           echo "✅ All secrets are set"
 
-      # 3. Setup Node.js
+      # 3️⃣ Setup Node.js
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '18'
 
-      # 4. Cache Node modules
+      # 4️⃣ Cache Node modules
       - name: Cache Node modules
         uses: actions/cache@v3
         with:
@@ -57,25 +57,25 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-node-
 
-      # 5. Install dependencies
+      # 5️⃣ Install dependencies
       - name: Install dependencies
         run: npm ci --legacy-peer-deps
 
-      # 6. Setup Java
+      # 6️⃣ Setup Java
       - name: Setup Java
         uses: actions/setup-java@v4
         with:
           distribution: 'zulu'
           java-version: '17'
 
-      # 7. Setup Android SDK
+      # 7️⃣ Setup Android SDK
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
       - name: Install Android SDK 35
         run: sdkmanager "platforms;android-35"
 
-      # 8. Cache Gradle
+      # 8️⃣ Cache Gradle
       - name: Cache Gradle
         uses: actions/cache@v3
         with:
@@ -85,26 +85,26 @@ jobs:
           key: gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
           restore-keys: gradle-
 
-      # 9. Make gradlew executable
+      # 9️⃣ Make gradlew executable
       - name: Make gradlew executable
         run: chmod +x ./android/gradlew
 
-      # 10. Decode signing key
+      # 🔟 Decode signing key
       - name: Decode keystore
         run: echo "${{ secrets.SIGNING_KEY }}" | base64 -d > android/app/upload-keystore.jks
 
-      # 11. Build Release AAB
+      # 1️⃣1️⃣ Build Release AAB
       - name: Build Release AAB
         run: |
           cd android
           ./gradlew bundleRelease
         env:
           MYAPP_UPLOAD_STORE_FILE: upload-keystore.jks
-          ALIAS: ${{ secrets.ALIAS }}
-          KEY_STORE_PASSWORD: ${{ secrets.KEY_STORE_PASSWORD }}
-          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          MYAPP_UPLOAD_KEY_ALIAS: ${{ secrets.ALIAS }}
+          MYAPP_UPLOAD_STORE_PASSWORD: ${{ secrets.KEY_STORE_PASSWORD }}
+          MYAPP_UPLOAD_KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
 
-      # 12. Verify AAB
+      # 1️⃣2️⃣ Verify AAB
       - name: Verify AAB
         run: |
           if [ ! -f "android/app/build/outputs/bundle/release/app-release.aab" ]; then
@@ -114,7 +114,7 @@ jobs:
           echo "✅ AAB created successfully"
           ls -la android/app/build/outputs/bundle/release/
 
-      # 13. Setup Ruby / Fastlane
+      # 1️⃣3️⃣ Setup Ruby / Fastlane
       - name: Setup Ruby
         uses: ruby/setup-ruby@v1
         with:
@@ -122,14 +122,14 @@ jobs:
           bundler-cache: true
           working-directory: android/fastlane
 
-      # 14. Install Fastlane dependencies
+      # 1️⃣4️⃣ Install Fastlane dependencies
       - name: Install Fastlane gems
         run: |
           cd android/fastlane
           bundle config path vendor/bundle
           bundle install --jobs 4 --retry 3
 
-      # 15. Deploy to Google Play (Internal Testing)
+      # 1️⃣5️⃣ Deploy to Google Play (Internal Testing)
       - name: Deploy to Play Store
         run: |
           cd android/fastlane
@@ -143,7 +143,7 @@ jobs:
           JSON_KEY_PATH: /tmp/play-store-key.json
           PACKAGE_NAME: com.vartmannew
 
-      # 16. Clean up sensitive files
+      # 1️⃣6️⃣ Clean up sensitive files
       - name: Cleanup
         if: always()
         run: |
