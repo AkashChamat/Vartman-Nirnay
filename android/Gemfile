@@ -1,5 +1,8 @@
 source "https://rubygems.org"
 
+# Core gems
+gem "abbrev"
+
 # Fastlane for automation
 gem "fastlane", ">= 2.228.0"
 
