@@ -64,3 +64,8 @@ yarn-error.log
 
 # testing
 /coverage
+
+# Ignore keystore and Play Store JSON
+android/app/upload-keystore.jks
+android/fastlane/*.json
+*.b64
