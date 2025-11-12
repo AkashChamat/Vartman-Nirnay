@@ -1,10 +1,10 @@
-name: Vartman Nirnay CI/CD release 
+name: Vartman Nirnay CI/CD release
 
 on:
   push:
     branches:
-      - main   # Trigger on main branch push
-  workflow_dispatch: # Allows manual trigger
+      - main
+  workflow_dispatch:
 
 jobs:
   build-and-deploy:
@@ -42,15 +42,27 @@ jobs:
           restore-keys: |
             gradle-
 
-      # 5. Build APK / AAB
+      # 5. Decode keystore file
+      - name: Decode keystore
+        run: echo "${{ secrets.SIGNING_KEY }}" | base64 -d > android/app/upload-keystore.jks
+
+      # 6. Set signing environment variables
+      - name: Set signing env vars
+        run: |
+          echo "SIGNING_KEY_PATH=android/app/upload-keystore.jks" >> $GITHUB_ENV
+          echo "SIGNING_PASSWORD=${{ secrets.KEYSTORE_PASSWORD }}" >> $GITHUB_ENV
+          echo "KEY_ALIAS=${{ secrets.KEY_ALIAS }}" >> $GITHUB_ENV
+          echo "KEY_PASSWORD=${{ secrets.KEY_PASSWORD }}" >> $GITHUB_ENV
+
+      # 7. Build APK / AAB
       - name: Build AAB
         run: ./gradlew bundleRelease
 
-      # 6. Setup Fastlane
+      # 8. Setup Fastlane
       - name: Setup Fastlane
         run: gem install fastlane
 
-      # 7. Upload to Google Play
+      # 9. Upload to Google Play
       - name: Upload to Google Play
         run: |
           echo "$SERVICE_ACCOUNT_JSON" > /tmp/service-account.json
@@ -59,3 +71,10 @@ jobs:
             --package_name $PACKAGE_NAME \
             --skip_upload_images false \
             --skip_upload_screenshots false
+
+      # 10. Clean up sensitive files
+      - name: Cleanup
+        if: always()
+        run: |
+          rm -f android/app/upload-keystore.jks
+          rm -f /tmp/service-account.json

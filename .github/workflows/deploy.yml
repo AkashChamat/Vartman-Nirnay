@@ -3,376 +3,141 @@ name: Deploy to Play Store
 on:
   push:
     branches: [ main ]
-  pull_request:
-    branches: [ main ]
+  workflow_dispatch: # allows manual trigger
 
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
     
+    env:
+      PACKAGE_NAME: com.vartmannew
+
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-      
-    - name: Validate required secrets
-      run: |
-        if [ -z "${{ secrets.SIGNING_KEY }}" ]; then
-          echo "❌ SIGNING_KEY secret is not set"
-          exit 1
-        fi
-        if [ -z "${{ secrets.PLAY_STORE_JSON_KEY }}" ]; then
-          echo "❌ PLAY_STORE_JSON_KEY secret is not set"
-          exit 1
-        fi
-        if [ -z "${{ secrets.ALIAS }}" ]; then
-          echo "❌ ALIAS secret is not set"
-          exit 1
-        fi
-        echo "✅ All required secrets are configured"
-        
-    - name: Setup Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: '18'
-        cache: 'npm'
-        
-    - name: Cache Node modules
-      uses: actions/cache@v3
-      with:
-        path: ~/.npm
-        key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
-        restore-keys: |
-          ${{ runner.os }}-node-
-          
-    - name: Install dependencies
-      run: npm ci --legacy-peer-deps
-      
-    - name: Setup Java
-      uses: actions/setup-java@v4
-      with:
-        distribution: 'zulu'
-        java-version: '17'
-        
-    - name: Setup Android SDK
-      uses: android-actions/setup-android@v3
+      # 1. Checkout code
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-    - name: Install Android SDK 35
-      run: sdkmanager "platforms;android-35"
-      
-    - name: Cache Gradle dependencies
-      uses: actions/cache@v3
-      with:
-        path: |
-          ~/.gradle/caches
-          ~/.gradle/wrapper
-        key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
-        restore-keys: |
-          ${{ runner.os }}-gradle-
-          
-    - name: Make gradlew executable
-      run: chmod +x ./android/gradlew
-      
-    - name: Decode keystore
-      run: |
-        echo "${{ secrets.SIGNING_KEY }}" | base64 -d > android/app/upload-keystore.jks
-        
-    - name: Build Release AAB
-      run: |
-        cd android
-        ./gradlew bundleRelease
-      env:
-        MYAPP_UPLOAD_STORE_FILE: upload-keystore.jks
-        ALIAS: ${{ secrets.ALIAS }}
-        KEY_STORE_PASSWORD: ${{ secrets.KEY_STORE_PASSWORD }}
-        KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
-        
-    - name: Verify AAB was created
-      run: |
-        if [ ! -f "android/app/build/outputs/bundle/release/app-release.aab" ]; then
-          echo "❌ AAB file not found"
-          exit 1
-        fi
-        echo "✅ AAB file created successfully"
-        ls -la android/app/build/outputs/bundle/release/
-        
-    - name: Setup Ruby for Fastlane
-      uses: ruby/setup-ruby@v1
-      with:
-        ruby-version: '3.2'
-        bundler-cache: true
-        working-directory: android/fastlane
-        
-    - name: Cache Ruby gems
-      uses: actions/cache@v3
-      with:
-        path: android/fastlane/vendor/bundle
-        key: ${{ runner.os }}-gems-${{ hashFiles('**/fastlane/Gemfile.lock') }}
-        restore-keys: |
-          ${{ runner.os }}-gems-
-          
-    - name: Install Fastlane dependencies
-      run: |
-        cd android/fastlane
-        bundle config path vendor/bundle
-        bundle install --jobs 4 --retry 3
-        
-    - name: Deploy to Play Store (Internal Testing)
-      if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-      run: |
-       cd android/fastlane
-       echo '${{ secrets.PLAY_STORE_JSON_KEY }}' > /tmp/play-store-key.json
-       AAB_PATH=$(realpath ../app/build/outputs/bundle/release/app-release.aab)
-       export AAB_PATH
-       export JSON_KEY_PATH=/tmp/play-store-key.json
-       export PACKAGE_NAME=com.vartmannew
-       bundle exec fastlane internal --verbose
-      env:
-       JSON_KEY_PATH: /tmp/play-store-key.json
-       PACKAGE_NAME: com.vartmannew
-        
-    - name: Build only (for PRs)
-      if: github.event_name == 'pull_request'
-      run: |
-        echo "✅ Build completed successfully for PR"
-        echo "📦 AAB size: $(du -h android/app/build/outputs/bundle/release/app-release.aab | cut -f1)"
-        
-    - name: Upload AAB as artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: app-release-aab
-        path: android/app/build/outputs/bundle/release/app-release.aab
-        retention-days: 30
-        
-    - name: Clean up sensitive files
-      if: always()
-      run: |
-        rm -f android/app/upload-keystore.jks
-        rm -f /tmp/play-store-key.json
-        
-    - name: Notify deployment status
-      if: always() && github.ref == 'refs/heads/main' && github.event_name == 'push'
-      run: |
-        if [ "${{ job.status }}" == "success" ]; then
-          echo "🎉 Deployment to Play Store Internal Testing successful!"
-        else
-          echo "❌ Deployment failed!"
-        fi
+      # 2. Validate required secrets
+      - name: Validate secrets
+        run: |
+          if [ -z "${{ secrets.SIGNING_KEY }}" ]; then
+            echo "❌ SIGNING_KEY secret is not set"
+            exit 1
+          fi
+          if [ -z "${{ secrets.PLAY_STORE_JSON_KEY }}" ]; then
+            echo "❌ PLAY_STORE_JSON_KEY secret is not set"
+            exit 1
+          fi
+          if [ -z "${{ secrets.ALIAS }}" ]; then
+            echo "❌ ALIAS secret is not set"
+            exit 1
+          fi
+          if [ -z "${{ secrets.KEY_STORE_PASSWORD }}" ]; then
+            echo "❌ KEY_STORE_PASSWORD secret is not set"
+            exit 1
+          fi
+          if [ -z "${{ secrets.KEY_PASSWORD }}" ]; then
+            echo "❌ KEY_PASSWORD secret is not set"
+            exit 1
+          fi
+          echo "✅ All secrets are set"
 
+      # 3. Setup Node.js
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
 
-# name: Deploy to Play Store and Generate OTA Bundle
+      # 4. Install dependencies
+      - name: Install dependencies
+        run: npm ci --legacy-peer-deps
 
-# on:
-#   push:
-#     branches: [ main ]
-#   pull_request:
-#     branches: [ main ]
+      # 5. Setup Java
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
 
-# jobs:
-#   build-and-deploy:
-#     runs-on: ubuntu-latest
+      # 6. Setup Android SDK
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
 
-#     steps:
-#     - name: Checkout code
-#       uses: actions/checkout@v4
+      - name: Install Android SDK 35
+        run: sdkmanager "platforms;android-35"
 
-#     - name: Validate required secrets
-#       run: |
-#         if [ -z "${{ secrets.SIGNING_KEY }}" ]; then
-#           echo "❌ SIGNING_KEY secret is not set"
-#           exit 1
-#         fi
-#         if [ -z "${{ secrets.PLAY_STORE_JSON_KEY }}" ]; then
-#           echo "❌ PLAY_STORE_JSON_KEY secret is not set"
-#           exit 1
-#         fi
-#         if [ -z "${{ secrets.ALIAS }}" ]; then
-#           echo "❌ ALIAS secret is not set"
-#           exit 1
-#         fi
-#         echo "✅ All required secrets are configured"
+      # 7. Cache Gradle
+      - name: Cache Gradle
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: gradle-
 
-#     - name: Setup Node.js
-#       uses: actions/setup-node@v4
-#       with:
-#         node-version: '18'
-#         cache: 'npm'
+      # 8. Make gradlew executable
+      - name: Make gradlew executable
+        run: chmod +x ./android/gradlew
 
-#     - name: Cache Node modules
-#       uses: actions/cache@v3
-#       with:
-#         path: ~/.npm
-#         key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
-#         restore-keys: |
-#           ${{ runner.os }}-node-
+      # 9. Decode signing key
+      - name: Decode keystore
+        run: echo "${{ secrets.SIGNING_KEY }}" | base64 -d > android/app/upload-keystore.jks
 
-#     - name: Install dependencies
-#       run: npm ci --legacy-peer-deps
+      # 10. Build Release AAB
+      - name: Build Release AAB
+        run: |
+          cd android
+          ./gradlew bundleRelease
+        env:
+          MYAPP_UPLOAD_STORE_FILE: upload-keystore.jks
+          ALIAS: ${{ secrets.ALIAS }}
+          KEY_STORE_PASSWORD: ${{ secrets.KEY_STORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
 
-#     - name: Setup Java
-#       uses: actions/setup-java@v4
-#       with:
-#         distribution: 'zulu'
-#         java-version: '17'
+      # 11. Verify AAB
+      - name: Verify AAB
+        run: |
+          if [ ! -f "android/app/build/outputs/bundle/release/app-release.aab" ]; then
+            echo "❌ AAB file not found"
+            exit 1
+          fi
+          echo "✅ AAB created successfully"
+          ls -la android/app/build/outputs/bundle/release/
 
-#     - name: Setup Android SDK
-#       uses: android-actions/setup-android@v3
+      # 12. Setup Ruby / Fastlane
+      - name: Setup Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.2'
+          bundler-cache: true
+          working-directory: android/fastlane
 
-#     - name: Install Android SDK 35
-#       run: sdkmanager "platforms;android-35"
+      # 13. Install Fastlane dependencies
+      - name: Install Fastlane gems
+        run: |
+          cd android/fastlane
+          bundle config path vendor/bundle
+          bundle install --jobs 4 --retry 3
 
-#     - name: Cache Gradle dependencies
-#       uses: actions/cache@v3
-#       with:
-#         path: |
-#           ~/.gradle/caches
-#           ~/.gradle/wrapper
-#         key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
-#         restore-keys: |
-#           ${{ runner.os }}-gradle-
+      # 14. Deploy to Google Play (Internal Testing)
+      - name: Deploy to Play Store
+        run: |
+          cd android/fastlane
+          echo "${{ secrets.PLAY_STORE_JSON_KEY }}" > /tmp/play-store-key.json
+          AAB_PATH=$(realpath ../app/build/outputs/bundle/release/app-release.aab)
+          export AAB_PATH
+          export JSON_KEY_PATH=/tmp/play-store-key.json
+          export PACKAGE_NAME=com.vartmannew
+          bundle exec fastlane internal --verbose
+        env:
+          JSON_KEY_PATH: /tmp/play-store-key.json
+          PACKAGE_NAME: com.vartmannew
 
-#     - name: Make gradlew executable
-#       run: chmod +x ./android/gradlew
-
-#     - name: Decode keystore
-#       run: |
-#         echo "${{ secrets.SIGNING_KEY }}" | base64 -d > android/app/upload-keystore.jks
-
-#     # NEW: Extract version from build.gradle
-#     - name: Extract version info
-#       id: version
-#       run: |
-#         VER_CODE=$(grep versionCode android/app/build.gradle | grep -o '[0-9]*')
-#         VER_NAME=$(grep versionName android/app/build.gradle | cut -d '"' -f2)
-#         echo "VERSION_CODE=$VER_CODE" >> $GITHUB_OUTPUT
-#         echo "VERSION_NAME=$VER_NAME" >> $GITHUB_OUTPUT
-#         echo "📱 Version: $VER_NAME ($VER_CODE)"
-
-#     # NEW: Generate React Native bundle for OTA updates
-#     - name: Generate React Native Bundle
-#       run: |
-#         npx react-native bundle --platform android --dev false --entry-file index.js --bundle-output android-release.bundle --assets-dest android-assets/
-#         zip -r bundle-${{ steps.version.outputs.VERSION_NAME }}.zip android-release.bundle android-assets/
-#         echo "📦 Bundle created: bundle-${{ steps.version.outputs.VERSION_NAME }}.zip"
-
-#     # NEW: Create version.json for OTA updates
-#     - name: Create version.json
-#       run: |
-#         cat <<EOF > version.json
-#         {
-#           "latestVersion": "${{ steps.version.outputs.VERSION_NAME }}",
-#           "versionCode": ${{ steps.version.outputs.VERSION_CODE }},
-#           "downloadUrl": "https://yourusername.github.io/vartman-updates/bundle-${{ steps.version.outputs.VERSION_NAME }}.zip",
-#           "mandatory": false,
-#           "releaseNotes": "Latest updates and improvements"
-#         }
-#         EOF
-#         echo "📋 Version file created"
-#         cat version.json
-
-#     - name: Build Release AAB
-#       run: |
-#         cd android
-#         ./gradlew bundleRelease
-#       env:
-#         MYAPP_UPLOAD_STORE_FILE: upload-keystore.jks
-#         ALIAS: ${{ secrets.ALIAS }}
-#         KEY_STORE_PASSWORD: ${{ secrets.KEY_STORE_PASSWORD }}
-#         KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
-
-#     - name: Verify AAB was created
-#       run: |
-#         if [ ! -f "android/app/build/outputs/bundle/release/app-release.aab" ]; then
-#           echo "❌ AAB file not found"
-#           exit 1
-#         fi
-#         echo "✅ AAB file created successfully"
-#         ls -la android/app/build/outputs/bundle/release/
-
-#     - name: Setup Ruby for Fastlane
-#       uses: ruby/setup-ruby@v1
-#       with:
-#         ruby-version: '3.2'
-#         bundler-cache: true
-#         working-directory: android/fastlane
-
-#     - name: Cache Ruby gems
-#       uses: actions/cache@v3
-#       with:
-#         path: android/fastlane/vendor/bundle
-#         key: ${{ runner.os }}-gems-${{ hashFiles('**/fastlane/Gemfile.lock') }}
-#         restore-keys: |
-#           ${{ runner.os }}-gems-
-
-#     - name: Install Fastlane dependencies
-#       run: |
-#         cd android/fastlane
-#         bundle config path vendor/bundle
-#         bundle install --jobs 4 --retry 3
-
-#     - name: Deploy to Play Store (Internal Testing)
-#       if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-#       run: |
-#         cd android/fastlane
-#         echo '${{ secrets.PLAY_STORE_JSON_KEY }}' > /tmp/play-store-key.json
-#         AAB_PATH=$(realpath ../app/build/outputs/bundle/release/app-release.aab)
-#         export AAB_PATH
-#         export JSON_KEY_PATH=/tmp/play-store-key.json
-#         export PACKAGE_NAME=com.vartmannew
-#         bundle exec fastlane internal --verbose
-#       env:
-#         JSON_KEY_PATH: /tmp/play-store-key.json
-#         PACKAGE_NAME: com.vartmannew
-
-#     # NEW: Deploy OTA files to GitHub Pages
-#     - name: Deploy OTA files to GitHub Pages
-#       if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-#       uses: peaceiris/actions-gh-pages@v3
-#       with:
-#         github_token: ${{ secrets.GITHUB_TOKEN }}
-#         publish_dir: .
-#         publish_branch: gh-pages
-#         keep_files: true
-#         include_files: |
-#           version.json
-#           bundle-*.zip
-
-#     - name: Build only (for PRs)
-#       if: github.event_name == 'pull_request'
-#       run: |
-#         echo "✅ Build completed successfully for PR"
-#         echo "📦 AAB size: $(du -h android/app/build/outputs/bundle/release/app-release.aab | cut -f1)"
-
-#     - name: Upload AAB as artifact
-#       uses: actions/upload-artifact@v4
-#       with:
-#         name: app-release-aab
-#         path: android/app/build/outputs/bundle/release/app-release.aab
-#         retention-days: 30
-
-#     # NEW: Upload OTA bundle as artifact
-#     - name: Upload OTA bundle as artifact
-#       uses: actions/upload-artifact@v4
-#       with:
-#         name: ota-bundle-${{ steps.version.outputs.VERSION_NAME }}
-#         path: |
-#           bundle-${{ steps.version.outputs.VERSION_NAME }}.zip
-#           version.json
-#         retention-days: 30
-
-#     - name: Clean up sensitive files
-#       if: always()
-#       run: |
-#         rm -f android/app/upload-keystore.jks
-#         rm -f /tmp/play-store-key.json
-
-#     - name: Notify deployment status
-#       if: always() && github.ref == 'refs/heads/main' && github.event_name == 'push'
-#       run: |
-#         if [ "${{ job.status }}" == "success" ]; then
-#           echo "🎉 Deployment to Play Store Internal Testing successful!"
-#           echo "📱 OTA bundle deployed to GitHub Pages"
-#         else
-#           echo "❌ Deployment failed!"
-#         fi
-
-
+      # 15. Clean up sensitive files
+      - name: Cleanup
+        if: always()
+        run: |
+          rm -f android/app/upload-keystore.jks
+          rm -f /tmp/play-store-key.json
