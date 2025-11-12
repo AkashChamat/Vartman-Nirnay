@@ -4,29 +4,32 @@ opt_out_usage
 default_platform(:android)
 
 platform :android do
-
+  ###########################################################
   # ✅ Pre-flight checks before any lane runs
+  ###########################################################
   before_all do
-    # AAB path
+    UI.message("🚀 Starting Fastlane deployment process...")
+
+    # Define AAB path (build output)
     aab_path = ENV['AAB_PATH'] || File.expand_path("../app/build/outputs/bundle/release/app-release.aab", __dir__)
     unless File.exist?(aab_path)
       UI.user_error!("❌ AAB file not found at #{aab_path}. Please build the project first.")
     end
     ENV['AAB_PATH'] = aab_path
 
-    # Play Store JSON key
+    # Play Store JSON key file
     json_key_path = ENV['JSON_KEY_PATH'] || File.expand_path("play-store-key.json", __dir__)
     unless File.exist?(json_key_path)
-      UI.user_error!("❌ Play Store JSON key not found at #{json_key_path}")
+      UI.user_error!("❌ Play Store JSON key not found at #{json_key_path}. Please ensure PLAY_STORE_JSON_KEY is set correctly.")
     end
     ENV['JSON_KEY_PATH'] = json_key_path
 
-    UI.success("✅ Pre-flight checks passed")
+    UI.success("✅ Pre-flight checks passed successfully.")
   end
 
-  ###############
-  # Deployment Lanes
-  ###############
+  ###########################################################
+  # 🚀 Deployment Lanes
+  ###########################################################
 
   desc "Deploy to Internal Testing"
   lane :internal do
@@ -92,9 +95,9 @@ platform :android do
     UI.success("🎉 Successfully deployed to Production!")
   end
 
-  ###############
-  # Promotion Lanes
-  ###############
+  ###########################################################
+  # 🔁 Promotion Lanes
+  ###########################################################
 
   desc "Promote Internal → Alpha"
   lane :promote_internal_to_alpha do
@@ -144,15 +147,14 @@ platform :android do
     UI.success("🎉 Promoted Beta → Production!")
   end
 
-  ###############
-  # Global Hooks
-  ###############
-
+  ###########################################################
+  # 🧹 Global Hooks
+  ###########################################################
   after_all do |lane|
-    UI.success("✅ Lane #{lane} completed successfully!")
+    UI.success("✅ Lane '#{lane}' completed successfully!")
   end
 
   error do |lane, exception|
-    UI.error("❌ Lane #{lane} failed with error: #{exception.message}")
+    UI.error("❌ Lane '#{lane}' failed with error: #{exception.message}")
   end
 end

@@ -1,4 +1,4 @@
-name: Vartman Nirnay CI/CD release
+name: Vartman Nirnay CI/CD Release
 
 on:
   push:
@@ -16,63 +16,105 @@ jobs:
       SERVICE_ACCOUNT_JSON: ${{ secrets.SERVICE_ACCOUNT_JSON }}
 
     steps:
-      # 1. Checkout code
+      # 1️⃣ Checkout repository
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
-      # 2. Setup JDK
+      # 2️⃣ Setup Node.js (for React Native)
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      # 3️⃣ Install JS dependencies
+      - name: Install dependencies
+        run: npm ci --legacy-peer-deps
+
+      # 4️⃣ Setup JDK
       - name: Setup JDK
-        uses: actions/setup-java@v3
+        uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: '17'
 
-      # 3. Setup Android SDK
+      # 5️⃣ Setup Android SDK
       - name: Setup Android SDK
-        uses: android-actions/setup-android@v2
+        uses: android-actions/setup-android@v3
 
-      # 4. Cache Gradle dependencies
-      - name: Cache Gradle packages
+      - name: Install Android SDK 35
+        run: sdkmanager "platforms;android-35"
+
+      # 6️⃣ Cache Gradle dependencies
+      - name: Cache Gradle
         uses: actions/cache@v3
         with:
           path: |
             ~/.gradle/caches
             ~/.gradle/wrapper
           key: gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
-          restore-keys: |
-            gradle-
+          restore-keys: gradle-
 
-      # 5. Decode keystore file
+      # 7️⃣ Make gradlew executable
+      - name: Make gradlew executable
+        run: chmod +x ./android/gradlew
+
+      # 8️⃣ Decode signing keystore
       - name: Decode keystore
         run: echo "${{ secrets.SIGNING_KEY }}" | base64 -d > android/app/upload-keystore.jks
 
-      # 6. Set signing environment variables
-      - name: Set signing env vars
+      # 9️⃣ Build Release AAB
+      - name: Build Release AAB
+        run: ./android/gradlew bundleRelease
+        env:
+          MYAPP_UPLOAD_STORE_FILE: android/app/upload-keystore.jks
+          MYAPP_UPLOAD_KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          MYAPP_UPLOAD_STORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          MYAPP_UPLOAD_KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+
+      # 🔟 Verify AAB output
+      - name: Verify AAB
         run: |
-          echo "SIGNING_KEY_PATH=android/app/upload-keystore.jks" >> $GITHUB_ENV
-          echo "SIGNING_PASSWORD=${{ secrets.KEYSTORE_PASSWORD }}" >> $GITHUB_ENV
-          echo "KEY_ALIAS=${{ secrets.KEY_ALIAS }}" >> $GITHUB_ENV
-          echo "KEY_PASSWORD=${{ secrets.KEY_PASSWORD }}" >> $GITHUB_ENV
+          if [ ! -f "android/app/build/outputs/bundle/release/app-release.aab" ]; then
+            echo "❌ AAB file not found!"
+            exit 1
+          fi
+          echo "✅ AAB created successfully"
+          ls -la android/app/build/outputs/bundle/release/
 
-      # 7. Build APK / AAB
-      - name: Build AAB
-        run: ./gradlew bundleRelease
+      # 1️⃣1️⃣ Setup Ruby (for Fastlane)
+      - name: Setup Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.2'
+          bundler-cache: true
+          working-directory: android
 
-      # 8. Setup Fastlane
-      - name: Setup Fastlane
-        run: gem install fastlane
-
-      # 9. Upload to Google Play
-      - name: Upload to Google Play
+      # 1️⃣2️⃣ Install Fastlane
+      - name: Install Fastlane
         run: |
-          echo "$SERVICE_ACCOUNT_JSON" > /tmp/service-account.json
-          fastlane supply \
-            --json_key /tmp/service-account.json \
-            --package_name $PACKAGE_NAME \
-            --skip_upload_images false \
-            --skip_upload_screenshots false
+          cd android
+          gem install bundler
+          bundle config path vendor/bundle
+          bundle install --jobs 4 --retry 3
 
-      # 10. Clean up sensitive files
+      # 1️⃣3️⃣ Deploy to Google Play (Internal Track)
+      - name: Deploy to Play Store
+        run: |
+          cd android
+          echo "${{ secrets.SERVICE_ACCOUNT_JSON }}" > /tmp/service-account.json
+          export JSON_KEY_PATH=/tmp/service-account.json
+          export PACKAGE_NAME=com.vartmannew
+          export AAB_PATH=$(realpath app/build/outputs/bundle/release/app-release.aab)
+          export FASTLANE_SKIP_UPDATE_CHECK=true
+          export FASTLANE_DISABLE_COLORS=true
+          export CI=true
+          bundle exec fastlane internal --verbose
+        env:
+          JSON_KEY_PATH: /tmp/service-account.json
+          PACKAGE_NAME: com.vartmannew
+
+      # 1️⃣4️⃣ Cleanup sensitive files
       - name: Cleanup
         if: always()
         run: |
