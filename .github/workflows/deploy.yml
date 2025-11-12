@@ -47,27 +47,35 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '18'
-          cache: 'npm'
 
-      # 4. Install dependencies
+      # 4. Cache Node modules
+      - name: Cache Node modules
+        uses: actions/cache@v3
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-
+
+      # 5. Install dependencies
       - name: Install dependencies
         run: npm ci --legacy-peer-deps
 
-      # 5. Setup Java
+      # 6. Setup Java
       - name: Setup Java
         uses: actions/setup-java@v4
         with:
           distribution: 'zulu'
           java-version: '17'
 
-      # 6. Setup Android SDK
+      # 7. Setup Android SDK
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
       - name: Install Android SDK 35
         run: sdkmanager "platforms;android-35"
 
-      # 7. Cache Gradle
+      # 8. Cache Gradle
       - name: Cache Gradle
         uses: actions/cache@v3
         with:
@@ -77,15 +85,15 @@ jobs:
           key: gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
           restore-keys: gradle-
 
-      # 8. Make gradlew executable
+      # 9. Make gradlew executable
       - name: Make gradlew executable
         run: chmod +x ./android/gradlew
 
-      # 9. Decode signing key
+      # 10. Decode signing key
       - name: Decode keystore
         run: echo "${{ secrets.SIGNING_KEY }}" | base64 -d > android/app/upload-keystore.jks
 
-      # 10. Build Release AAB
+      # 11. Build Release AAB
       - name: Build Release AAB
         run: |
           cd android
@@ -96,7 +104,7 @@ jobs:
           KEY_STORE_PASSWORD: ${{ secrets.KEY_STORE_PASSWORD }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
 
-      # 11. Verify AAB
+      # 12. Verify AAB
       - name: Verify AAB
         run: |
           if [ ! -f "android/app/build/outputs/bundle/release/app-release.aab" ]; then
@@ -106,7 +114,7 @@ jobs:
           echo "✅ AAB created successfully"
           ls -la android/app/build/outputs/bundle/release/
 
-      # 12. Setup Ruby / Fastlane
+      # 13. Setup Ruby / Fastlane
       - name: Setup Ruby
         uses: ruby/setup-ruby@v1
         with:
@@ -114,14 +122,14 @@ jobs:
           bundler-cache: true
           working-directory: android/fastlane
 
-      # 13. Install Fastlane dependencies
+      # 14. Install Fastlane dependencies
       - name: Install Fastlane gems
         run: |
           cd android/fastlane
           bundle config path vendor/bundle
           bundle install --jobs 4 --retry 3
 
-      # 14. Deploy to Google Play (Internal Testing)
+      # 15. Deploy to Google Play (Internal Testing)
       - name: Deploy to Play Store
         run: |
           cd android/fastlane
@@ -135,7 +143,7 @@ jobs:
           JSON_KEY_PATH: /tmp/play-store-key.json
           PACKAGE_NAME: com.vartmannew
 
-      # 15. Clean up sensitive files
+      # 16. Clean up sensitive files
       - name: Cleanup
         if: always()
         run: |
