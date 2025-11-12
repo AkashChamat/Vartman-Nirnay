@@ -1,193 +1,127 @@
-default_platform(:android)
+name: Deploy to Play Store
 
-platform :android do
-  before_all do
-    # Ensure the AAB file exists
-    aab_path = File.expand_path("../app/build/outputs/bundle/release/app-release.aab", __dir__)
-    unless File.exist?(aab_path)
-      UI.user_error!("❌ AAB file not found at #{aab_path}. Please build the project first.")
-    end
-    ENV['AAB_PATH'] = aab_path
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch: # manual trigger
 
-    # Ensure Play Store key file exists
-    json_key_path = ENV['JSON_KEY_PATH'] || File.expand_path("play-store-key.json", __dir__)
-    unless File.exist?(json_key_path)
-      UI.user_error!("❌ Play Store JSON key not found at #{json_key_path}")
-    end
-    ENV['JSON_KEY_PATH'] = json_key_path
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
 
-    UI.success("✅ Pre-flight checks passed")
-  end
+    env:
+      PACKAGE_NAME: com.vartmannew
 
-  desc "Deploy to Play Store Internal Testing"
-  lane :internal do
-    UI.message("🚀 Deploying to Internal Testing...")
+    steps:
+      # 1️⃣ Checkout code
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-    upload_to_play_store(
-      track: 'internal',
-      json_key: ENV['JSON_KEY_PATH'],
-      aab: ENV['AAB_PATH'],
-      package_name: ENV['PACKAGE_NAME'] || 'com.vartmannew',
-      skip_upload_apk: true,
-      skip_upload_metadata: true,
-      skip_upload_images: true,
-      skip_upload_screenshots: true,
-      release_status: 'completed',
-      timeout: 300
-    )
+      # 2️⃣ Validate required secrets
+      - name: Validate secrets
+        run: |
+          if [ -z "${{ secrets.SIGNING_KEY }}" ]; then
+            echo "❌ SIGNING_KEY secret is not set"
+            exit 1
+          fi
+          if [ -z "${{ secrets.PLAY_STORE_JSON_KEY }}" ]; then
+            echo "❌ PLAY_STORE_JSON_KEY secret is not set"
+            exit 1
+          fi
+          if [ -z "${{ secrets.ALIAS }}" ]; then
+            echo "❌ ALIAS secret is not set"
+            exit 1
+          fi
+          if [ -z "${{ secrets.KEY_STORE_PASSWORD }}" ]; then
+            echo "❌ KEY_STORE_PASSWORD secret is not set"
+            exit 1
+          fi
+          if [ -z "${{ secrets.KEY_PASSWORD }}" ]; then
+            echo "❌ KEY_PASSWORD secret is not set"
+            exit 1
+          fi
+          echo "✅ All secrets are set"
 
-    UI.success("🎉 Successfully deployed to Internal Testing!")
-  end
+      # 3️⃣ Setup Node.js
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
 
-  desc "Deploy to Play Store Alpha Testing"
-  lane :alpha do
-    UI.message("🚀 Deploying to Alpha Testing...")
+      # 4️⃣ Install dependencies
+      - name: Install dependencies
+        run: npm ci --legacy-peer-deps
 
-    upload_to_play_store(
-      track: 'alpha',
-      json_key: ENV['JSON_KEY_PATH'],
-      aab: ENV['AAB_PATH'],
-      package_name: ENV['PACKAGE_NAME'] || 'com.vartmannew',
-      skip_upload_apk: true,
-      skip_upload_metadata: true,
-      skip_upload_images: true,
-      skip_upload_screenshots: true,
-      release_status: 'completed',
-      timeout: 300
-    )
+      # 5️⃣ Setup Java
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
 
-    UI.success("🎉 Successfully deployed to Alpha Testing!")
-  end
+      # 6️⃣ Setup Android SDK
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+      - name: Install Android SDK 35
+        run: sdkmanager "platforms;android-35"
 
-  desc "Deploy to Play Store Beta Testing"
-  lane :beta do
-    UI.message("🚀 Deploying to Beta Testing...")
+      # 7️⃣ Make gradlew executable
+      - name: Make gradlew executable
+        run: chmod +x ./android/gradlew
 
-    upload_to_play_store(
-      track: 'beta',
-      json_key: ENV['JSON_KEY_PATH'],
-      aab: ENV['AAB_PATH'],
-      package_name: ENV['PACKAGE_NAME'] || 'com.vartmannew',
-      skip_upload_apk: true,
-      skip_upload_metadata: true,
-      skip_upload_images: true,
-      skip_upload_screenshots: true,
-      release_status: 'completed',
-      timeout: 300
-    )
+      # 8️⃣ Decode signing key
+      - name: Decode keystore
+        run: echo "${{ secrets.SIGNING_KEY }}" | base64 -d > android/app/upload-keystore.jks
 
-    UI.success("🎉 Successfully deployed to Beta Testing!")
-  end
+      # 9️⃣ Build Release AAB
+      - name: Build Release AAB
+        run: |
+          cd android
+          ./gradlew bundleRelease
+        env:
+          MYAPP_UPLOAD_STORE_FILE: upload-keystore.jks
+          MYAPP_UPLOAD_KEY_ALIAS: ${{ secrets.ALIAS }}
+          MYAPP_UPLOAD_STORE_PASSWORD: ${{ secrets.KEY_STORE_PASSWORD }}
+          MYAPP_UPLOAD_KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
 
-  desc "Deploy to Play Store Production"
-  lane :production do
-    UI.message("🚀 Deploying to Production...")
-    UI.confirm("⚠️ Are you sure you want to deploy to Production?")
+      # 🔟 Verify AAB
+      - name: Verify AAB
+        run: |
+          if [ ! -f "android/app/build/outputs/bundle/release/app-release.aab" ]; then
+            echo "❌ AAB file not found"
+            exit 1
+          fi
+          echo "✅ AAB created successfully"
+          ls -la android/app/build/outputs/bundle/release/
 
-    upload_to_play_store(
-      track: 'production',
-      json_key: ENV['JSON_KEY_PATH'],
-      aab: ENV['AAB_PATH'],
-      package_name: ENV['PACKAGE_NAME'] || 'com.vartmannew',
-      skip_upload_apk: true,
-      skip_upload_metadata: true,
-      skip_upload_images: true,
-      skip_upload_screenshots: true,
-      release_status: 'completed',
-      timeout: 300
-    )
+      # 1️⃣1️⃣ Setup Ruby / Fastlane
+      - name: Setup Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.2'
+          bundler-cache: true
+          working-directory: android/fastlane
 
-    UI.success("🎉 Successfully deployed to Production!")
-  end
+      # 1️⃣2️⃣ Install Fastlane gems
+      - name: Install Fastlane gems
+        run: |
+          cd android/fastlane
+          bundle config path vendor/bundle
+          bundle install --jobs 4 --retry 3
 
-  desc "Promote from Internal to Alpha"
-  lane :promote_internal_to_alpha do
-    UI.message("🔄 Promoting from Internal to Alpha...")
+      # 1️⃣3️⃣ Deploy to Play Store (Internal Testing)
+      - name: Deploy to Play Store
+        run: |
+          cd android/fastlane
+          echo "${{ secrets.PLAY_STORE_JSON_KEY }}" > /tmp/play-store-key.json
+          export JSON_KEY_PATH=/tmp/play-store-key.json
+          export AAB_PATH=$(realpath ../app/build/outputs/bundle/release/app-release.aab)
+          export PACKAGE_NAME=com.vartmannew
+          bundle exec fastlane internal --verbose
 
-    upload_to_play_store(
-      track: 'internal',
-      track_promote_to: 'alpha',
-      json_key: ENV['JSON_KEY_PATH'],
-      package_name: ENV['PACKAGE_NAME'] || 'com.vartmannew',
-      skip_upload_apk: true,
-      skip_upload_aab: true,
-      skip_upload_metadata: true,
-      skip_upload_images: true,
-      skip_upload_screenshots: true,
-      timeout: 300
-    )
-
-    UI.success("🎉 Successfully promoted to Alpha!")
-  end
-
-  desc "Promote from Alpha to Beta"
-  lane :promote_alpha_to_beta do
-    UI.message("🔄 Promoting from Alpha to Beta...")
-
-    upload_to_play_store(
-      track: 'alpha',
-      track_promote_to: 'beta',
-      json_key: ENV['JSON_KEY_PATH'],
-      package_name: ENV['PACKAGE_NAME'] || 'com.vartmannew',
-      skip_upload_apk: true,
-      skip_upload_aab: true,
-      skip_upload_metadata: true,
-      skip_upload_images: true,
-      skip_upload_screenshots: true,
-      timeout: 300
-    )
-
-    UI.success("🎉 Successfully promoted to Beta!")
-  end
-
-  desc "Promote from Beta to Production"
-  lane :promote_beta_to_production do
-    UI.message("🔄 Promoting from Beta to Production...")
-    UI.confirm("⚠️ Are you sure you want to promote to Production?")
-
-    upload_to_play_store(
-      track: 'beta',
-      track_promote_to: 'production',
-      json_key: ENV['JSON_KEY_PATH'],
-      package_name: ENV['PACKAGE_NAME'] || 'com.vartmannew',
-      skip_upload_apk: true,
-      skip_upload_aab: true,
-      skip_upload_metadata: true,
-      skip_upload_images: true,
-      skip_upload_screenshots: true,
-      timeout: 300
-    )
-
-    UI.success("🎉 Successfully promoted to Production!")
-  end
-
-  desc "Get app info from Play Store"
-  lane :app_info do
-    UI.message("📱 Fetching app info from Play Store...")
-
-    version_info = google_play_track_version_codes(
-      json_key: ENV['JSON_KEY_PATH'],
-      package_name: ENV['PACKAGE_NAME'] || 'com.vartmannew'
-    )
-
-    UI.message("Current version codes:")
-    version_info.each do |track, versions|
-      UI.message("#{track}: #{versions}")
-    end
-  end
-
-  desc "Increment version code"
-  lane :increment_version do
-    increment_version_code(
-      gradle_file_path: "../app/build.gradle"
-    )
-  end
-
-  after_all do |lane|
-    UI.success("✅ Lane #{lane} completed successfully!")
-  end
-
-  error do |lane, exception|
-    UI.error("❌ Lane #{lane} failed with error: #{exception.message}")
-  end
-end
+      # 1️⃣4️⃣ Cleanup sensitive files
+      - name: Cleanup
+        if: always()
+        run: |
+          rm -f android/app/upload-keystore.jks
+          rm -f /tmp/play-store-key.json

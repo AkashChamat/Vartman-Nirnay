@@ -1,0 +1,19 @@
+current directory: C:/PJSOFTECH/vartman/android/fastlane/vendor/bundle/ruby/3.4.0/gems/nkf-0.2.0/ext/nkf
+D:/Ruby34-x64/bin/ruby.exe extconf.rb
+creating Makefile
+
+current directory: C:/PJSOFTECH/vartman/android/fastlane/vendor/bundle/ruby/3.4.0/gems/nkf-0.2.0/ext/nkf
+make DESTDIR\= sitearchdir\=./.gem.20251112-9584-dcj5s8 sitelibdir\=./.gem.20251112-9584-dcj5s8 clean
+
+current directory: C:/PJSOFTECH/vartman/android/fastlane/vendor/bundle/ruby/3.4.0/gems/nkf-0.2.0/ext/nkf
+make DESTDIR\= sitearchdir\=./.gem.20251112-9584-dcj5s8 sitelibdir\=./.gem.20251112-9584-dcj5s8
+generating nkf-x64-mingw-ucrt.def
+compiling nkf.c
+linking shared-object nkf.so
+
+current directory: C:/PJSOFTECH/vartman/android/fastlane/vendor/bundle/ruby/3.4.0/gems/nkf-0.2.0/ext/nkf
+make DESTDIR\= sitearchdir\=./.gem.20251112-9584-dcj5s8 sitelibdir\=./.gem.20251112-9584-dcj5s8 install
+/usr/bin/install -c -m 0755 nkf.so ./.gem.20251112-9584-dcj5s8
+
+current directory: C:/PJSOFTECH/vartman/android/fastlane/vendor/bundle/ruby/3.4.0/gems/nkf-0.2.0/ext/nkf
+make DESTDIR\= sitearchdir\=./.gem.20251112-9584-dcj5s8 sitelibdir\=./.gem.20251112-9584-dcj5s8 clean

@@ -1,0 +1,20 @@
+current directory: C:/PJSOFTECH/vartman/android/fastlane/vendor/bundle/ruby/3.4.0/gems/sysrandom-1.0.5/ext/sysrandom
+D:/Ruby34-x64/bin/ruby.exe extconf.rb
+creating Makefile
+
+current directory: C:/PJSOFTECH/vartman/android/fastlane/vendor/bundle/ruby/3.4.0/gems/sysrandom-1.0.5/ext/sysrandom
+make DESTDIR\= sitearchdir\=./.gem.20251112-9584-ta2arw sitelibdir\=./.gem.20251112-9584-ta2arw clean
+
+current directory: C:/PJSOFTECH/vartman/android/fastlane/vendor/bundle/ruby/3.4.0/gems/sysrandom-1.0.5/ext/sysrandom
+make DESTDIR\= sitearchdir\=./.gem.20251112-9584-ta2arw sitelibdir\=./.gem.20251112-9584-ta2arw
+generating sysrandom_ext-x64-mingw-ucrt.def
+compiling randombytes_sysrandom.c
+compiling sysrandom_ext.c
+linking shared-object sysrandom_ext.so
+
+current directory: C:/PJSOFTECH/vartman/android/fastlane/vendor/bundle/ruby/3.4.0/gems/sysrandom-1.0.5/ext/sysrandom
+make DESTDIR\= sitearchdir\=./.gem.20251112-9584-ta2arw sitelibdir\=./.gem.20251112-9584-ta2arw install
+/usr/bin/install -c -m 0755 sysrandom_ext.so ./.gem.20251112-9584-ta2arw
+
+current directory: C:/PJSOFTECH/vartman/android/fastlane/vendor/bundle/ruby/3.4.0/gems/sysrandom-1.0.5/ext/sysrandom
+make DESTDIR\= sitearchdir\=./.gem.20251112-9584-ta2arw sitelibdir\=./.gem.20251112-9584-ta2arw clean

@@ -1,0 +1,24 @@
+current directory: C:/PJSOFTECH/vartman/android/fastlane/vendor/bundle/ruby/3.4.0/gems/json-2.12.2/ext/json/ext/parser
+D:/Ruby34-x64/bin/ruby.exe extconf.rb
+checking for rb_enc_interned_str() in ruby.h... yes
+checking for rb_hash_new_capa() in ruby.h... yes
+checking for rb_hash_bulk_insert() in ruby.h... yes
+checking for strnlen() in string.h... yes
+checking for whether -std=c99 is accepted as CFLAGS... yes
+creating Makefile
+
+current directory: C:/PJSOFTECH/vartman/android/fastlane/vendor/bundle/ruby/3.4.0/gems/json-2.12.2/ext/json/ext/parser
+make DESTDIR\= sitearchdir\=./.gem.20251112-9584-jwwn45 sitelibdir\=./.gem.20251112-9584-jwwn45 clean
+
+current directory: C:/PJSOFTECH/vartman/android/fastlane/vendor/bundle/ruby/3.4.0/gems/json-2.12.2/ext/json/ext/parser
+make DESTDIR\= sitearchdir\=./.gem.20251112-9584-jwwn45 sitelibdir\=./.gem.20251112-9584-jwwn45
+generating parser-x64-mingw-ucrt.def
+compiling parser.c
+linking shared-object json/ext/parser.so
+
+current directory: C:/PJSOFTECH/vartman/android/fastlane/vendor/bundle/ruby/3.4.0/gems/json-2.12.2/ext/json/ext/parser
+make DESTDIR\= sitearchdir\=./.gem.20251112-9584-jwwn45 sitelibdir\=./.gem.20251112-9584-jwwn45 install
+/usr/bin/install -c -m 0755 parser.so ./.gem.20251112-9584-jwwn45/json/ext
+
+current directory: C:/PJSOFTECH/vartman/android/fastlane/vendor/bundle/ruby/3.4.0/gems/json-2.12.2/ext/json/ext/parser
+make DESTDIR\= sitearchdir\=./.gem.20251112-9584-jwwn45 sitelibdir\=./.gem.20251112-9584-jwwn45 clean
