@@ -1,6 +1,7 @@
 apply plugin: "com.android.application"
 apply plugin: "org.jetbrains.kotlin.android"
 apply plugin: "com.facebook.react"
+apply plugin: 'com.google.gms.google-services' // Firebase plugin
 
 def enableHermes = true
 def jscFlavor = 'org.webkit:android-jsc:+'
@@ -24,14 +25,13 @@ android {
         applicationId "com.vartmannew"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 21
+        versionCode 22
         versionName "1.1.1"
 
         ndk {
             abiFilters "armeabi-v7a", "arm64-v8a", "x86_64"
         }
 
-        // Default manifest placeholder
         manifestPlaceholders = [
             removeAdIdPermission: "keep"
         ]
@@ -51,7 +51,7 @@ android {
             keyPassword MYAPP_UPLOAD_KEY_PASSWORD
         }
         internal {
-            initWith(release) // internal builds must be signed with release key for Play Store
+            initWith(release) // Internal builds signed with release key
         }
     }
 
@@ -63,17 +63,15 @@ android {
             signingConfig signingConfigs.release
             minifyEnabled enableProguardInReleaseBuilds
             shrinkResources false
-            proguardFiles getDefaultProguardFile("proguard-android-optimize.txt"),
-                    "proguard-rules.pro"
+            proguardFiles getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro"
         }
         internal {
             initWith(release)
             signingConfig signingConfigs.internal
-            // Remove AD_ID permission for internal builds
             manifestPlaceholders = [
                 removeAdIdPermission: "remove"
             ]
-            matchingFallbacks = ['release'] // fix variant mismatch
+            matchingFallbacks = ['release']
         }
     }
 
@@ -137,6 +135,3 @@ dependencies {
 apply from: file("../../node_modules/@react-native-community/cli-platform-android/native_modules.gradle")
 applyNativeModulesAppBuildGradle(project)
 apply from: "../../node_modules/react-native-vector-icons/fonts.gradle"
-
-// Firebase plugin
-apply plugin: 'com.google.gms.google-services'
