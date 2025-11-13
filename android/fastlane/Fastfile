@@ -7,32 +7,48 @@ platform :android do
   before_all do
     UI.message("🚀 Starting Fastlane deployment process...")
 
-    ENV['JSON_KEY_PATH'] ||= File.expand_path("play-store-key.json", __dir__)
+    # Path to Play Store service account JSON (works on Windows/Linux/Mac)
+    ENV['JSON_KEY_PATH'] ||= File.join(__dir__, "play-store-key.json")
+    UI.message("Using JSON key: #{ENV['JSON_KEY_PATH']}")
     unless File.exist?(ENV['JSON_KEY_PATH'])
       UI.user_error!("❌ Play Store JSON key not found at #{ENV['JSON_KEY_PATH']}")
     end
 
-    ENV['GRADLE_WRAPPER'] ||= File.expand_path(Gem.win_platform? ? "gradlew.bat" : "gradlew", "../")
+    # Gradle wrapper path
+    ENV['GRADLE_WRAPPER'] ||= File.expand_path("../gradlew", __dir__)
     ENV['PROJECT_DIR'] ||= File.expand_path("../", __dir__)
     ENV['PACKAGE_NAME'] ||= "com.vartmannew"
   end
 
-  # Build and upload helper
+  # Helper to build and upload AAB
   def build_and_upload(track, skip_metadata: false, build_type: "release")
     UI.header("📦 Building and deploying #{track} (#{build_type})")
 
+    # Use release variant for internal builds
+    gradle_build_type = build_type.downcase == "internal" ? "release" : build_type.downcase
+
+    UI.message("Gradle build type: #{gradle_build_type}")
+
+    # Build the AAB
     gradle(
       task: "bundle",
-      build_type: build_type.capitalize,
+      build_type: gradle_build_type.capitalize,
       project_dir: ENV['PROJECT_DIR'],
       gradle_path: ENV['GRADLE_WRAPPER']
     )
 
-    aab_path = File.join(ENV['PROJECT_DIR'], "app/build/outputs/bundle/#{build_type}/app-#{build_type}.aab")
+    # Path to AAB file
+    aab_path = File.join(
+      ENV['PROJECT_DIR'],
+      "app/build/outputs/bundle/#{gradle_build_type}/app-#{gradle_build_type}.aab"
+    )
+    UI.message("Looking for AAB at: #{aab_path}")
+
     unless File.exist?(aab_path)
       UI.user_error!("❌ AAB file not found at #{aab_path}")
     end
 
+    # Upload to Play Store
     upload_to_play_store(
       track: track,
       json_key: ENV['JSON_KEY_PATH'],
@@ -48,24 +64,28 @@ platform :android do
     UI.success("🎉 Successfully deployed to #{track}")
   end
 
+  # Lane: Internal Testing
   desc "Deploy to Internal Testing"
   lane :internal do
     build_and_upload('internal', skip_metadata: true, build_type: "internal")
   end
 
+  # Lane: Alpha
   desc "Deploy to Alpha"
   lane :alpha do
-    build_and_upload('alpha')
+    build_and_upload('alpha', skip_metadata: false, build_type: "release")
   end
 
+  # Lane: Beta
   desc "Deploy to Beta"
   lane :beta do
-    build_and_upload('beta')
+    build_and_upload('beta', skip_metadata: false, build_type: "release")
   end
 
+  # Lane: Production
   desc "Deploy to Production"
   lane :production do
-    build_and_upload('production')
+    build_and_upload('production', skip_metadata: false, build_type: "release")
   end
 
   after_all do |lane|

@@ -114,6 +114,7 @@ const LoginScreen = ({navigation}) => {
     'Banking',
     'Saralseva',
     'Railway',
+    'Police Bharati',
     'Army Bharati',
     'SSC Exam',
     'Other',
