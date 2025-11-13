@@ -24,24 +24,28 @@ platform :android do
   def build_and_upload(track, skip_metadata: false, build_type: "release")
     UI.header("📦 Building and deploying #{track} (#{build_type})")
 
-    # Use release variant for internal builds
+    # Determine Gradle build type
     gradle_build_type = build_type.downcase == "internal" ? "release" : build_type.downcase
     UI.message("Gradle build type: #{gradle_build_type}")
 
-    # Ensure AD_ID permission is included
-    manifest_path = File.join(ENV['PROJECT_DIR'], "app", "src", "main", "AndroidManifest.xml")
-    UI.message("📋 Checking AD_ID permission in manifest: #{manifest_path}")
-    unless File.read(manifest_path).include?("com.google.android.gms.permission.AD_ID")
-      UI.user_error!("❌ AD_ID permission missing in AndroidManifest.xml!")
-    end
-
-    # Build the AAB
+    # Build the AAB first to generate the merged manifest
     gradle(
       task: "bundle",
       build_type: gradle_build_type.capitalize,
       project_dir: ENV['PROJECT_DIR'],
       gradle_path: ENV['GRADLE_WRAPPER']
     )
+
+    # Path to merged manifest for the variant
+    merged_manifest_path = File.join(
+      ENV['PROJECT_DIR'],
+      "app/build/intermediates/merged_manifests/#{gradle_build_type}/AndroidManifest.xml"
+    )
+    UI.message("📋 Checking AD_ID permission in merged manifest: #{merged_manifest_path}")
+
+    unless File.exist?(merged_manifest_path) && File.read(merged_manifest_path).include?("com.google.android.gms.permission.AD_ID")
+      UI.user_error!("❌ AD_ID permission missing in merged AndroidManifest.xml!")
+    end
 
     # Path to AAB file
     aab_path = File.join(
