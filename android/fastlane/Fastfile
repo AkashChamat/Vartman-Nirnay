@@ -37,13 +37,17 @@ platform :android do
     )
 
     # Path to merged manifest for the variant
-    merged_manifest_path = File.join(
+    merged_manifest_dir = File.join(
       ENV['PROJECT_DIR'],
-      "app/build/intermediates/merged_manifests/#{gradle_build_type}/AndroidManifest.xml"
+      "app/build/intermediates/merged_manifests/#{gradle_build_type}"
     )
+
+    # Look for the actual manifest in process*Manifest folder
+    merged_manifest_path = Dir.glob("#{merged_manifest_dir}/process*Manifest/AndroidManifest.xml").first
     UI.message("📋 Checking AD_ID permission in merged manifest: #{merged_manifest_path}")
 
-    unless File.exist?(merged_manifest_path) && File.read(merged_manifest_path).include?("com.google.android.gms.permission.AD_ID")
+    unless merged_manifest_path && File.exist?(merged_manifest_path) &&
+           File.read(merged_manifest_path).include?("com.google.android.gms.permission.AD_ID")
       UI.user_error!("❌ AD_ID permission missing in merged AndroidManifest.xml!")
     end
 
