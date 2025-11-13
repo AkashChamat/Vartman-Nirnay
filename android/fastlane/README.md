@@ -29,7 +29,7 @@ Deploy to Internal Testing
 [bundle exec] fastlane android alpha
 ```
 
-Deploy to Alpha Testing
+Deploy to Alpha
 
 ### android beta
 
@@ -37,7 +37,7 @@ Deploy to Alpha Testing
 [bundle exec] fastlane android beta
 ```
 
-Deploy to Beta Testing
+Deploy to Beta
 
 ### android production
 
@@ -46,30 +46,6 @@ Deploy to Beta Testing
 ```
 
 Deploy to Production
-
-### android promote_internal_to_alpha
-
-```sh
-[bundle exec] fastlane android promote_internal_to_alpha
-```
-
-Promote Internal → Alpha
-
-### android promote_alpha_to_beta
-
-```sh
-[bundle exec] fastlane android promote_alpha_to_beta
-```
-
-Promote Alpha → Beta
-
-### android promote_beta_to_production
-
-```sh
-[bundle exec] fastlane android promote_beta_to_production
-```
-
-Promote Beta → Production
 
 ----
 

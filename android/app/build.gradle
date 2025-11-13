@@ -5,7 +5,7 @@ apply plugin: "com.facebook.react"
 def enableHermes = true
 def jscFlavor = 'org.webkit:android-jsc:+'
 
-// SOLUTION: Make hermesEnabled accessible to other modules like react-native-reanimated
+// Make hermesEnabled accessible to other modules
 project.ext.react = [
     enableHermes: enableHermes,
     hermesEnabled: enableHermes,
@@ -13,43 +13,28 @@ project.ext.react = [
     bundleInRelease: true
 ]
 
-/**
- * This is the configuration block to customize your React Native Android app.
- * By default you don't need to apply any configuration, just uncomment the lines you need.
- */
-react {
-    // React Native bundling options (optional and usually left as default)
-}
-
-/**
- * Set this to true to Run Proguard on Release builds to minify the Java bytecode.
- */
 def enableProguardInReleaseBuilds = true
-
 
 android {
     namespace "com.vartmannew"
-    ndkVersion rootProject.ext.ndkVersion
-    buildToolsVersion rootProject.ext.buildToolsVersion
     compileSdk rootProject.ext.compileSdkVersion
+    buildToolsVersion rootProject.ext.buildToolsVersion
 
     defaultConfig {
         applicationId "com.vartmannew"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 12
-        versionName "1.1.1"  
+        versionCode 21
+        versionName "1.1.1"
 
         ndk {
-            // FIXED: Added x86_64 for 16KB page size support
             abiFilters "armeabi-v7a", "arm64-v8a", "x86_64"
         }
 
-        // ADDED: Enable 16KB page size support
+        // Default manifest placeholder
         manifestPlaceholders = [
-            'appAuthenticationPolicy': 'fingerprintAndPasscode'
+            removeAdIdPermission: "keep"
         ]
-        
     }
 
     signingConfigs {
@@ -60,14 +45,13 @@ android {
             keyPassword 'android'
         }
         release {
-            // storeFile file("upload-keystore.jks")
-            // storePassword System.getenv("KEY_STORE_PASSWORD")
-            // keyAlias System.getenv("ALIAS")
-            // keyPassword System.getenv("KEY_PASSWORD")
             storeFile file(MYAPP_UPLOAD_STORE_FILE)
             storePassword MYAPP_UPLOAD_STORE_PASSWORD
             keyAlias MYAPP_UPLOAD_KEY_ALIAS
             keyPassword MYAPP_UPLOAD_KEY_PASSWORD
+        }
+        internal {
+            initWith(release) // internal builds must be signed with release key for Play Store
         }
     }
 
@@ -80,15 +64,23 @@ android {
             minifyEnabled enableProguardInReleaseBuilds
             shrinkResources false
             proguardFiles getDefaultProguardFile("proguard-android-optimize.txt"),
-            "proguard-rules.pro"
+                    "proguard-rules.pro"
+        }
+        internal {
+            initWith(release)
+            signingConfig signingConfigs.internal
+            // Remove AD_ID permission for internal builds
+            manifestPlaceholders = [
+                removeAdIdPermission: "remove"
+            ]
+            matchingFallbacks = ['release'] // fix variant mismatch
         }
     }
-    
+
     kotlinOptions {
         jvmTarget = "17"
     }
 
-    // Add this for Android Gradle Plugin 8.x compatibility
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_17
         targetCompatibility JavaVersion.VERSION_17
@@ -99,9 +91,6 @@ android {
             useLegacyPackaging = true
             pickFirsts += ['**/*.so']
         }
-   
-
-     // ADDED: Handle duplicate files for 16KB support
         resources {
             excludes += [
                 'META-INF/DEPENDENCIES',
@@ -111,37 +100,29 @@ android {
                 'META-INF/NOTICE.txt'
             ]
         }
-         
         pickFirst '**/libc++_shared.so'
         pickFirst '**/libjsc.so'
         pickFirst '**/libhermes.so'
-    
-    
     }
 
-     // ADDED: Configure bundle for 16KB page size support
     bundle {
-        language {
-            enableSplit = false
-        }
-        density {
-            enableSplit = false
-        }
-        abi {
-            enableSplit = true
-        }
+        language { enableSplit = false }
+        density { enableSplit = false }
+        abi { enableSplit = true }
     }
 }
 
 dependencies {
     implementation platform('com.google.firebase:firebase-bom:32.7.0')
     implementation 'com.google.firebase:firebase-messaging'
-    implementation 'com.google.firebase:firebase-analytics'
-    
+
+    // Firebase Analytics is included only for non-internal builds
+    if (!project.gradle.startParameter.taskNames.any { it.toLowerCase().contains("internal") }) {
+        implementation 'com.google.firebase:firebase-analytics'
+    }
+
     implementation("com.facebook.react:react-android")
     implementation("com.facebook.react:flipper-integration")
-
-    // ADDED: Core AndroidX dependencies for edge-to-edge support
     implementation "androidx.core:core-ktx:1.12.0"
     implementation "androidx.activity:activity-ktx:1.8.2"
 
@@ -152,7 +133,10 @@ dependencies {
     }
 }
 
-apply from: file("../../node_modules/@react-native-community/cli-platform-android/native_modules.gradle");
+// React Native modules
+apply from: file("../../node_modules/@react-native-community/cli-platform-android/native_modules.gradle")
 applyNativeModulesAppBuildGradle(project)
 apply from: "../../node_modules/react-native-vector-icons/fonts.gradle"
+
+// Firebase plugin
 apply plugin: 'com.google.gms.google-services'

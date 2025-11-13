@@ -1,0 +1,26 @@
+source "https://rubygems.org"
+
+# ✅ Ruby version (used by setup-ruby in GitHub Actions)
+ruby ">= 3.0.0"
+
+# 🧩 Core dependencies
+gem "fastlane", ">= 2.228.0"
+
+# ✅ Optional: include abbrev if specifically needed by your custom Fastlane tasks
+gem "abbrev"
+
+# 🚀 Fastlane plugins
+gem "fastlane-plugin-increment_version_code"
+gem "fastlane-plugin-load_json"
+
+# 📦 Additional utilities
+gem "json", "~> 2.6"
+gem "httparty", "~> 0.21"
+gem "multi_xml", "~> 0.6.0"
+gem "colored2", "~> 3.1"
+
+# 🧰 Development and linting (optional)
+group :development do
+  gem "rubocop", "~> 1.50"
+  gem "rubocop-performance", "~> 1.16"
+end
