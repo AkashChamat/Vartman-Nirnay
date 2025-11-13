@@ -6,7 +6,6 @@ apply plugin: 'com.google.gms.google-services' // Firebase plugin
 def enableHermes = true
 def jscFlavor = 'org.webkit:android-jsc:+'
 
-// Make hermesEnabled accessible to other modules
 project.ext.react = [
     enableHermes: enableHermes,
     hermesEnabled: enableHermes,
@@ -32,6 +31,7 @@ android {
             abiFilters "armeabi-v7a", "arm64-v8a", "x86_64"
         }
 
+        // Manifest placeholder to control AD_ID permission
         manifestPlaceholders = [
             removeAdIdPermission: "keep"
         ]
@@ -51,7 +51,7 @@ android {
             keyPassword MYAPP_UPLOAD_KEY_PASSWORD
         }
         internal {
-            initWith(release) // Internal builds signed with release key
+            initWith(release)
         }
     }
 
@@ -69,7 +69,7 @@ android {
             initWith(release)
             signingConfig signingConfigs.internal
             manifestPlaceholders = [
-                removeAdIdPermission: "remove"
+                removeAdIdPermission: "keep" // Ensure AD_ID stays
             ]
             matchingFallbacks = ['release']
         }
@@ -114,7 +114,6 @@ dependencies {
     implementation platform('com.google.firebase:firebase-bom:32.7.0')
     implementation 'com.google.firebase:firebase-messaging'
 
-    // Firebase Analytics is included only for non-internal builds
     if (!project.gradle.startParameter.taskNames.any { it.toLowerCase().contains("internal") }) {
         implementation 'com.google.firebase:firebase-analytics'
     }
@@ -131,7 +130,6 @@ dependencies {
     }
 }
 
-// React Native modules
 apply from: file("../../node_modules/@react-native-community/cli-platform-android/native_modules.gradle")
 applyNativeModulesAppBuildGradle(project)
 apply from: "../../node_modules/react-native-vector-icons/fonts.gradle"

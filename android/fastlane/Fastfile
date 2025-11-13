@@ -7,7 +7,7 @@ platform :android do
   before_all do
     UI.message("🚀 Starting Fastlane deployment process...")
 
-    # Path to Play Store service account JSON (works on Windows/Linux/Mac)
+    # Path to Play Store service account JSON
     ENV['JSON_KEY_PATH'] ||= File.join(__dir__, "play-store-key.json")
     UI.message("Using JSON key: #{ENV['JSON_KEY_PATH']}")
     unless File.exist?(ENV['JSON_KEY_PATH'])
@@ -26,8 +26,14 @@ platform :android do
 
     # Use release variant for internal builds
     gradle_build_type = build_type.downcase == "internal" ? "release" : build_type.downcase
-
     UI.message("Gradle build type: #{gradle_build_type}")
+
+    # Ensure AD_ID permission is included
+    manifest_path = File.join(ENV['PROJECT_DIR'], "app", "src", "main", "AndroidManifest.xml")
+    UI.message("📋 Checking AD_ID permission in manifest: #{manifest_path}")
+    unless File.read(manifest_path).include?("com.google.android.gms.permission.AD_ID")
+      UI.user_error!("❌ AD_ID permission missing in AndroidManifest.xml!")
+    end
 
     # Build the AAB
     gradle(
