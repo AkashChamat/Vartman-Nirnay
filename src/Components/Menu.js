@@ -130,9 +130,10 @@ const Menu = () => {
   const confirmLogout = async () => {
     setLogoutConfirmVisible(false);
     await logout();
+    // Reset to the unauthenticated stack entry (route name used in navigator)
     navigation.reset({
       index: 0,
-      routes: [{name: 'Login'}],
+      routes: [{name: 'LoginScreen'}],
     });
   };
 

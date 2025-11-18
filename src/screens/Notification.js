@@ -94,7 +94,21 @@ const Notification = () => {
           )
         : [];
 
-      setNotifications(filteredNotifications);
+      // Sort notifications so newest (present date) appear first
+      const sortedNotifications = filteredNotifications.slice().sort((a, b) => {
+        const at = a && a.createdDate ? Date.parse(a.createdDate) : NaN;
+        const bt = b && b.createdDate ? Date.parse(b.createdDate) : NaN;
+
+        // Place items with invalid/missing dates at the end
+        if (isNaN(at) && isNaN(bt)) return 0;
+        if (isNaN(at)) return 1;
+        if (isNaN(bt)) return -1;
+
+        // Newest first (descending)
+        return bt - at;
+      });
+
+      setNotifications(sortedNotifications);
     } catch (error) {
       console.error('Error fetching notifications:', error);
       setError(error.message || 'Failed to fetch notifications');

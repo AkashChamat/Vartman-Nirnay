@@ -301,8 +301,15 @@ export const AuthProvider = ({children}) => {
         }
 
         return {success: true};
+      } else if (response && response.message) {
+        // If backend returns a meaningful message (e.g. "Invalid email." or "Invalid password."), show it
+        const serverMsg = response.message || 'Invalid credentials';
+        console.warn('[AUTH] Login failed:', serverMsg);
+        Alert.alert('Login Error', serverMsg);
+        dispatch({type: 'SET_LOADING', isLoading: false});
+        return {success: false, message: serverMsg};
       } else {
-        console.error('[AUTH] Invalid response from server');
+        console.error('[AUTH] Invalid response from server', response);
         Alert.alert('Login Error', 'Invalid response from server');
         dispatch({type: 'SET_LOADING', isLoading: false});
         return {success: false, message: 'Invalid response'};
@@ -327,6 +334,15 @@ export const AuthProvider = ({children}) => {
       // Something else (config, setup issue, etc.)
       else {
         console.error('   - Config:', error.config);
+      }
+
+      // If server returned a JSON body with a message (e.g. Invalid email/password), surface it
+      if (error.response && error.response.data && error.response.data.message) {
+        const serverMsg = error.response.data.message;
+        console.warn('[AUTH] Server login error:', serverMsg);
+        Alert.alert('Login Error', serverMsg);
+        dispatch({type: 'SET_LOADING', isLoading: false});
+        return {success: false, message: serverMsg};
       }
 
       Alert.alert('Login Error', 'Network error or invalid credentials');
